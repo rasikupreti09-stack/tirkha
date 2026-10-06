@@ -1,0 +1,19 @@
+{
+  "name": "tirkha",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @tirkha/web dev",
+    "dev:mobile": "pnpm --filter @tirkha/mobile start",
+    "typecheck": "pnpm -r typecheck",
+    "build:web": "pnpm --filter @tirkha/web build",
+    "check:expo": "pnpm --filter @tirkha/mobile run check:deps",
+    "theme:sync": "node scripts/sync-theme.mjs",
+    "theme:check": "node scripts/sync-theme.mjs --check",
+    "preinstall": "node scripts/sync-theme.mjs"
+  }
+}

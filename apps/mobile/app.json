@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Tirkha",
+    "slug": "tirkha",
+    "scheme": "tirkha",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
