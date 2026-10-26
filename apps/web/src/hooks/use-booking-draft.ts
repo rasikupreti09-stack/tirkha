@@ -10,22 +10,26 @@ import { createBooking } from "../lib/bookings";
 
 function diagnosticJobDetails(prefill: ReturnType<typeof diagnosticBookingPrefillSchema.parse>) {
   const { diagnostic, duration_minutes: duration } = prefill;
-  const lines = [
-    "AI-assisted service triage summary (not a confirmed diagnosis)",
+  return [
+    "AI-assisted triage only; not a confirmed diagnosis or price.",
     `Reported symptom: ${diagnostic.symptom}`,
-    `Suggested issue: ${diagnostic.issue_title} (${diagnostic.confidence} confidence)`,
-    `Assistant note: ${diagnostic.explanation}`,
-    diagnostic.severity ? `Customer-reported severity: ${diagnostic.severity}` : "",
-    diagnostic.area ? `Area / landmark mentioned in chat: ${diagnostic.area}` : "",
-    diagnostic.preferred_time ? `Preferred time mentioned in chat: ${diagnostic.preferred_time} (confirm the exact Nepal date and time below)` : "",
+    `Limited finding: ${diagnostic.issue_title}`,
+    diagnostic.diagnostic_code ? `Supported triage route: ${diagnostic.diagnostic_code} (not a confirmed component failure)` : "",
+    diagnostic.visual_defect ? `Visible observation: ${diagnostic.visual_defect}` : "",
+    diagnostic.visual_material ? `Visible material: ${diagnostic.visual_material}` : "",
+    diagnostic.visual_mounting ? `Mounting observation: ${diagnostic.visual_mounting}` : "",
+    ...(diagnostic.visual_evidence ?? []).map(entry => `Image evidence: ${entry}`),
+    diagnostic.root_cause_hypothesis ? `Unconfirmed cause to verify: ${diagnostic.root_cause_hypothesis}` : "",
+    `Triage note: ${diagnostic.explanation}`,
+    diagnostic.area ? `Area / landmark: ${diagnostic.area}` : "",
+    diagnostic.preferred_time ? `Preferred time: ${diagnostic.preferred_time} (confirm the exact Nepal date and time below)` : "",
     diagnostic.urgency !== "routine" ? `Triage urgency: ${diagnostic.urgency}` : "",
     diagnostic.safety_note ? `Safety note: ${diagnostic.safety_note}` : "",
-    diagnostic.photo_assessed ? "A photo informed a visual hint only; the image itself is not attached to this booking." : "",
-    diagnostic.catalog_total_paisa != null ? `Catalog reference only: service/labour ${formatNpr(diagnostic.catalog_service_paisa ?? 0)} + visit fee ${formatNpr(diagnostic.catalog_visit_paisa ?? 0)} = ${formatNpr(diagnostic.catalog_total_paisa)}. The booking estimate below is recalculated from the selected professional's hourly rate and chosen duration; parts/materials are excluded and require a separate quote and customer approval.` : `Suggested duration: ${duration} minutes. Parts/materials are not included and require a separate quote and customer approval.`,
-  ].filter(Boolean);
-  return lines.join("\n").slice(0, 2000);
+    diagnostic.photo_assessed ? "A photo informed visual observations only; the image itself is not attached." : "",
+    `Requested appointment duration: ${duration} minutes. Price is quote pending; an on-site inspection and written quote with customer approval are required before repair.`,
+  ].filter(Boolean).join("\n").slice(0, 2000);
 }
-export function useBookingDraft(initialSlug = "") {
+export function useBookingDraft(initialSlug = "", inspectionOnly = false) {
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [categoryId, setCategoryId] = useState("");
   const [professionalId, setProfessionalId] = useState("");
@@ -52,7 +56,7 @@ export function useBookingDraft(initialSlug = "") {
   const selectedProfessional = choices.find((item) => item.profile_id === professionalId);
   let estimate: number | null = null;
   let estimateError = "";
-  try { estimate = estimateLabourPaisa(selectedProfessional?.hourly_rate_paisa ?? null, duration); }
+  try { estimate = inspectionOnly ? null : estimateLabourPaisa(selectedProfessional?.hourly_rate_paisa ?? null, duration); }
   catch { estimateError = "Choose a shorter duration; this estimate exceeds the supported amount."; }
 
   useEffect(() => {
@@ -123,8 +127,8 @@ export function useBookingDraft(initialSlug = "") {
       if (!address.success) throw new Error(address.error.issues[0].message);
       if (!address.data.map_pin) throw new Error("Drop a pin on the map so nearby Heroes can receive the exact service location.");
       const payload = {
-        category_id: categoryId, professional_id: professionalId || null,
-        service_address: locationToAddress(address.data), job_details: details,
+        category_id: categoryId, professional_id: inspectionOnly ? null : professionalId || null,
+        service_address: locationToAddress(address.data), job_details: inspectionOnly ? `${details.slice(0, 1750)}\n\nInspection request: no AI price or repair approval. Require an on-site inspection and written quote before work.` : details,
         latitude: address.data.map_pin?.latitude ?? null, longitude: address.data.map_pin?.longitude ?? null,
         resolved_address: address.data.map_pin?.resolved_address ?? null,
         diagnostic_summary: diagnostic ? ((diagnostic.diagnostic_code ? `[${diagnostic.diagnostic_code}] ` : "") + diagnostic.issue_title + ": " + diagnostic.explanation + (diagnostic.symptom ? " Customer reports: " + diagnostic.symptom : "")).slice(0, 1200) : undefined,
@@ -165,5 +169,8 @@ export function useBookingDraft(initialSlug = "") {
     submit,
   };
 }
+
+
+
 
 
