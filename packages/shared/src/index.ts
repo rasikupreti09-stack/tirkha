@@ -2,8 +2,16 @@ import { z } from "zod";
 import tokens from "./tokens.json";
 
 export { tokens };
-export const userRoleSchema = z.enum(["customer", "professional", "admin"]);
-export type UserRole = z.infer<typeof userRoleSchema>;
+export * from "./schemas";
+export * from "./auth";
+export * from "./discovery";
+export * from "./booking-workflow";
+export * from "./booking-realtime";
+export * from "./payments";
+export * from "./chat";
+export * from "./environment";
+export * from "./geocoding";
+export type { Database } from "./database";
 
 export const publicSupabaseEnvSchema = z.object({
   url: z.url().refine((value) => new URL(value).protocol === "https:", {
@@ -12,3 +20,10 @@ export const publicSupabaseEnvSchema = z.object({
   anonKey: z.string().min(1, "Supabase anon key is required"),
 });
 export type PublicSupabaseEnv = z.infer<typeof publicSupabaseEnvSchema>;
+
+export * from "./phone-auth";
+
+
+export * from "./catalog";
+
+export * from "./home-diagnostics";

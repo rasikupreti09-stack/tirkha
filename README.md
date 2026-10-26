@@ -169,4 +169,4 @@ Expo/React Native versions were selected from the published Expo template; the l
 - Peer dependency check reported no issues.
 - Git ignore rules cover both applications' real environment files.
 
-No Supabase credentials were provided, so no live backend connection was tested. Native binaries have not been built, signed, submitted, or tested on physical devices. Git is initial
+No Supabase credentials were provided, so no live backend connection was tested. Native binaries have not been built, signed, submitted, or tested on physical devices. Git is initialized with no commits or remote.

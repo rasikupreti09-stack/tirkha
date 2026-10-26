@@ -1,6 +1,161 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 @import "tw-animate-css";
 @import "@tirkha/shared/theme.css";
+@import "../components/marketplace.css";
+
+.leaflet-tooltip.tirkha-landmark-label { border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 6px; background: #f8fafc; color: #0f172a; box-shadow: 0 2px 8px #0f172a22; font: 600 10px/1.2 Arial, sans-serif; }
+.leaflet-marker-icon.tirkha-smooth-marker,
+.leaflet-marker-icon.tirkha-fleet-marker { transition: transform 0.8s linear; will-change: transform; }
+.tirkha-pin-pulse { transform-box: fill-box; transform-origin: center; animation: tirkha-pin-pulse 1.8s ease-out infinite; }
+@keyframes tirkha-pin-pulse { 0% { opacity: .9; transform: scale(.7); } 75%, 100% { opacity: 0; transform: scale(1.8); } }
+@media (prefers-reduced-motion: reduce) { .tirkha-pin-pulse { animation: none; } }
+.tirkha-map-frame { position: relative; overflow: hidden; border-radius: inherit; }
+.tirkha-vector-map.leaflet-container { background: #f3f5ef; color: #20372f; font-family: inherit; }
+.tirkha-vector-map .leaflet-pane { z-index: 200; }
+.tirkha-vector-map .leaflet-overlay-pane svg { overflow: visible; }
+.leaflet-tooltip.tirkha-place-label,
+.leaflet-tooltip.tirkha-city-label { border: 0; background: transparent; box-shadow: none; color: #536a62; font: 750 9px/1.2 Arial, sans-serif; letter-spacing: .105em; text-shadow: 0 1px 0 #f8faf2, 1px 0 0 #f8faf2, 0 -1px 0 #f8faf2, -1px 0 0 #f8faf2; white-space: nowrap; }
+.leaflet-tooltip.tirkha-city-label { color: #27594e; font-size: 11px; font-weight: 850; letter-spacing: .18em; }
+.leaflet-tooltip.tirkha-place-label { color: #60736d; font-size: 8px; letter-spacing: .06em; }
+.leaflet-tooltip.tirkha-place-label::before,
+.leaflet-tooltip.tirkha-city-label::before { display: none; }
+.tirkha-region-control { z-index: 650; margin: 12px 12px 0 0; }
+.tirkha-region-pills { display: flex; flex-wrap: wrap; gap: 5px; max-width: min(480px, calc(100vw - 90px)); }
+.tirkha-region-pills button { display: inline-flex; min-height: 34px; align-items: center; gap: 6px; border: 1px solid #e1e8df; border-radius: 999px; padding: 0 10px; background: #fffffff2; color: #435950; box-shadow: 0 3px 12px #153b2914; cursor: pointer; font: 650 10px/1 Arial, sans-serif; backdrop-filter: blur(12px); }
+.tirkha-region-pills button:hover { border-color: #89ba9f; background: #f2fbf5; color: #14634f; }
+.tirkha-region-pills button:focus-visible { outline: 3px solid #34d399; outline-offset: 2px; }
+.tirkha-region-dot { width: 6px; height: 6px; border-radius: 50%; background: #33816d; box-shadow: 0 0 0 3px #33816d1c; }
+.tirkha-map-signature { position: absolute; z-index: 500; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 8px; border: 1px solid #ffffffd9; border-radius: 13px; padding: 8px 11px 8px 8px; background: #fffffff0; color: #20372f; box-shadow: 0 5px 20px #17362b1c; pointer-events: auto; backdrop-filter: blur(12px); }
+.tirkha-map-signature-mark { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 10px; background: #126b56; color: #fff; font: 750 21px/1 Georgia, serif; }
+.tirkha-map-signature > span:nth-child(2) { display: flex; flex-direction: column; gap: 2px; }
+.tirkha-map-signature strong { color: #255448; font-size: 9px; letter-spacing: .13em; }
+.tirkha-map-signature small { color: #718179; font-size: 9px; }
+.tirkha-map-signature a { color: #7b8982; font-size: 7px; text-decoration: underline; text-underline-offset: 2px; }
+.leaflet-tooltip.tirkha-road-label { border: 1px solid #e2e9e1; border-radius: 7px; padding: 4px 7px; background: #fffffff2; color: #425d50; box-shadow: 0 3px 10px #18372b16; font: 650 10px/1.2 Arial, sans-serif; }
+.tirkha-map-live-dot { width: 6px; height: 6px; margin-left: 5px; border-radius: 50%; background: #31a776; box-shadow: 0 0 0 4px #31a7761d; }
+.tirkha-map-page { min-height: 100vh; padding: 24px clamp(18px, 5vw, 76px) 28px; background: radial-gradient(ellipse at 77% 10%, #e9f1e8 0, transparent 38%), #f8f8f3; color: #1b2e27; }
+.tirkha-map-page-header { display: flex; max-width: 1480px; align-items: center; justify-content: space-between; margin: 0 auto; }
+.tirkha-map-back { display: inline-flex; align-items: center; gap: 8px; color: #21483c; font-size: 14px; font-weight: 700; text-decoration: none; }
+.tirkha-map-back span { font-family: Georgia, serif; font-size: 16px; }
+.tirkha-map-page-status { display: inline-flex; align-items: center; gap: 8px; color: #678077; font-size: 9px; font-weight: 800; letter-spacing: .14em; }
+.tirkha-map-page-status i { width: 7px; height: 7px; border-radius: 50%; background: #278765; box-shadow: 0 0 0 4px #2787651b; }
+.tirkha-map-page-intro { max-width: 1480px; margin: 50px auto 28px; }
+.tirkha-map-page-kicker, .tirkha-map-panel-overline { margin: 0 0 12px; color: #28745d; font-size: 9px; font-weight: 850; letter-spacing: .18em; }
+.tirkha-map-page-intro h1 { margin: 0; color: #203a30; font-family: Georgia, "Times New Roman", serif; font-size: clamp(34px, 5vw, 60px); font-weight: 500; letter-spacing: -.055em; line-height: .99; }
+.tirkha-map-page-intro h1 em { color: #377561; font-weight: 400; }
+.tirkha-map-page-intro > p:last-child { max-width: 520px; margin: 14px 0 0; color: #6a7a71; font-size: 13px; line-height: 1.7; }
+.tirkha-map-explorer { display: grid; max-width: 1480px; min-height: 580px; grid-template-columns: minmax(0, 1fr) 340px; margin: 0 auto; overflow: hidden; border: 1px solid #dce5dc; border-radius: 23px; background: #fff; box-shadow: 0 24px 70px #19372b12; }
+.tirkha-map-explorer-canvas { min-width: 0; border-right: 1px solid #e4eae3; }
+.tirkha-map-explorer-canvas .tirkha-map-frame { height: 100%; min-height: 580px; border-radius: 0; }
+.tirkha-map-explorer-canvas .leaflet-container { min-height: 580px; }
+.tirkha-map-explorer-panel { display: flex; flex-direction: column; padding: 27px 23px 22px; }
+.tirkha-map-explorer-panel h2 { margin: 0; color: #203a30; font-family: Georgia, "Times New Roman", serif; font-size: 30px; font-weight: 500; letter-spacing: -.04em; line-height: 1.06; }
+.tirkha-map-explorer-panel > div:first-child > p { margin: 11px 0 0; color: #75847c; font-size: 12px; line-height: 1.65; }
+.tirkha-map-city-list { display: grid; gap: 7px; margin: 23px 0 17px; }
+.tirkha-map-city-list button { display: flex; min-height: 58px; align-items: center; gap: 11px; border: 1px solid #e8ede7; border-radius: 13px; padding: 8px 11px; background: #fbfcf9; color: #29483b; cursor: pointer; text-align: left; transition: transform .16s ease, border-color .16s ease, background .16s ease; }
+.tirkha-map-city-list button:hover { transform: translateY(-1px); border-color: #b5d7c3; background: #f2faf4; }
+.tirkha-map-city-list button:focus-visible { outline: 3px solid #34d399; outline-offset: 2px; }
+.tirkha-map-city-number { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border-radius: 9px; background: #eaf4ec; color: #3d735d; font: 700 10px/1 Arial, sans-serif; }
+.tirkha-map-city-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+.tirkha-map-city-copy strong { color: #304d40; font-size: 12px; }
+.tirkha-map-city-copy small { overflow: hidden; color: #86938b; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.tirkha-map-city-arrow { color: #83958a; font-size: 15px; }
+.tirkha-map-location-readout { display: flex; align-items: center; gap: 11px; margin-top: auto; border: 1px solid #e3eee5; border-radius: 13px; padding: 12px; background: #f4faf5; }
+.tirkha-map-location-pulse { width: 9px; height: 9px; flex: 0 0 9px; border-radius: 50%; background: #218367; box-shadow: 0 0 0 5px #2183671b; }
+.tirkha-map-location-readout > span:last-child { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.tirkha-map-location-readout small { color: #6a897a; font-size: 8px; font-weight: 800; letter-spacing: .1em; }
+.tirkha-map-location-readout strong { overflow: hidden; color: #365448; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.tirkha-map-panel-footnote { margin: 12px 0 0; color: #9aa49d; font-size: 9px; line-height: 1.6; }
+.tirkha-map-explorer-loading { display: grid; min-height: 580px; place-items: center; background: #f3f5ef; color: #63756c; font-size: 13px; }
+.tirkha-map-page-footer { display: flex; max-width: 1480px; justify-content: space-between; gap: 20px; margin: 14px auto 0; color: #86938b; font-size: 9px; }
+@media (max-width: 1000px) {
+  .tirkha-map-explorer { grid-template-columns: minmax(0, 1fr) 300px; }
+  .tirkha-map-explorer-panel { padding: 24px 17px 18px; }
+}
+@media (max-width: 760px) {
+  .tirkha-map-page { padding: 17px 14px 20px; }
+  .tirkha-map-page-intro { margin: 38px auto 22px; }
+  .tirkha-map-explorer { display: flex; flex-direction: column; }
+  .tirkha-map-explorer-canvas { order: 1; border-right: 0; border-bottom: 1px solid #e4eae3; }
+  .tirkha-map-explorer-canvas .tirkha-map-frame,
+  .tirkha-map-explorer-canvas .leaflet-container { height: min(66vh, 540px) !important; min-height: 390px; }
+  .tirkha-map-explorer-panel { order: 2; padding: 22px 18px 18px; }
+  .tirkha-map-city-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tirkha-map-city-list button { min-height: 62px; gap: 7px; padding: 7px; }
+  .tirkha-map-city-number { width: 26px; height: 26px; flex-basis: 26px; }
+  .tirkha-map-city-copy small { font-size: 8px; }
+  .tirkha-map-page-footer { flex-direction: column; gap: 6px; }
+  .tirkha-region-control { margin: 10px 10px 0 0; }
+  .tirkha-region-pills { max-width: calc(100vw - 65px); }
+  .tirkha-region-pills button { min-height: 30px; padding: 0 8px; font-size: 9px; }
+}
+.tirkha-map-brand { position: absolute; z-index: 500; right: 12px; bottom: 26px; display: flex; flex-direction: column; gap: 2px; max-width: calc(100% - 24px); border: 1px solid #ffffffb8; border-radius: 8px; padding: 7px 10px; background: #ffffffed; color: #1f2937; box-shadow: 0 2px 10px #0f172a22; pointer-events: none; }
+.tirkha-map-brand strong { font-size: 12px; line-height: 1.2; }
+.tirkha-map-brand span { color: #475569; font-size: 10px; line-height: 1.2; }
+.tirkha-tracking-shell { overflow: hidden; border: 1px solid #dbe6df; border-radius: 22px; background: #fff; box-shadow: 0 18px 48px #16382b12; }
+.tirkha-tracking-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 24px; background: radial-gradient(ellipse at 0 0, #dff7e9 0, #f5fbf7 43%, #fff 100%); }
+.tirkha-tracking-kicker { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; color: #047857; font-size: 10px; font-weight: 800; letter-spacing: .16em; }
+.tirkha-tracking-header h3 { margin: 0; color: #14251e; font-size: clamp(20px, 2.5vw, 27px); font-weight: 750; letter-spacing: -.035em; line-height: 1.1; }
+.tirkha-tracking-subtitle { margin: 7px 0 0; color: #64746c; font-size: 13px; }
+.tirkha-live-indicator { position: relative; display: inline-block; width: 9px; height: 9px; flex: 0 0 9px; border-radius: 999px; background: #94a3b8; }
+.tirkha-live-indicator.is-live { background: #10b981; box-shadow: 0 0 0 4px #10b98122; }
+.tirkha-live-indicator.is-live::after { position: absolute; inset: -4px; border: 1px solid #10b98180; border-radius: inherit; content: ""; animation: tirkha-live-ping 1.8s ease-out infinite; }
+@keyframes tirkha-live-ping { 0% { transform: scale(.75); opacity: .8; } 100% { transform: scale(1.9); opacity: 0; } }
+.tirkha-connection-badge { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; border: 1px solid #dbe5df; border-radius: 999px; padding: 9px 12px; background: #fff; color: #53665d; font-size: 11px; font-weight: 700; box-shadow: 0 2px 8px #153b2910; }
+.tirkha-connection-badge.is-live { border-color: #bcebd0; color: #047857; }
+.tirkha-tracking-map-wrap { position: relative; padding: 0 14px; background: #f8faf9; }
+.tirkha-trust-note { position: absolute; z-index: 600; bottom: 14px; left: 26px; display: flex; align-items: center; gap: 7px; border: 1px solid #ffffffc9; border-radius: 999px; padding: 8px 11px; background: #fffffff0; color: #475b51; box-shadow: 0 3px 12px #14251e18; font-size: 10px; font-weight: 650; pointer-events: none; }
+.tirkha-trust-note svg { color: #047857; }
+.tirkha-map-surface { overflow: hidden; border: 1px solid #dbe5df; border-radius: 18px; background: #f8faf9; }
+.tirkha-live-map-canvas { height: clamp(350px, 54vw, 510px); border-radius: 17px; background: #e8f0eb; }
+.tirkha-live-map-canvas .leaflet-container { background: #e8f0eb; font-family: Arial, sans-serif; }
+.tirkha-map-live-chip { position: absolute; z-index: 500; top: 14px; left: 14px; display: flex; align-items: center; gap: 10px; min-width: 176px; border: 1px solid #ffffffd4; border-radius: 13px; padding: 10px 13px; background: #fffffff2; box-shadow: 0 5px 18px #10291e1c; pointer-events: none; }
+.tirkha-map-live-chip > span:last-child { display: flex; flex-direction: column; gap: 3px; }
+.tirkha-map-live-chip strong { color: #263b31; font-size: 10px; letter-spacing: .08em; }
+.tirkha-map-live-chip small { color: #728078; font-size: 10px; }
+.tirkha-map-actions { z-index: 600; margin: 14px 14px 0 0; }
+.tirkha-map-actions .leaflet-control { overflow: hidden; margin: 0; border: 1px solid #e2e8e4; border-radius: 12px; box-shadow: 0 5px 16px #10291e1c; }
+.tirkha-map-actions button { display: grid; width: 42px; height: 42px; place-items: center; border: 0; background: #fff; color: #284438; cursor: pointer; }
+.tirkha-map-actions button:hover { background: #ecfdf5; color: #047857; }
+.tirkha-map-actions button:focus-visible { outline: 3px solid #34d399; outline-offset: -3px; }
+.tirkha-route-summary { display: flex; align-items: center; gap: 20px; min-height: 92px; padding: 16px 20px; border-top: 1px solid #e4ece6; background: linear-gradient(110deg, #fff 15%, #f2faf5 100%); }
+.tirkha-route-arrival { display: flex; align-items: center; gap: 12px; min-width: 168px; }
+.tirkha-route-icon { display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; border: 1px solid #cdebd9; border-radius: 13px; background: #eaf8ef; color: #047857; }
+.tirkha-route-arrival > span:last-child, .tirkha-route-distance { display: flex; flex-direction: column; gap: 4px; }
+.tirkha-route-arrival small { color: #6c7c73; font-size: 9px; font-weight: 800; letter-spacing: .1em; }
+.tirkha-route-arrival strong { color: #173a2b; font-size: 24px; letter-spacing: -.04em; line-height: 1; }
+.tirkha-route-distance { min-width: 0; flex: 1; border-left: 1px solid #dce8df; padding-left: 20px; }
+.tirkha-route-distance strong { color: #31463b; font-size: 13px; }
+.tirkha-route-distance small { overflow: hidden; color: #77867e; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.tirkha-navigation-button { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; flex: 0 0 auto; border: 0; border-radius: 12px; padding: 0 16px; background: #047857; color: #fff; font-size: 12px; font-weight: 750; text-decoration: none; box-shadow: 0 5px 14px #0478572c; transition: background .15s ease, transform .15s ease; }
+.tirkha-navigation-button:hover { transform: translateY(-1px); background: #065f46; }
+.tirkha-navigation-button:focus-visible { outline: 3px solid #6ee7b7; outline-offset: 3px; }
+.tirkha-navigation-button.is-disabled { background: #64748b; box-shadow: none; }
+.tirkha-tracking-footer { display: flex; align-items: center; gap: 26px; padding: 14px 24px 17px; border-top: 1px solid #edf2ee; background: #fff; }
+.tirkha-tracking-metric { display: flex; align-items: center; gap: 9px; }
+.tirkha-metric-icon { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 10px; background: #f0f8f3; color: #23825d; }
+.tirkha-tracking-metric > span:last-child { display: flex; flex-direction: column; gap: 2px; }
+.tirkha-tracking-metric small { color: #7a8980; font-size: 10px; }
+.tirkha-tracking-metric strong { color: #2d4036; font-size: 12px; }
+.tirkha-gps-updated { margin: 0 0 0 auto; color: #88958d; font-size: 10px; text-align: right; }
+@media (max-width: 620px) {
+  .tirkha-tracking-shell { border-radius: 17px; }
+  .tirkha-tracking-header { align-items: flex-start; padding: 18px 16px; }
+  .tirkha-tracking-subtitle { max-width: 250px; font-size: 11px; }
+  .tirkha-connection-badge { max-width: 145px; gap: 5px; padding: 8px; font-size: 9px; }
+  .tirkha-connection-badge svg { width: 13px; }
+  .tirkha-tracking-map-wrap { padding: 0 8px; }
+  .tirkha-live-map-canvas { height: min(58vh, 440px); min-height: 340px; }
+  .tirkha-route-summary { flex-wrap: wrap; gap: 12px; padding: 13px; }
+  .tirkha-route-arrival { min-width: 135px; flex: 1; }
+  .tirkha-route-distance { min-width: 100%; order: 3; border-left: 0; border-top: 1px solid #e5ece7; padding: 10px 0 0; }
+  .tirkha-route-distance small { white-space: normal; }
+  .tirkha-navigation-button { min-width: 120px; padding: 0 12px; }
+  .tirkha-tracking-footer { flex-wrap: wrap; gap: 13px 18px; padding: 13px 16px; }
+  .tirkha-gps-updated { width: 100%; margin: 0; text-align: left; }
+  .tirkha-trust-note { bottom: 12px; left: 18px; padding: 7px 9px; font-size: 9px; }
+}
 
 @theme inline {
   --color-background: var(--background);

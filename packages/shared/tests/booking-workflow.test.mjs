@@ -1,0 +1,118 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { PGlite } from "@electric-sql/pglite";
+import { nepalDateTimeToIso, estimateLabourPaisa, bookingActions } from "../src/booking-workflow.ts";
+import { workflowBookingSchema, bookingRequestSchema } from "../src/schemas.ts";
+
+test("Nepal appointments round-trip and money remains integer paisa", () => {
+  assert.equal(nepalDateTimeToIso("2027-01-01", "00:15"), "2026-12-31T18:30:00.000Z");
+  for (const [date, time] of [["2027-02-29", "10:00"], ["2027-01-01", "24:00"], ["2027-13-01", "10:00"]]) assert.throws(() => nepalDateTimeToIso(date, time));
+  assert.equal(estimateLabourPaisa(12551, 30), 6276);
+  assert.equal(estimateLabourPaisa(0, 60), 0);
+  assert.equal(estimateLabourPaisa(null, 60), null);
+  assert.throws(() => estimateLabourPaisa(2147483647, 480));
+  assert.throws(() => estimateLabourPaisa(100, 45));
+});
+
+test("booking RPCs enforce ownership, pricing, retries, job transitions and read boundaries", async (t) => {
+  const db = new PGlite();
+  t.after(() => db.close());
+  await db.exec(`
+    create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
+    create schema auth;
+    create table auth.users(id uuid primary key, raw_user_meta_data jsonb);
+    create function auth.uid() returns uuid language sql stable as
+      'select nullif(current_setting(''request.jwt.claim.sub'', true), '''')::uuid';
+    grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;
+  `);
+  for (const file of ["01_initial_schema.sql", "02_auth_signup_roles.sql", "03_service_discovery.sql", "04_booking_workflow.sql"]) {
+    await db.exec(await readFile(new URL("../supabase/migrations/" + file, import.meta.url), "utf8"));
+  }
+  await db.exec(await readFile(new URL("../supabase/seed.sql", import.meta.url), "utf8"));
+  const categories = (await db.query("select id, slug from public.service_categories")).rows;
+  const plumbing = categories.find((c) => c.slug === "plumbing").id;
+  const electrical = categories.find((c) => c.slug === "electrical").id;
+  const [customer, stranger, pro, competitor, pending, electrician] = Array.from({ length: 6 }, () => randomUUID());
+  for (const id of [customer, stranger, pro, competitor, pending, electrician]) {
+    await db.query("insert into auth.users values ($1, $2)", [id, { requested_role: [customer, stranger].includes(id) ? "customer" : "professional", full_name: "Test Account" }]);
+  }
+  await db.query("update public.professional_profiles set verification_status='verified',hourly_rate_paisa=12551 where profile_id <> $1", [pending]);
+  for (const id of [pro, competitor, pending, electrician]) await db.query("insert into public.professional_service_categories values ($1,$2)", [id, id === electrician ? electrical : plumbing]);
+  const actor = async (id) => { await db.exec("reset role"); await db.query("select set_config('request.jwt.claim.sub',$1,false)", [id]); await db.exec("set role authenticated"); };
+  const appointment = new Date(Date.now() + 7 * 86400000).toISOString();
+  const payload = (overrides = {}) => ({ request_id: randomUUID(), category_id: plumbing, professional_id: null, service_address: "Lalitpur, Ward 4, Near Patan Dhoka", job_details: "Repair leaking kitchen tap", scheduled_at: appointment, duration_minutes: 30, ...overrides });
+  const create = async (p) => (await db.query("select row_to_json(b) data from public.create_booking_request($1,$2,$3,$4,$5,$6,$7) b", [p.request_id,p.category_id,p.professional_id,p.service_address,p.job_details,p.scheduled_at,p.duration_minutes])).rows[0].data;
+  const change = async (id, action) => (await db.query("select row_to_json(b) data from public.transition_booking($1,$2) b", [id, action])).rows[0].data;
+  const rejects = async (promise, message) => assert.rejects(promise, (e) => e.message === message);
+  await actor(customer);
+  const assignedInput = payload({ professional_id: pro });
+  bookingRequestSchema.parse(assignedInput);
+  assert.equal(bookingRequestSchema.safeParse({ ...assignedInput, total_price_paisa: 1 }).success, false);
+  const assigned = await create(assignedInput);
+  workflowBookingSchema.parse(assigned);
+  assert.equal(assigned.customer_id, customer);
+  assert.equal(assigned.status, "requested");
+  assert.equal(assigned.total_price_paisa, 6276);
+  assert.equal(assigned.hourly_rate_paisa, 12551);
+  assert.equal((await create(assignedInput)).id, assigned.id);
+  await rejects(create({ ...assignedInput, job_details: "Changed description" }), "REQUEST_ID_REUSED");
+  await rejects(create(payload({ professional_id: pending })), "PROFESSIONAL_UNAVAILABLE");
+  await rejects(create(payload({ professional_id: electrician })), "PROFESSIONAL_UNAVAILABLE");
+  await rejects(create(payload({ scheduled_at: "2000-01-01T00:00:00Z" })), "INVALID_SCHEDULE");
+  await rejects(create(payload({ duration_minutes: 45 })), "INVALID_DURATION");
+  await rejects(create(payload({ job_details: "tiny" })), "INVALID_JOB_DETAILS");
+  await assert.rejects(db.query("insert into public.bookings(customer_id,category_id,service_address,scheduled_at) values ($1,$2,'Patan',$3)", [customer,plumbing,appointment]), (e) => e.code === "42501");
+  await assert.rejects(db.query("update public.bookings set status='completed'"), (e) => e.code === "42501");
+  await assert.rejects(db.query("select * from public.booking_request_keys"), (e) => e.code === "42501");
+  const openInput = payload();
+  const open = await create(openInput);
+  assert.equal(open.total_price_paisa, null);
+  const cancel = await create(payload());
+  assert.deepEqual(bookingActions(cancel,customer,"customer",false), ["cancelled"]);
+  await actor(stranger);
+  assert.equal((await db.query("select * from public.bookings")).rows.length, 0);
+  await rejects(change(cancel.id,"cancelled"), "BOOKING_UNAVAILABLE");
+  await actor(pending);
+  assert.equal((await db.query("select * from public.bookings")).rows.length, 0);
+  await rejects(change(open.id,"accepted"), "VERIFIED_PROFESSIONAL_REQUIRED");
+  await actor(electrician);
+  assert.equal((await db.query("select * from public.bookings")).rows.length, 0);
+  await rejects(change(open.id,"accepted"), "CATEGORY_NOT_SUPPORTED");
+  await actor(customer);
+  assert.equal((await change(cancel.id,"cancelled")).status,"cancelled");
+  assert.equal((await change(cancel.id,"cancelled")).status,"cancelled");
+  await actor(pro);
+  await rejects(create(payload()), "CUSTOMER_REQUIRED");
+  assert.equal((await db.query("select * from public.bookings")).rows.length,2);
+  await rejects(change(assigned.id,"completed"),"INVALID_TRANSITION");
+  const accepted = await change(assigned.id,"accepted");
+  assert.equal(accepted.status,"accepted");
+  assert.equal((await change(assigned.id,"accepted")).status,"accepted");
+  assert.deepEqual(bookingActions(accepted,pro,"professional",true),["on_the_way"]);
+  await rejects(change(open.id,"accepted"),"SCHEDULE_CONFLICT");
+  await actor(customer);
+  await rejects(change(assigned.id,"cancelled"),"REQUEST_NO_LONGER_PENDING");
+  await actor(competitor);
+  await rejects(change(assigned.id,"accepted"),"BOOKING_UNAVAILABLE");
+  const claimed = await change(open.id,"accepted");
+  assert.equal(claimed.professional_id,competitor);
+  assert.equal(claimed.total_price_paisa,null);
+  await actor(pro);
+  await rejects(change(open.id,"accepted"),"BOOKING_UNAVAILABLE");
+  assert.equal((await db.query("select * from public.bookings where id=$1",[open.id])).rows.length,0);
+  assert.equal((await change(assigned.id,"in_progress")).status,"in_progress");
+  assert.equal((await change(assigned.id,"completed")).status,"completed");
+  assert.equal((await change(assigned.id,"completed")).status,"completed");
+  await rejects(change(assigned.id,"in_progress"),"INVALID_TRANSITION");
+  await actor(customer);
+  assert.equal((await create(openInput)).status,"accepted");
+  assert.equal((await db.query("select * from public.booking_status_history where booking_id=$1",[assigned.id])).rows.length,4);
+  assert.equal((await db.query("select * from public.booking_status_history where booking_id=$1",[cancel.id])).rows.length,2);
+  await actor(stranger);
+  assert.equal((await db.query("select * from public.booking_status_history")).rows.length,0);
+  await db.exec("reset role; set role anon");
+  await assert.rejects(create(payload()),(e)=>e.code === "42501");
+  await db.exec("reset role");
+});

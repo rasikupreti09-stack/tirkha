@@ -1,0 +1,646 @@
+[
+  {
+    "id": "sink-leak",
+    "title": "Under-sink leak repair",
+    "category_slug": "plumbing",
+    "category_name": "Plumbing",
+    "icon": "wrench",
+    "vertical": "Home repairs",
+    "base_paisa": 45000,
+    "visit_paisa": 15000,
+    "duration_minutes": 45,
+    "description": "Stop the drip. Get your kitchen back.",
+    "included": [
+      "Inspection of one accessible under-sink leak",
+      "Seal and tighten existing joints",
+      "Leak test and cleanup"
+    ],
+    "excluded": [
+      "Replacement parts",
+      "Concealed pipes or wall cutting"
+    ],
+    "keywords": [
+      "leak",
+      "tap",
+      "sink",
+      "water",
+      "plumber",
+      "pipe",
+      "drip"
+    ],
+    "image": "/images/plumbing.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 0
+  },
+  {
+    "id": "pipe-fitting",
+    "title": "Pipe fitting & repair",
+    "category_slug": "plumbing",
+    "category_name": "Plumbing",
+    "icon": "wrench",
+    "vertical": "Home repairs",
+    "base_paisa": 85000,
+    "visit_paisa": 15000,
+    "duration_minutes": 90,
+    "description": "Reliable connections for everyday water flow.",
+    "included": [
+      "Fit or repair up to two accessible joints",
+      "Pressure check",
+      "Work-area cleanup"
+    ],
+    "excluded": [
+      "Pipes and fittings",
+      "Excavation or concealed lines"
+    ],
+    "keywords": [
+      "pipe",
+      "fitting",
+      "plumbing",
+      "drain",
+      "water"
+    ],
+    "image": "/images/plumbing.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 1
+  },
+  {
+    "id": "tap-installation",
+    "title": "Tap installation",
+    "category_slug": "plumbing",
+    "category_name": "Plumbing",
+    "icon": "wrench",
+    "vertical": "Home repairs",
+    "base_paisa": 55000,
+    "visit_paisa": 15000,
+    "duration_minutes": 60,
+    "description": "A fresh fitting, installed with care.",
+    "included": [
+      "Remove one existing tap",
+      "Install customer-supplied tap",
+      "Water-flow and leak test"
+    ],
+    "excluded": [
+      "New tap and connectors",
+      "Countertop drilling"
+    ],
+    "keywords": [
+      "tap",
+      "faucet",
+      "install",
+      "plumbing",
+      "bathroom"
+    ],
+    "image": "/images/plumbing.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 2
+  },
+  {
+    "id": "electrical-wiring",
+    "title": "Wiring & fault checks",
+    "category_slug": "electrical",
+    "category_name": "Electrical",
+    "icon": "zap",
+    "vertical": "Home repairs",
+    "base_paisa": 75000,
+    "visit_paisa": 15000,
+    "duration_minutes": 90,
+    "description": "Make your everyday connections work better.",
+    "included": [
+      "Inspect one electrical circuit",
+      "Repair accessible loose connections",
+      "Safety and function check"
+    ],
+    "excluded": [
+      "New wire or breakers",
+      "Full-house rewiring"
+    ],
+    "keywords": [
+      "wire",
+      "wiring",
+      "electric",
+      "spark",
+      "power",
+      "socket",
+      "fault"
+    ],
+    "image": "/images/electrical.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 3
+  },
+  {
+    "id": "switchboard",
+    "title": "Switchboard repair",
+    "category_slug": "electrical",
+    "category_name": "Electrical",
+    "icon": "zap",
+    "vertical": "Home repairs",
+    "base_paisa": 50000,
+    "visit_paisa": 15000,
+    "duration_minutes": 60,
+    "description": "Small switches. A big difference.",
+    "included": [
+      "Inspect one switchboard",
+      "Replace customer-supplied switch or socket",
+      "Function test"
+    ],
+    "excluded": [
+      "Replacement switchboard or parts",
+      "Wall repairs"
+    ],
+    "keywords": [
+      "switch",
+      "switchboard",
+      "socket",
+      "electrical"
+    ],
+    "image": "/images/electrical.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 4
+  },
+  {
+    "id": "inverter",
+    "title": "Inverter setup",
+    "category_slug": "electrical",
+    "category_name": "Electrical",
+    "icon": "zap",
+    "vertical": "Home repairs",
+    "base_paisa": 150000,
+    "visit_paisa": 15000,
+    "duration_minutes": 120,
+    "description": "A considered setup for backup power.",
+    "included": [
+      "Connect one compatible inverter and battery",
+      "Check accessible connections",
+      "Usage handover"
+    ],
+    "excluded": [
+      "Inverter and battery",
+      "New circuits or distribution board"
+    ],
+    "keywords": [
+      "inverter",
+      "battery",
+      "backup",
+      "electricity"
+    ],
+    "image": "/images/electrical.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 5
+  },
+  {
+    "id": "carpentry",
+    "title": "Door & furniture fixes",
+    "category_slug": "carpentry",
+    "category_name": "Carpentry",
+    "icon": "hammer",
+    "vertical": "Home repairs",
+    "base_paisa": 90000,
+    "visit_paisa": 15000,
+    "duration_minutes": 90,
+    "description": "Give well-loved furniture a little attention.",
+    "included": [
+      "Adjust one door or cabinet",
+      "Tighten accessible hinges",
+      "Minor alignment and cleanup"
+    ],
+    "excluded": [
+      "Timber and new hardware",
+      "Custom furniture or polishing"
+    ],
+    "keywords": [
+      "carpenter",
+      "wood",
+      "door",
+      "furniture",
+      "hinge",
+      "cabinet"
+    ],
+    "image": "/images/carpentry.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 6
+  },
+  {
+    "id": "deep-clean",
+    "title": "Deep home cleaning",
+    "category_slug": "home-cleaning",
+    "category_name": "Home Cleaning",
+    "icon": "sparkles",
+    "vertical": "Cleaning",
+    "base_paisa": 450000,
+    "visit_paisa": 15000,
+    "duration_minutes": 240,
+    "description": "A cleaner home. A clearer head.",
+    "included": [
+      "Floors and reachable surfaces up to 800 sq ft",
+      "Kitchen exterior surfaces",
+      "One bathroom deep clean"
+    ],
+    "excluded": [
+      "Exterior windows or high-access work",
+      "Pest removal and hazardous waste"
+    ],
+    "keywords": [
+      "clean",
+      "home",
+      "house",
+      "kitchen",
+      "bathroom",
+      "dust",
+      "mop"
+    ],
+    "image": "/images/cleaning.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 7
+  },
+  {
+    "id": "tank-clean",
+    "title": "Water tank & reservoir cleaning",
+    "category_slug": "water-tank-cleaning",
+    "category_name": "Water Tank Cleaning",
+    "icon": "droplets",
+    "vertical": "Cleaning",
+    "base_paisa": 250000,
+    "visit_paisa": 15000,
+    "duration_minutes": 180,
+    "description": "Care for the water your home depends on.",
+    "included": [
+      "Accessible tank inspection up to 1000 litres",
+      "Drain, scrub and rinse",
+      "Before-and-after condition report"
+    ],
+    "excluded": [
+      "Structural repair or water-quality certification",
+      "Confined-space entry into unsafe wells or inar"
+    ],
+    "keywords": [
+      "water",
+      "tank",
+      "inar",
+      "underground",
+      "reservoir",
+      "sanitation"
+    ],
+    "image": "/images/tank.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 8
+  },
+  {
+    "id": "sofa-clean",
+    "title": "Sofa & carpet shampooing",
+    "category_slug": "sofa-carpet-cleaning",
+    "category_name": "Sofa & Carpet",
+    "icon": "sofa",
+    "vertical": "Cleaning",
+    "base_paisa": 220000,
+    "visit_paisa": 15000,
+    "duration_minutes": 120,
+    "description": "Freshen up your favourite corner.",
+    "included": [
+      "Vacuum and shampoo one three-seat sofa OR carpet up to 80 sq ft",
+      "Fabric spot test",
+      "Drying guidance"
+    ],
+    "excluded": [
+      "Guaranteed removal of permanent stains",
+      "Silk, leather or delicate specialty treatment"
+    ],
+    "keywords": [
+      "sofa",
+      "carpet",
+      "shampoo",
+      "stain",
+      "upholstery"
+    ],
+    "image": "/images/cleaning.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 9
+  },
+  {
+    "id": "doctor-home",
+    "title": "Doctor consultation at home",
+    "category_slug": "doctor-at-home",
+    "category_name": "Doctor at Home",
+    "icon": "stethoscope",
+    "vertical": "Care & wellness",
+    "base_paisa": 200000,
+    "visit_paisa": 15000,
+    "duration_minutes": 45,
+    "description": "A non-emergency consultation, at home.",
+    "included": [
+      "One scheduled general consultation",
+      "History and basic clinical assessment",
+      "Written follow-up advice"
+    ],
+    "excluded": [
+      "Emergency care",
+      "Medicines, lab tests or procedures"
+    ],
+    "keywords": [
+      "doctor",
+      "medical",
+      "consultation",
+      "health",
+      "fever",
+      "illness"
+    ],
+    "image": "/images/doctor.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 10
+  },
+  {
+    "id": "home-nurse",
+    "title": "Home nurse & elderly care",
+    "category_slug": "home-nursing",
+    "category_name": "Home Nursing",
+    "icon": "heart",
+    "vertical": "Care & wellness",
+    "base_paisa": 180000,
+    "visit_paisa": 15000,
+    "duration_minutes": 120,
+    "description": "Thoughtful assistance for everyday care.",
+    "included": [
+      "Two-hour scheduled care visit",
+      "Daily living and mobility support",
+      "Family handover"
+    ],
+    "excluded": [
+      "Medicines and consumables",
+      "Overnight care or unprescribed procedures"
+    ],
+    "keywords": [
+      "nurse",
+      "elderly",
+      "elder",
+      "senior",
+      "care",
+      "caregiver"
+    ],
+    "image": "/images/nurse.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 11
+  },
+  {
+    "id": "physiotherapy",
+    "title": "At-home physiotherapy",
+    "category_slug": "physiotherapy",
+    "category_name": "Physiotherapy",
+    "icon": "activity",
+    "vertical": "Care & wellness",
+    "base_paisa": 150000,
+    "visit_paisa": 15000,
+    "duration_minutes": 60,
+    "description": "Support for movement, one session at a time.",
+    "included": [
+      "One scheduled assessment and guided session",
+      "Individual movement plan",
+      "Follow-up exercise guidance"
+    ],
+    "excluded": [
+      "Equipment purchases",
+      "Medical diagnosis or emergency injury care"
+    ],
+    "keywords": [
+      "physio",
+      "physiotherapy",
+      "movement",
+      "rehabilitation",
+      "back",
+      "joint"
+    ],
+    "image": "/images/physio.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 12
+  },
+  {
+    "id": "salon-home",
+    "title": "Home salon & spa",
+    "category_slug": "home-salon",
+    "category_name": "Home Salon & Spa",
+    "icon": "scissors",
+    "vertical": "Care & wellness",
+    "base_paisa": 120000,
+    "visit_paisa": 15000,
+    "duration_minutes": 90,
+    "description": "A little time, just for you.",
+    "included": [
+      "One basic haircut OR express facial",
+      "Single-use hygiene essentials",
+      "Setup and cleanup"
+    ],
+    "excluded": [
+      "Hair colour, advanced treatments or add-ons",
+      "Medical skin treatments"
+    ],
+    "keywords": [
+      "salon",
+      "spa",
+      "haircut",
+      "facial",
+      "hair",
+      "beauty",
+      "massage"
+    ],
+    "image": "/images/salon.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 13
+  },
+  {
+    "id": "astrology-session",
+    "title": "Astrology consultation",
+    "category_slug": "astrology",
+    "category_name": "Astrology",
+    "icon": "sparkles",
+    "vertical": "Everyday support",
+    "base_paisa": 120000,
+    "visit_paisa": 15000,
+    "duration_minutes": 60,
+    "description": "A private, scheduled conversation about your questions and traditions.",
+    "included": [
+      "One private 60-minute consultation",
+      "Discussion of one selected topic",
+      "Written summary of the session"
+    ],
+    "excluded": [
+      "Guaranteed predictions or outcomes",
+      "Medical, legal or financial advice"
+    ],
+    "keywords": [
+      "astrologer",
+      "astrology",
+      "kundali",
+      "horoscope",
+      "birth chart",
+      "jyotish"
+    ],
+    "image": "/images/astrology.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur"
+    ],
+    "active": true,
+    "sort_order": 14
+  },
+  {
+    "id": "home-tutor",
+    "title": "At-home tutoring session",
+    "category_slug": "home-tutoring",
+    "category_name": "Home Tutoring",
+    "icon": "book-open",
+    "vertical": "Everyday support",
+    "base_paisa": 100000,
+    "visit_paisa": 15000,
+    "duration_minutes": 60,
+    "description": "One focused learning session at home, matched to a subject and grade.",
+    "included": [
+      "One 60-minute session for one learner",
+      "Lesson planning around a shared topic",
+      "Brief parent or learner handover"
+    ],
+    "excluded": [
+      "Exam result guarantees",
+      "Printed books, travel outside selected areas"
+    ],
+    "keywords": [
+      "tutor",
+      "tutoring",
+      "teacher",
+      "homework",
+      "math",
+      "science",
+      "english",
+      "tuition"
+    ],
+    "image": "/images/tutor.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur"
+    ],
+    "active": true,
+    "sort_order": 15
+  },
+  {
+    "id": "home-decorator",
+    "title": "Home decoration consultation",
+    "category_slug": "home-decorators",
+    "category_name": "Home Decorators",
+    "icon": "sparkles",
+    "vertical": "Everyday support",
+    "base_paisa": 250000,
+    "visit_paisa": 15000,
+    "duration_minutes": 120,
+    "description": "A practical in-home consultation for a room refresh or small gathering.",
+    "included": [
+      "One two-hour in-home consultation",
+      "Layout and colour suggestions for one room",
+      "Written shopping and setup checklist"
+    ],
+    "excluded": [
+      "Furniture or decor purchases",
+      "Event execution, construction or electrical work"
+    ],
+    "keywords": [
+      "decorator",
+      "decoration",
+      "interior",
+      "event decor",
+      "party",
+      "styling",
+      "room"
+    ],
+    "image": "/images/decor.jpg",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 16
+  }
+]

@@ -7,9 +7,14 @@
     "node": ">=24.0.0 <25"
   },
   "scripts": {
+    "dev:mock": "pnpm --filter @tirkha/shared dev:mock",
     "dev:web": "pnpm --filter @tirkha/web dev",
     "dev:mobile": "pnpm --filter @tirkha/mobile start",
     "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @tirkha/shared test",
+    "test:pilot": "pnpm --filter @tirkha/shared test:pilot",
+    "check:env": "node scripts/check-environment.mjs",
+    "check:env:pilot": "node scripts/check-environment.mjs --full",
     "build:web": "pnpm --filter @tirkha/web build",
     "check:expo": "pnpm --filter @tirkha/mobile run check:deps",
     "theme:sync": "node scripts/sync-theme.mjs",
@@ -17,3 +22,5 @@
     "preinstall": "node scripts/sync-theme.mjs"
   }
 }
+
+

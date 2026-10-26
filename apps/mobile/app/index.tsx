@@ -1,10 +1,9 @@
-import { Text, View } from "react-native";
+import { Redirect } from "expo-router";
+import { ActivityIndicator, View } from "react-native";
+import { tokens } from "@tirkha/shared";
+import { useAuth } from "../providers/auth-provider";
 export default function Home() {
-  return <View className="flex-1 bg-background p-6">
-    <Text className="text-3xl font-semibold text-primary">Tirkha</Text>
-    <Text className="mt-4 text-base text-muted-foreground">Home and daily assistance in Nepal.</Text>
-    <View className="mt-8 rounded-lg border border-border bg-card p-6">
-      <Text className="text-foreground">The mobile workspace is ready.</Text>
-    </View>
-  </View>;
+  const { session, loading } = useAuth();
+  if (loading) return <View className="flex-1 items-center justify-center bg-background"><ActivityIndicator color={tokens.colors.primary} accessibilityLabel="Loading account" /></View>;
+  return <Redirect href={session ? "/(app)/dashboard" : "/(auth)/login"} />;
 }
