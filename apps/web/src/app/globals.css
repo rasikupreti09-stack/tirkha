@@ -184,3 +184,5 @@
   * { @apply border-border; }
   body { @apply bg-background text-foreground; font-family: Arial, sans-serif; }
 }
+
+.mk-diagnostic-choices{display:grid;gap:8px;margin:10px 0 4px}.mk-diagnostic-choices button{display:flex;align-items:flex-start;gap:8px;width:100%;padding:10px 12px;border:1px solid #dbe5df;border-radius:12px;background:#fff;color:#1f2937;text-align:left;line-height:1.4;cursor:pointer}.mk-diagnostic-choices button:hover,.mk-diagnostic-choices button:focus-visible{border-color:#10b981;background:#f0fdf4;outline:2px solid transparent}.mk-diagnostic-choices button b{color:#047857;flex:none}

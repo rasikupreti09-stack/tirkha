@@ -127,7 +127,7 @@ export function useBookingDraft(initialSlug = "") {
         service_address: locationToAddress(address.data), job_details: details,
         latitude: address.data.map_pin?.latitude ?? null, longitude: address.data.map_pin?.longitude ?? null,
         resolved_address: address.data.map_pin?.resolved_address ?? null,
-        diagnostic_summary: diagnostic ? (diagnostic.issue_title + ": " + diagnostic.explanation + (diagnostic.symptom ? " Customer reports: " + diagnostic.symptom : "")).slice(0, 1200) : undefined,
+        diagnostic_summary: diagnostic ? ((diagnostic.diagnostic_code ? `[${diagnostic.diagnostic_code}] ` : "") + diagnostic.issue_title + ": " + diagnostic.explanation + (diagnostic.symptom ? " Customer reports: " + diagnostic.symptom : "")).slice(0, 1200) : undefined,
         diagnostic_severity: diagnostic?.severity || undefined,
         diagnostic_urgency: diagnostic?.urgency,
         suggested_parts: diagnostic?.suggested_parts ?? [],
