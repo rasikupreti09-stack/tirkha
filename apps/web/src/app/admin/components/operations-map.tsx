@@ -11,7 +11,7 @@ type HeroLocation = {
   speed_mps: number | null; battery_level: number | null; active_booking_id: string | null;
   status: "online_idle" | "en_route" | "on_service"; updated_at: string;
 };
-type Hero = { id: string; name: string };
+type Hero = { id: string; name: string; phone: string | null };
 export type OperationsJob = { id: string; professional_id: string | null; customer_name: string; service_name: string; status: BookingStatus; address: string };
 const VALLEY_CENTER: [number, number] = [27.7172, 85.324];
 
@@ -59,11 +59,12 @@ export function OperationsMap({ heroes, locations, jobs }: { heroes: Hero[]; loc
           const location = locationById.get(hero.id);
           const online = !!location && Date.now() - Date.parse(location.updated_at) <= 90_000;
           const label = !online ? "Offline" : location.status === "en_route" ? "En Route" : location.status === "on_service" ? "On Service" : "Online (Idle)";
-          return <li key={hero.id}>
-            <button type="button" onClick={() => setSelectedId(hero.id)} className={`w-full p-3 text-left hover:bg-muted ${selectedId === hero.id ? "bg-muted" : ""}`}>
+          return <li key={hero.id} className="flex items-center gap-2 pr-3">
+            <button type="button" onClick={() => setSelectedId(hero.id)} className={`min-w-0 flex-1 p-3 text-left hover:bg-muted ${selectedId === hero.id ? "bg-muted" : ""}`}>
               <span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{hero.name}</span><span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${online ? "bg-emerald-100 text-emerald-900" : "bg-slate-100 text-slate-600"}`}>{label}</span></span>
               {location && <span className="mt-1 block text-xs text-muted-foreground">Last ping {relativePing(location.updated_at)}</span>}
             </button>
+            {hero.phone && <a href={`tel:${hero.phone}`} aria-label={`Call ${hero.name}`} className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border text-emerald-800 hover:bg-emerald-50"><span aria-hidden="true">☎</span></a>}
           </li>;
         })}
         {heroes.length === 0 && <li className="p-5 text-sm text-muted-foreground">No verified Heroes are registered yet.</li>}

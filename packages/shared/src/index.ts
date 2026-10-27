@@ -27,3 +27,5 @@ export * from "./phone-auth";
 export * from "./catalog";
 
 export * from "./home-diagnostics";
+
+export * from "./hero-portal";

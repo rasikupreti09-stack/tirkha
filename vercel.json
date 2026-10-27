@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/finance/archive", "schedule": "0 3 * * *" }
+  ]
+}

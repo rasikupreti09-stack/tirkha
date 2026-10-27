@@ -32,6 +32,10 @@ export const professionalProfileSchema = z.object({
   verification_status: verificationStatusSchema,
   rating: z.number().min(0).max(5).multipleOf(0.01),
   hourly_rate_paisa: paisaSchema.nullable(),
+  trade_code: z.enum(["PLUMBING", "ELECTRICAL"]).nullable(),
+  operational_zone: z.enum(["Kathmandu", "Lalitpur", "Bhaktapur", "Baneshwor", "Thamel", "Kirtipur"]).nullable(),
+  citizenship_document_path: z.string().nullable(),
+  suspended_at: timestampSchema.nullable(),
 });
 
 export const serviceCategorySchema = z.object({

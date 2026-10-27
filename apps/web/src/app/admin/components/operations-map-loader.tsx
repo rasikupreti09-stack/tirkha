@@ -11,4 +11,4 @@ export type OperationsHeroLocation = {
 export const OperationsMap = dynamic(() => import("./operations-map").then(module => module.OperationsMap), {
   ssr: false,
   loading: () => <div className="grid min-h-[480px] place-items-center rounded-xl border bg-muted text-sm text-muted-foreground" role="status">Loading Valley fleet map…</div>,
-}) as (props: { heroes: { id: string; name: string }[]; locations: OperationsHeroLocation[]; jobs: OperationsJob[] }) => React.ReactElement;
+}) as (props: { heroes: { id: string; name: string; phone: string | null }[]; locations: OperationsHeroLocation[]; jobs: OperationsJob[] }) => React.ReactElement;
