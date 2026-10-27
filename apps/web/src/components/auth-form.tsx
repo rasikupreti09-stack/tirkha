@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { createPhoneAuth, isDemoPhoneAuthNumber, phoneAuthError, phoneSchema, phoneSignupSchema, verifyDemoPhoneAuthCode, DEMO_PHONE_AUTH_NUMBERS, DEMO_PHONE_AUTH_CODE } from "@tirkha/shared";
+import { createPhoneAuth, isDemoPhoneAuthNumber, phoneAuthError, phoneSchema, phoneSignupSchema, verifyDemoPhoneAuthCode, DEMO_PHONE_AUTH_NUMBERS, DEMO_PHONE_AUTH_CODE, normalizeNepalPhoneNumber } from "@tirkha/shared";
 import { useAuth } from "./auth-provider";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
 const demoAuthEnabled = process.env.NEXT_PUBLIC_TIRKHA_DEMO_AUTH === "1" || (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_TIRKHA_LOCAL_MOCK === "1");
 const demoPhoneAllowlist = (process.env.NEXT_PUBLIC_TIRKHA_DEMO_PHONES || DEMO_PHONE_AUTH_NUMBERS.join(","))
-  .split(",").map(value => value.trim()).filter(Boolean);
+  .split(",").map(value => normalizeNepalPhoneNumber(value)).filter(Boolean);
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const signup = mode === "signup";
@@ -28,7 +28,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [returnTo, setReturnTo] = useState("/dashboard");
   const [returnToReady, setReturnToReady] = useState(false);
   const lock = useRef(false);
-  const isDemoPhone = isDemoPhoneAuthNumber(phone, demoAuthEnabled, demoPhoneAllowlist);
+  const normalizedPhone = normalizeNepalPhoneNumber(phone);
+  const isDemoPhone = isDemoPhoneAuthNumber(normalizedPhone, demoAuthEnabled, demoPhoneAllowlist);
   const canUseDemo = demoAuthEnabled;
   useEffect(() => { const timer = setInterval(() => setCooldown(n => Math.max(0, n - 1)), 1000); return () => clearInterval(timer); }, []);
 
@@ -36,24 +37,24 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     if (lock.current || (!verify && cooldown > 0)) return;
     lock.current = true; setBusy(true); setError("");
     try {
-      phoneSchema.parse(phone);
+      const canonicalPhone = phoneSchema.parse(normalizedPhone);
       if (!verify && signup) phoneSignupSchema.parse({ full_name: name, role });
       if (isDemoPhone) {
         if (!verify) {
           setSent(true); setDemoCodeSent(true); setToken(""); setCooldown(0);
           return;
         }
-        if (!verifyDemoPhoneAuthCode(phone, token, demoAuthEnabled, demoPhoneAllowlist)) {
+        if (!verifyDemoPhoneAuthCode(canonicalPhone, token, demoAuthEnabled, demoPhoneAllowlist)) {
           throw new Error(`For this demo number, enter ${DEMO_PHONE_AUTH_CODE}.`);
         }
         const demoRole = signup ? role : returnTo.startsWith("/hero/") ? "professional" : "customer";
-        demoSignIn(phone, demoRole, name || "Tirkha Demo User");
+        demoSignIn(canonicalPhone, demoRole, name || "Tirkha Demo User");
         return;
       }
       if (!client) throw new Error("Supabase phone authentication is not configured. Enable the local demo option or configure Supabase.");
       const auth = createPhoneAuth(client);
-      const result = verify ? await auth.verifyPhoneOtp(phone, token)
-        : await auth.signInWithPhone(phone, signup ? { full_name: name, role } : undefined);
+      const result = verify ? await auth.verifyPhoneOtp(canonicalPhone, token)
+        : await auth.signInWithPhone(canonicalPhone, signup ? { full_name: name, role } : undefined);
       if (result.error) throw result.error;
       if (!verify) { setSent(true); setDemoCodeSent(false); setToken(""); setCooldown(60); }
     } catch (failure) {
@@ -64,10 +65,16 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
   const router = useRouter();
   useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get("next");
-    if (requested?.startsWith("/") && !requested.startsWith("//")) {
-      setReturnTo(requested);
-      if (!signup && requested.startsWith("/hero/")) setRole("professional");
+    const encoded = new URL(window.location.href).searchParams.get("next");
+    let requested = encoded;
+    if (requested) { try { requested = decodeURIComponent(requested); } catch { requested = null; } }
+    if (requested?.startsWith("/") && !requested.startsWith("//") && !requested.includes("\\")) {
+      const safeTarget = new URL(requested, window.location.origin);
+      if (safeTarget.origin === window.location.origin) {
+        const localPath = safeTarget.pathname + safeTarget.search + safeTarget.hash;
+        setReturnTo(localPath);
+        if (!signup && safeTarget.pathname.startsWith("/hero/")) setRole("professional");
+      }
     }
     setReturnToReady(true);
   }, [signup]);

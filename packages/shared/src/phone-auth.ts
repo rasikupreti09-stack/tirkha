@@ -9,9 +9,18 @@ export const phoneSignupSchema = z.object({
 export const DEMO_PHONE_AUTH_NUMBERS = ["+9779800000000", "+9779812345678"] as const;
 export const DEMO_PHONE_AUTH_CODE = "123456";
 
+/** Canonicalize supported Nepal mobile formats before validation or auth requests. */
+export function normalizeNepalPhoneNumber(phone: string): string {
+  const compact = phone.trim().replace(/[\s()-]/g, "");
+  if (/^9[0-9]{9}$/.test(compact)) return `+977${compact}`;
+  if (/^9779[0-9]{9}$/.test(compact)) return `+${compact}`;
+  return compact;
+}
+
 /** Demo OTP is opt-in and restricted to explicitly configured test identities. */
 export function isDemoPhoneAuthNumber(phone: string, enabled: boolean, allowedNumbers: readonly string[] = DEMO_PHONE_AUTH_NUMBERS): boolean {
-  return enabled && phoneSchema.safeParse(phone).success && allowedNumbers.includes(phone);
+  const normalized = normalizeNepalPhoneNumber(phone);
+  return enabled && phoneSchema.safeParse(normalized).success && allowedNumbers.some(value => normalizeNepalPhoneNumber(value) === normalized);
 }
 export function verifyDemoPhoneAuthCode(phone: string, token: string, enabled: boolean, allowedNumbers?: readonly string[]): boolean {
   return isDemoPhoneAuthNumber(phone, enabled, allowedNumbers) && token === DEMO_PHONE_AUTH_CODE;
@@ -23,13 +32,13 @@ type PhoneAuthClient = { auth: {
 } };
 export async function signInWithPhone(client: PhoneAuthClient, phone: string, signup?: z.infer<typeof phoneSignupSchema>) {
   const profile = signup ? phoneSignupSchema.parse(signup) : undefined;
-  return client.auth.signInWithOtp({ phone: phoneSchema.parse(phone), options: {
+  return client.auth.signInWithOtp({ phone: phoneSchema.parse(normalizeNepalPhoneNumber(phone)), options: {
     shouldCreateUser: !!profile,
     ...(profile ? { data: { full_name: profile.full_name, requested_role: profile.role } } : {}),
   } });
 }
 export async function verifyPhoneOtp(client: PhoneAuthClient, phone: string, token: string) {
-  return client.auth.verifyOtp({ phone: phoneSchema.parse(phone), token: phoneOtpSchema.parse(token), type: "sms" });
+  return client.auth.verifyOtp({ phone: phoneSchema.parse(normalizeNepalPhoneNumber(phone)), token: phoneOtpSchema.parse(token), type: "sms" });
 }
 export function createPhoneAuth(client: PhoneAuthClient) {
   return {
