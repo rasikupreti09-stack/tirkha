@@ -34,7 +34,7 @@ export type Database = {
     Views: { [_ in never]: never };
     Functions: {
       get_booking_contact: { Args: { p_booking_id: string }; Returns: { full_name: string | null; phone: string }[] };
-      submit_hero_registration: { Args: { p_full_name: string; p_phone: string; p_trade_code: "PLUMBING" | "ELECTRICAL" | "BEAUTICIAN" | "APPLIANCE_TECHNICIAN"; p_operational_zone: "Kathmandu" | "Lalitpur" | "Bhaktapur" | "Baneshwor" | "Thamel" | "Kirtipur"; p_document_path: string }; Returns: VerificationStatus };
+      submit_hero_registration: { Args: { p_full_name: string; p_phone: string; p_trade_code: "PLUMBING" | "ELECTRICAL" | "APPLIANCE_TECHNICIAN" | "BEAUTICIAN" | "PAINTER" | "CLEANER" | "HANDYMAN"; p_operational_zone: "Kathmandu" | "Lalitpur" | "Bhaktapur" | "Baneshwor" | "Thamel" | "Kirtipur"; p_document_path: string }; Returns: VerificationStatus };
       admin_set_hero_status: { Args: { p_profile_id: string; p_status: "verified" | "rejected" | "suspended" }; Returns: undefined };
       hero_zone_matches_booking: { Args: { p_professional_id: string; p_address: string }; Returns: boolean };
       submit_professional_job_quote: { Args: { p_booking_id: string; p_labor_paisa: number; p_materials_paisa: number; p_materials_breakdown: string; p_scope: string }; Returns: ProfessionalJobQuote };
@@ -71,9 +71,3 @@ export type Database = {
     CompositeTypes: { [_ in never]: never };
   };
 };
-
-
-
-
-
-

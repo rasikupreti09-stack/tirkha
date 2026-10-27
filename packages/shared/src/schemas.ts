@@ -32,8 +32,8 @@ export const professionalProfileSchema = z.object({
   verification_status: verificationStatusSchema,
   rating: z.number().min(0).max(5).multipleOf(0.01),
   hourly_rate_paisa: paisaSchema.nullable(),
-  trade_code: z.enum(["PLUMBING", "ELECTRICAL", "BEAUTICIAN", "APPLIANCE_TECHNICIAN"]).nullable(),
-  trade_category: z.enum(["PLUMBING", "ELECTRICAL", "BEAUTICIAN", "APPLIANCE_TECHNICIAN"]).nullable().optional(),
+  trade_code: z.enum(["PLUMBING", "ELECTRICAL", "APPLIANCE_TECHNICIAN", "BEAUTICIAN", "PAINTER", "CLEANER", "HANDYMAN"]).nullable(),
+  trade_category: z.enum(["PLUMBING", "ELECTRICAL", "APPLIANCE_TECHNICIAN", "BEAUTICIAN", "PAINTER", "CLEANER", "HANDYMAN"]).nullable().optional(),
   operational_zone: z.enum(["Kathmandu", "Lalitpur", "Bhaktapur", "Baneshwor", "Thamel", "Kirtipur"]).nullable(),
   citizenship_document_path: z.string().nullable(),
   suspended_at: timestampSchema.nullable(),
@@ -154,5 +154,3 @@ export const bookingRequestSchema = z.strictObject({
   && (value.resolved_address == null || value.latitude != null), "A map address requires a complete coordinate pair.");
 export type WorkflowBooking = z.infer<typeof workflowBookingSchema>;
 export type BookingRequest = z.infer<typeof bookingRequestSchema>;
-
-

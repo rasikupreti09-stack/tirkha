@@ -1,8 +1,9 @@
 "use client";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
-import { configurationMessage, DEMO_PHONE_AUTH_NUMBERS, isDemoPhoneAuthNumber, normalizeNepalPhoneNumber, observeAuthSession, type AuthSnapshot, type Database, type HeroTrade } from "@tirkha/shared";
+import { configurationMessage, DEMO_PHONE_AUTH_NUMBERS, normalizeNepalPhoneNumber, observeAuthSession, type AuthSnapshot, type Database, type HeroTrade } from "@tirkha/shared";
 import { getSupabase } from "@/lib/supabase";
+import { isDemoAuthPhone } from "@/lib/auth";
 
 type DemoRole = "customer" | "professional";
 type DemoIdentity = { phone: string; role: DemoRole; fullName: string; tradeCategory?: HeroTrade; createdAt: string };
@@ -10,13 +11,13 @@ type AuthState = AuthSnapshot<Session> & { client: SupabaseClient<Database> | nu
 const demoStorageKey = "tirkha.demo-auth.v1";
 const activeRoleStorageKey = "tirkha.demo-auth.active-role";
 const demoAuthEnabled = process.env.NEXT_PUBLIC_TIRKHA_DEMO_AUTH === "1" || (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_TIRKHA_LOCAL_MOCK === "1");
-const demoPhoneAllowlist = (process.env.NEXT_PUBLIC_TIRKHA_DEMO_PHONES || DEMO_PHONE_AUTH_NUMBERS.join(","))
-  .split(",").map(value => normalizeNepalPhoneNumber(value)).filter(Boolean);
+const demoPhoneAllowlist = [...new Set([...DEMO_PHONE_AUTH_NUMBERS, ...(process.env.NEXT_PUBLIC_TIRKHA_DEMO_PHONES || "").split(",").map(value => normalizeNepalPhoneNumber(value)).filter(Boolean)])];
 function roleStorageKey(role: DemoRole) { return `${demoStorageKey}:${role}`; }
 function expectedDemoRole(): DemoRole {
   if (typeof window === "undefined") return "customer";
-  const next = new URL(window.location.href).searchParams.get("next");
-  if (window.location.pathname.startsWith("/hero/") || next?.startsWith("/hero/")) return "professional";
+  const url = new URL(window.location.href);
+  const next = url.searchParams.get("next");
+  if (window.location.pathname.startsWith("/hero/") || next?.startsWith("/hero/") || url.searchParams.get("role") === "professional") return "professional";
   try {
     const active = window.sessionStorage.getItem(activeRoleStorageKey);
     if (active === "customer" || active === "professional") return active;
@@ -24,7 +25,7 @@ function expectedDemoRole(): DemoRole {
   return "customer";
 }
 function sessionFromIdentity(identity: DemoIdentity): Session | null {
-  if (!isDemoPhoneAuthNumber(identity.phone, true, demoPhoneAllowlist) || !["customer", "professional"].includes(identity.role)) return null;
+  if (!isDemoAuthPhone(identity.phone, demoAuthEnabled, demoPhoneAllowlist) || !["customer", "professional"].includes(identity.role)) return null;
   const createdAt = new Date(identity.createdAt);
   if (Number.isNaN(createdAt.valueOf()) || Date.now() - createdAt.valueOf() > 7 * 24 * 60 * 60 * 1000) return null;
   const expiresAt = Math.floor(createdAt.valueOf() / 1000) + 7 * 24 * 60 * 60;
@@ -46,7 +47,7 @@ function sessionFromIdentity(identity: DemoIdentity): Session | null {
   };
 }
 function readDemoSession(): Session | null {
-  if (!demoAuthEnabled || typeof window === "undefined") return null;
+  if (typeof window === "undefined") return null;
   try {
     const role = expectedDemoRole();
     const raw = window.localStorage.getItem(roleStorageKey(role));
@@ -55,7 +56,7 @@ function readDemoSession(): Session | null {
       if (session) return session;
     }
     // Read the pre role-scoped key for existing local demo sessions.
-    const legacy = window.localStorage.getItem(demoStorageKey);
+    const legacy = window.localStorage.getItem("tirkha_demo_user") ?? window.localStorage.getItem(demoStorageKey);
     if (!legacy) return null;
     const identity = JSON.parse(legacy) as DemoIdentity;
     return identity.role === role ? sessionFromIdentity(identity) : null;
@@ -82,10 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
   function demoSignIn(phone: string, role: DemoRole, fullName = "Tirkha Demo User", tradeCategory?: HeroTrade) {
     const normalizedPhone = normalizeNepalPhoneNumber(phone);
-    if (!isDemoPhoneAuthNumber(normalizedPhone, demoAuthEnabled, demoPhoneAllowlist)) throw new Error("Demo sign-in is disabled for this number.");
+    if (!isDemoAuthPhone(normalizedPhone, demoAuthEnabled, demoPhoneAllowlist)) throw new Error("Demo sign-in is disabled for this number.");
     const identity: DemoIdentity = { phone: normalizedPhone, role, fullName: fullName.trim() || "Tirkha Demo User", ...(tradeCategory ? { tradeCategory } : {}), createdAt: new Date().toISOString() };
     try {
       window.localStorage.setItem(roleStorageKey(role), JSON.stringify(identity));
+      window.localStorage.setItem("tirkha_demo_user", JSON.stringify(identity));
       window.sessionStorage.setItem(activeRoleStorageKey, role);
     } catch { /* Keep the demo session usable in this tab if browser storage is unavailable. */ }
     const session = sessionFromIdentity(identity);

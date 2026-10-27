@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const HERO_TRADES = ["PLUMBING", "ELECTRICAL", "BEAUTICIAN", "APPLIANCE_TECHNICIAN"] as const;
+export const HERO_TRADES = ["PLUMBING", "ELECTRICAL", "APPLIANCE_TECHNICIAN", "BEAUTICIAN", "PAINTER", "CLEANER", "HANDYMAN"] as const;
 export const HERO_OPERATIONAL_ZONES = ["Kathmandu", "Lalitpur", "Bhaktapur", "Baneshwor", "Thamel", "Kirtipur"] as const;
 export const heroTradeSchema = z.enum(HERO_TRADES);
 export const heroOperationalZoneSchema = z.enum(HERO_OPERATIONAL_ZONES);
@@ -40,7 +40,7 @@ export type CompletedTransaction = {
   timestamp: string;
   hero_id: string;
   hero_name: string;
-  hero_trade: 'PLUMBING' | 'ELECTRICAL' | 'BEAUTICIAN' | 'APPLIANCE_TECHNICIAN';
+  hero_trade: 'PLUMBING' | 'ELECTRICAL' | 'APPLIANCE_TECHNICIAN' | 'BEAUTICIAN' | 'PAINTER' | 'CLEANER' | 'HANDYMAN';
   gross_amount: number;
   commission_rate: number;
   company_income: number;

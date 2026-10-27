@@ -7,6 +7,10 @@ export const phoneSignupSchema = z.object({
   full_name: z.string().trim().min(2, "Enter your full name.").max(100),
   role: z.enum(["customer", "professional"]),
   trade_category: heroTradeSchema.optional(),
+}).superRefine((value, context) => {
+  if (value.role === "professional" && !value.trade_category) {
+    context.addIssue({ code: "custom", path: ["trade_category"], message: "Choose a Hero trade category." });
+  }
 });
 export const DEMO_PHONE_AUTH_NUMBERS = ["+9779800000000", "+9779812345678"] as const;
 export const DEMO_PHONE_AUTH_CODE = "123456";

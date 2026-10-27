@@ -7,7 +7,7 @@ import { HERO_OPERATIONAL_ZONES, HERO_TRADES, heroRegistrationSchema, type HeroO
 import { useAuth } from "@/components/auth-provider";
 
 const zoneLabels: Record<HeroOperationalZone, string> = { Kathmandu: "Kathmandu", Lalitpur: "Lalitpur", Bhaktapur: "Bhaktapur", Baneshwor: "Baneshwor / New Baneshwor", Thamel: "Thamel", Kirtipur: "Kirtipur" };
-const tradeLabels: Record<HeroTrade, string> = { PLUMBING: "Plumber", ELECTRICAL: "Electrician", BEAUTICIAN: "Beautician", APPLIANCE_TECHNICIAN: "Appliance Technician" };
+const tradeLabels: Record<HeroTrade, string> = { PLUMBING: "🚰 Plumber (प्लम्बर)", ELECTRICAL: "⚡ Electrician (इलेक्ट्रीशियन)", APPLIANCE_TECHNICIAN: "🔌 Appliance Repair (उपकरण मर्मत)", BEAUTICIAN: "✨ Beautician (सौन्दर्य सेवा)", PAINTER: "🎨 Painter (पेन्टर)", CLEANER: "🧹 Cleaner / Maid (सरसफाई)", HANDYMAN: "🛠️ General Handyman / Repair (सामान्य मर्मत)" };
 
 type ExistingApplication = { verification_status: "pending" | "verified" | "rejected"; suspended_at: string | null; operational_zone: HeroOperationalZone | null; trade_code: HeroTrade | null; trade_category: HeroTrade | null };
 

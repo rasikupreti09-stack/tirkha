@@ -4,7 +4,7 @@ import { Check, ExternalLink, Eye, Phone, RefreshCw, ShieldAlert, UserRoundCheck
 import { useAuth } from "@/components/auth-provider";
 import type { HeroOperationalZone, HeroTrade, VerificationStatus } from "@tirkha/shared";
 
-const trades: Record<HeroTrade, string> = { PLUMBING: "Plumber", ELECTRICAL: "Electrician", BEAUTICIAN: "Beautician", APPLIANCE_TECHNICIAN: "Appliance Technician" };
+const trades: Record<HeroTrade, string> = { PLUMBING: "Plumber", ELECTRICAL: "Electrician", APPLIANCE_TECHNICIAN: "Appliance Repair", BEAUTICIAN: "Beautician", PAINTER: "Painter", CLEANER: "Cleaner / Maid", HANDYMAN: "General Handyman / Repair" };
 const zones: Record<HeroOperationalZone, string> = { Kathmandu: "Kathmandu", Lalitpur: "Lalitpur", Bhaktapur: "Bhaktapur", Baneshwor: "Baneshwor", Thamel: "Thamel", Kirtipur: "Kirtipur" };
 type KycRow = { profile_id: string; trade_code: HeroTrade | null; trade_category: HeroTrade | null; operational_zone: HeroOperationalZone | null; citizenship_document_path: string | null; verification_status: VerificationStatus; suspended_at: string | null };
 type Contact = { id: string; full_name: string | null; phone: string };
