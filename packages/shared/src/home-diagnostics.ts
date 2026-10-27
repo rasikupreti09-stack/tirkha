@@ -19,6 +19,9 @@ export const HOME_ISSUES = [
   { id: "no-water", title: "No water at the tap", trade: "plumbing", serviceId: null, patterns: [/\b(no|not|zero)\s+(water|pani)\b/, /\b(water|pani)\b.*\b(not coming|stopped|aayena|chaina)\b/] },
   { id: "intermittent-supply", title: "Intermittent household water supply", trade: "plumbing", serviceId: null, patterns: [/\b(intermittent|comes and goes|supply stops|water cuts|pani aaune jane)\b.*\b(water|supply|pani|tap)\b/] },
   { id: "pipe-noise", title: "Banging or vibrating water pipes", trade: "plumbing", serviceId: null, patterns: [/\b(pipe|pipes|water line|water pipes)\b.*\b(banging|vibrating|hammering|knocking|awaz)\b/] },
+  { id: "sewer-odor", title: "Drain or sewer odour", trade: "plumbing", serviceId: "pipe-fitting", patterns: [/\b(sewer|drain|dhal|sink|bathroom|toilet)\b.*\b(odor|odour|smell|gandha)/i, /\b(odor|odour|gandha)\b.*\b(sewer|drain|dhal|sink|bathroom|toilet)/i] },
+  { id: "diverter-valve", title: "Shower diverter or concealed valve concern", trade: "plumbing", serviceId: "pipe-fitting", patterns: [/\b(diverter|concealed shower valve)\b/i] },
+  { id: "seepage", title: "Wall, ceiling or floor seepage", trade: "plumbing", serviceId: "pipe-fitting", patterns: [/\b(seepage|dampness|wet patch|wall leak|ceiling leak)\b/i] },
   { id: "no-power", title: "Power loss in a room or circuit", trade: "electrical", serviceId: "electrical-wiring", patterns: [/\b(no|not|loss of|without)\s+(power|electricity|bijuli)\b/, /\b(batti|bijuli|light)\b.*\b(na-aako|naako|not working|gako|aaena|chaina|chhaina|off)\b/, /बत्ती.*(नआएको|नबलेको|बलेन)|बिजुली.*(गएको|आएन)/u] },
   { id: "flicker", title: "Flickering or dim lights", trade: "electrical", serviceId: "electrical-wiring", patterns: [/\b(flicker|flickering|dim|unstable)\b.*\b(light|power|voltage|batti)\b/] },
   { id: "breaker-trip", title: "Breaker repeatedly trips", trade: "electrical", serviceId: "electrical-wiring", patterns: [/\b(breaker|mcb|fuse|trip|tripping)\b/] },
@@ -46,7 +49,7 @@ export function suggestedPartsForService(serviceId: string): string[] {
   return [...(SUGGESTED_PARTS_BY_SERVICE[serviceId] ?? [])];
 }
 
-export const SUPPORTED_DIAGNOSTIC_CODES = ["PL-TAP-CLOSURE-LEAK", "PL-TAP-BASE-LEAK", "PL-UNDER-SINK-JOINT-LEAK", "PL-EXPOSED-JOINT-LEAK", "PL-EXPOSED-PIPE-LEAK", "PL-ONSITE-INSPECTION", "EL-SITE-INSPECTION", "EL-ONSITE-INSPECTION", "PL-PPR-FUSION-JOINT-LEAK", "PL-GI-THREADED-CORROSION-LEAK", "PL-PVC-SOLVENT-WELD-LEAK", "PL-CONCEALED-WALL-SLAB-LEAK", "PL-SUBMERSIBLE-PUMP-MOTOR-FAULT", "PL-BOOSTER-PUMP-SHORT-CYCLE", "PL-TANK-FLOAT-VALVE-OVERFLOW", "PL-SUMP-CONTAMINATION", "PL-DUAL-FLUSH-CISTERN-FAULT", "PL-MIXER-CARTRIDGE-WEAR", "PL-SOLAR-PRV-DISCHARGE", "PL-GAS-GEYSER-IGNITION-DIAPHRAGM", "PL-RO-MEMBRANE-FOULING", "EL-MCB-THERMAL-SHORT-TRIP", "EL-RCCB-NUISANCE-TRIP", "EL-DB-BUSBAR-LOOSE-TERMINAL", "EL-PHASE-VOLTAGE-DROP", "EL-BURNT-OUTLET-HEAVY-LOAD", "EL-UPS-CHANGEOVER-WIRING", "EL-NEUTRAL-EARTH-LEAKAGE", "EL-WATER-LEVEL-SENSOR-CORROSION"] as const;
+export const SUPPORTED_DIAGNOSTIC_CODES = ["PL-TAP-CLOSURE-LEAK", "PL-TAP-BASE-LEAK", "PL-UNDER-SINK-JOINT-LEAK", "PL-EXPOSED-JOINT-LEAK", "PL-EXPOSED-PIPE-LEAK", "PL-ONSITE-INSPECTION", "EL-SITE-INSPECTION", "EL-ONSITE-INSPECTION", "PL-PPR-FUSION-JOINT-LEAK", "PL-GI-THREADED-CORROSION-LEAK", "PL-PVC-SOLVENT-WELD-LEAK", "PL-CONCEALED-WALL-SLAB-LEAK", "PL-SUBMERSIBLE-PUMP-MOTOR-FAULT", "PL-BOOSTER-PUMP-SHORT-CYCLE", "PL-TANK-FLOAT-VALVE-OVERFLOW", "PL-SUMP-CONTAMINATION", "PL-DUAL-FLUSH-CISTERN-FAULT", "PL-MIXER-CARTRIDGE-WEAR", "PL-SOLAR-PRV-DISCHARGE", "PL-GAS-GEYSER-IGNITION-DIAPHRAGM", "PL-RO-MEMBRANE-FOULING", "PL-SUPPLY-LINE-LEAK", "PL-SUMP-PUMP-NO-WATER", "PL-DRAIN-DHAL-BLOCKAGE", "PL-SEWER-GAS-ODOR", "PL-CONCEALED-DIVERTER-VALVE", "PL-FLUSH-MECHANISM-FAULT", "PL-SEEPAGE-DAMPNESS", "PL-SOLAR-GEYSER-PIPE-LEAK", "EL-MCB-THERMAL-SHORT-TRIP", "EL-RCCB-NUISANCE-TRIP", "EL-DB-BUSBAR-LOOSE-TERMINAL", "EL-PHASE-VOLTAGE-DROP", "EL-BURNT-OUTLET-HEAVY-LOAD", "EL-UPS-CHANGEOVER-WIRING", "EL-NEUTRAL-EARTH-LEAKAGE", "EL-WATER-LEVEL-SENSOR-CORROSION", "EL-MCB-RCCB-TRIPPING", "EL-BURNING-WIRE-SMELL", "EL-ELECTRIC-SHOCK-EARTHING", "EL-FLOATING-NEUTRAL", "EL-MAIN-DB-SPARKING", "EL-INVERTER-BYPASS-SWITCH", "EL-MOTOR-STARTER-FAULT", "EL-REGULATOR-LIGHT-FLICKER"] as const;
 export type SupportedDiagnosticCode = (typeof SUPPORTED_DIAGNOSTIC_CODES)[number];
 export const diagnosticDraftSchema = z.object({
   symptom: z.string().trim().min(1).max(1200), issue_title: z.string().trim().min(1).max(120),
@@ -76,7 +79,7 @@ export function matchHomeIssue(text: string): HomeIssue | null {
 export type DiagnosticLanguage = "english" | "nepali_devanagari" | "nepali_romanized";
 export function diagnosticLanguageForText(text: string): DiagnosticLanguage {
   if (/[\u0900-\u097f]/u.test(text)) return "nepali_devanagari";
-  if (/\b(dhara|bhairacha|bhairako|chha|cha|fohor|safa|paani|dhal|plumbingg|elctrician|batti|bijuli|garnu|chahiyo|tapai|mero|na-aako|jyotish|inar|pani|chuhiyo|chuhirako|aairacha|aairako|bhayeko|gayo|bhayo)\b/i.test(text)) return "nepali_devanagari";
+  if (/\b(dhara|bhairacha|bhairako|chha|cha|fohor|safa|paani|dhal|plumbingg|elctrician|batti|bijuli|garnu|chahiyo|tapai|mero|na-aako|jyotish|inar|pani|chuhiyo|chuhirako|aairacha|aairako|bhayeko|gayo|bhayo|sump|motor|aayena|gandha|lagyo|jaleyo|diverter|regulator|seepage|dhal)\b/i.test(text)) return "nepali_devanagari";
   return "english";
 }
 
@@ -108,10 +111,10 @@ export function serviceIdForDiagnosticCode(code: string): string | null {
   return faultServiceId(code);
 }
 export function detectHomeSafetyRisk(text: string): "electric" | "water-electric" | "gas" | null {
-  const q = text.toLowerCase();
-  if (/gas (leak|smell|gandha)|smell(s|ing)? of gas|gas gandha|gas ko gandha|ग्यास.*(गन्ध|चुहावट)/u.test(q)) return "gas";
-  if (/electric shock|electric tingling|earth leakage|current lagyo|tingle.*tap|shock.*water|water.*(socket|wire|switch)|flood.*electric|electric.*flood|pani.*(bijuli|wire|tar|switch|socket)|bijuli.*pani|dhara.*current|करेन्ट.*(लाग|झट्का)|पानी.*(तार|स्विच|सकेट|बिजुली)/u.test(q)) return "water-electric";
-  if (/sparking|smoke|burning smell|burnt plastic|hot outlet|hot switchboard|fire|exposed live wire|bare wire|spark|chingaari|jaleko plastic|jaleko gandha|dhuwa|आगो|धुवाँ|जलेको गन्ध|बोर्ड.*तातो|स्विच.*तातो|तार.*(खुला|चुँडिएको)/u.test(q)) return "electric";
+  const q = normalizeHomeDiagnosticText(text);
+  if (/\bgas\b.*\b(leak|smell|gandha|odor|odour)\b|\b(leak|smell|gandha|odor|odour)\b.*\bgas\b|ग्यास.*(गन्ध|चुहावट)/u.test(q)) return "gas";
+  if (/electric shock|shock lagyo|jhatka lagyo|electric tingling|earth leakage|current lagyo|current aayo|tingle.*tap|shock.*water|water.*(socket|wire|switch)|flood.*electric|electric.*flood|pani.*(bijuli|wire|tar|switch|socket)|bijuli.*pani|dhara.*current|करेन्ट.*(लाग|झट्का|आयो)|पानी.*(तार|स्विच|सकेट|बिजुली)/u.test(q)) return "water-electric";
+  if (/sparking|smoke|burning smell|burnt plastic|burned socket|burnt socket|socket burned|wire jaleyo|jaleko wire|wire burn|hot outlet|hot switchboard|fire|exposed live wire|bare wire|spark|chingaari|jaleko plastic|jaleko gandha|dhuwa|आगो|धुवाँ|जलेको गन्ध|बोर्ड.*तातो|स्विच.*तातो|तार.*(खुला|चुँडिएको|जलेको)/u.test(q)) return "electric";
   return null;
 }
 

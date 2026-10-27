@@ -18,11 +18,11 @@ function riskMessage(risk: "electric" | "water-electric" | "gas", language: Diag
   if (language !== "english") {
     if (risk === "gas") return "यो ग्याससम्बन्धी तत्काल जोखिम हुन सक्छ। सबैलाई बाहिर सुरक्षित ठाउँमा लैजानुहोस्; आगो वा स्विच नचलाउनुहोस्। बाहिर पुगेपछि स्थानीय आपतकालीन सेवा वा ग्यास आपूर्तिकर्तालाई सम्पर्क गर्नुहोस्।";
     if (risk === "water-electric") return "पानी र बिजुली वा करेन्टको झट्का खतरनाक हुन सक्छ। त्यस ठाउँबाट टाढा रहनुहोस्, पानी वा उपकरण नछुनुहोस्, र योग्य आपतकालीन सहायता बोलाउनुहोस्। असुरक्षित ठाउँको मेन स्विच नछुनुहोस्।";
-    return "झिल्का, धुवाँ वा जलेको गन्ध तत्काल जोखिमको संकेत हुन सक्छ। उपकरणबाट टाढा रहनुहोस् र स्थानीय आपतकालीन सेवा वा विद्युत् प्राधिकरणलाई सम्पर्क गर्नुहोस्।";
+    return "झिल्का, धुवाँ, जलेको तार वा तातो/जलेको सकेट तत्काल जोखिमको संकेत हुन सक्छ। टाढा रहनुहोस्। सुक्खा र सुरक्षित ठाउँबाट जोखिमनजिक नपुगी मेन ब्रेकर बन्द गर्न सकिने भए मात्र बन्द गर्नुहोस्; अन्यथा नछुनुहोस्। योग्य आपतकालीन सहायता वा विद्युत् प्राधिकरणलाई सम्पर्क गर्नुहोस्।";
   }
   if (risk === "gas") return "This may be an immediate gas hazard. Take everyone outside; avoid flames and electrical switches. Once outside, contact local emergency services or your gas supplier.";
   if (risk === "water-electric") return "Water near electricity or an electric shock can be dangerous. Keep away, do not touch the water or equipment, and contact qualified emergency help. Do not approach a main switch if the area is unsafe.";
-  return "Sparks, smoke or a burning smell can signal an immediate hazard. Keep away from the equipment and contact local emergency or utility help.";
+  return "Sparks, smoke, a burning wire or a hot/burnt socket can signal an immediate hazard. Keep away. If the main breaker is reachable from a dry, safe place without approaching the hazard, switch it off; otherwise leave it alone. Contact qualified emergency or utility help.";
 }
 function textFor(language: DiagnosticLanguage, english: string, nepali: string) { return language === "english" ? english : nepali; }
 function questionFor(issueId: string, step: number, language: DiagnosticLanguage, previousAnswers: readonly number[] = [], faultCode?: string): DiagnosticQuestion | null {
