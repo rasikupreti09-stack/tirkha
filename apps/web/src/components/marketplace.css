@@ -261,3 +261,5 @@
 .mk-portal-card a:first-child{border-color:#167451;background:#167451;color:#fff}
 .mk-portal-card a:hover{filter:brightness(.96)}
 @media(max-width:700px){.mk-portal-grid{grid-template-columns:1fr}.mk-portal-card p{min-height:0}.mk-portal-card{padding:14px}.mk-auth-content{max-height:85dvh;overflow-y:auto}}
+
+.mk-fallback-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.mk-fallback-actions button{min-height:38px;border:1px solid #167451;border-radius:8px;background:#167451;color:white;font-size:11px;font-weight:700}@media(max-width:480px){.mk-fallback-actions{grid-template-columns:1fr}}

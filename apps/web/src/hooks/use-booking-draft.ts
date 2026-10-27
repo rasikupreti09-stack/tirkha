@@ -126,12 +126,28 @@ export function useBookingDraft(initialSlug = "", inspectionOnly = false) {
       const address = locationPreferenceSchema.safeParse(location);
       if (!address.success) throw new Error(address.error.issues[0].message);
       if (!address.data.map_pin) throw new Error("Drop a pin on the map so nearby Heroes can receive the exact service location.");
+      const diagnosticSummary = diagnostic ? [
+        diagnostic.diagnostic_code ? `Route code: ${diagnostic.diagnostic_code}` : "Route code: on-site inspection fallback",
+        `Trade: ${diagnostic.trade ?? "unclassified; verify on site"}`,
+        `Finding: ${diagnostic.issue_title}`,
+        `Customer report: ${diagnostic.symptom}`,
+        diagnostic.triage_answers.length ? `Three-step triage: ${diagnostic.triage_answers.join(" → ")}` : "Three-step triage: not completed; inspect on site",
+        diagnostic.severity ? `Severity: ${diagnostic.severity}` : diagnostic.urgency ? `Urgency: ${diagnostic.urgency}` : "",
+        diagnostic.visual_material ? `Visible material: ${diagnostic.visual_material}` : "",
+        diagnostic.visual_mounting ? `Mounting: ${diagnostic.visual_mounting}` : "",
+        diagnostic.visual_defect ? `Visible defect: ${diagnostic.visual_defect}` : "",
+        diagnostic.visual_evidence?.length ? `Photo observations: ${diagnostic.visual_evidence.join(", ")}` : "",
+        diagnostic.root_cause_hypothesis ? `Unconfirmed possibility: ${diagnostic.root_cause_hypothesis}` : "",
+        diagnostic.safety_note ? `Safety note: ${diagnostic.safety_note}` : "",
+        `Triage note: ${diagnostic.explanation}`,
+        "Preliminary routing only; confirm on site. No AI price or repair approval.",
+      ].filter(Boolean).join("; ").slice(0, 1200) : undefined;
       const payload = {
         category_id: categoryId, professional_id: inspectionOnly ? null : professionalId || null,
         service_address: locationToAddress(address.data), job_details: inspectionOnly ? `${details.slice(0, 1750)}\n\nInspection request: no AI price or repair approval. Require an on-site inspection and written quote before work.` : details,
         latitude: address.data.map_pin?.latitude ?? null, longitude: address.data.map_pin?.longitude ?? null,
         resolved_address: address.data.map_pin?.resolved_address ?? null,
-        diagnostic_summary: diagnostic ? ((diagnostic.diagnostic_code ? `[${diagnostic.diagnostic_code}] ` : "") + diagnostic.issue_title + ": " + diagnostic.explanation + (diagnostic.symptom ? " Customer reports: " + diagnostic.symptom : "")).slice(0, 1200) : undefined,
+        diagnostic_summary: diagnosticSummary,
         diagnostic_severity: diagnostic?.severity || undefined,
         diagnostic_urgency: diagnostic?.urgency,
         suggested_parts: diagnostic?.suggested_parts ?? [],
