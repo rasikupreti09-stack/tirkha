@@ -24,8 +24,45 @@ export const HOME_FAULT_TREE = [
 ] as const;
 export type HomeFaultNode = (typeof HOME_FAULT_TREE)[number];
 export type HomeFaultCode = HomeFaultNode["code"];
+
+const TYPO_ALIASES: Readonly<Record<string, string>> = {
+  plumbng: "plumbing", pluming: "plumbing", plumer: "plumber", plumbr: "plumber",
+  elctrician: "electrician", electrcian: "electrician", electrican: "electrician", electical: "electrical",
+  paani: "pani", leakage: "leak", leeking: "leaking", leek: "leak", dhal: "drain", sewage: "drain",
+  bijli: "bijuli", bati: "light", batti: "light", dharaa: "dhara", dhaal: "drain", triped: "trip", tripped: "trip", fohor: "dirty",
+};
+
+/** Normalize common spelling variants before deterministic local fault-tree matching. */
+export function normalizeHomeDiagnosticText(text: string): string {
+  const cleaned = text.normalize("NFKC").toLocaleLowerCase("ne-NP")
+    .replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim();
+  return cleaned.split(" ").map(token => {
+    const alias = TYPO_ALIASES[token];
+    if (alias) return alias;
+    const collapsed = token.replace(/([a-z])\1+/g, "$1");
+    const collapsedAlias = TYPO_ALIASES[collapsed];
+    if (collapsedAlias) return collapsedAlias;
+    const knownIntent = [...PLUMBING_INTENT_TERMS, ...ELECTRICAL_INTENT_TERMS].some(term => collapsed === term || (term.length >= 4 && collapsed.startsWith(term)));
+    return knownIntent ? collapsed : token;
+  }).join(" ");
+}
+const PLUMBING_INTENT_TERMS = ["plumb", "leak", "pipe", "tap", "dhara", "pani", "tank", "drain", "sewage", "fohor", "dirty", "dirt", "muddy", "पानी", "धारा", "पाइप", "ढल", "नाली", "चुह"];
+const ELECTRICAL_INTENT_TERMS = ["electr", "light", "spark", "mcb", "fuse", "wire", "bijuli", "short", "shock", "power", "बिजुली", "बत्ती", "झिल्का", "तार", "करेन्ट"];
+function intentScore(tokens: string[], terms: readonly string[]) {
+  return tokens.reduce((score, token) => score + (terms.some(term => token === term || (term.length >= 4 && token.startsWith(term))) ? 1 : 0), 0);
+}
+
+/** Identify a primary trade from generic or imperfect text; ties remain unclassified. */
+export function detectHomeFaultTrade(text: string): FaultTrade | null {
+  const tokens = normalizeHomeDiagnosticText(text).split(" ").filter(Boolean);
+  const plumbing = intentScore(tokens, PLUMBING_INTENT_TERMS);
+  const electrical = intentScore(tokens, ELECTRICAL_INTENT_TERMS);
+  if (plumbing === electrical || plumbing === 0 && electrical === 0) return null;
+  return plumbing > electrical ? "plumbing" : "electrical";
+}
+
 export function matchHomeFault(text: string): HomeFaultNode | null {
-  const normalized = text.toLocaleLowerCase("ne-NP").replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim();
+  const normalized = normalizeHomeDiagnosticText(text);
   return HOME_FAULT_TREE.find(node => node.patterns.some(pattern => pattern.test(normalized))) ?? null;
 }
 

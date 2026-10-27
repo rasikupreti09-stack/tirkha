@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { diagnosticQuestionCount as faultQuestionCount, faultServiceId, faultTreeQuestion, HOME_FAULT_TREE, matchHomeFault, resolveHomeFaultCode, type HomeFaultCode } from "./home-fault-tree";
-export { HOME_FAULT_TREE, matchHomeFault };
+import { diagnosticQuestionCount as faultQuestionCount, detectHomeFaultTrade, faultServiceId, faultTreeQuestion, HOME_FAULT_TREE, matchHomeFault, normalizeHomeDiagnosticText, resolveHomeFaultCode, type HomeFaultCode } from "./home-fault-tree";
+export { HOME_FAULT_TREE, detectHomeFaultTrade, matchHomeFault, normalizeHomeDiagnosticText };
 export type { HomeFaultCode, HomeFaultNode } from "./home-fault-tree";
 
 /** Symptom matching routes a request; it is not a confirmed fault. */
@@ -63,15 +63,20 @@ export const diagnosticDraftSchema = z.object({
 });
 export type DiagnosticDraft = z.infer<typeof diagnosticDraftSchema>;
 export function matchHomeIssue(text: string): HomeIssue | null {
-  const fault = matchHomeFault(text);
+  const normalized = normalizeHomeDiagnosticText(text);
+  const fault = matchHomeFault(normalized);
   if (fault) return HOME_ISSUES.find(issue => issue.id === fault.issueId) ?? null;
-  const normalized = text.toLocaleLowerCase("ne-NP").replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim();
-  return HOME_ISSUES.find(issue => issue.patterns.some(pattern => pattern.test(normalized))) ?? null;
+  const matched = HOME_ISSUES.find(issue => issue.patterns.some(pattern => pattern.test(normalized)));
+  if (matched) return matched;
+  const trade = detectHomeFaultTrade(normalized);
+  if (!trade) return null;
+  if (trade === "plumbing" && /\b(drain|sewage|dhal|ढल|नाली)\b/u.test(normalized)) return HOME_ISSUES.find(issue => issue.id === "blocked-drain") ?? null;
+  return HOME_ISSUES.find(issue => issue.id === (trade === "plumbing" ? "plumbing-general" : "electrical-general")) ?? null;
 }
 export type DiagnosticLanguage = "english" | "nepali_devanagari" | "nepali_romanized";
 export function diagnosticLanguageForText(text: string): DiagnosticLanguage {
   if (/[\u0900-\u097f]/u.test(text)) return "nepali_devanagari";
-  if (/\b(dhara|bhairacha|bhairako|chha|cha|fohor|safa|batti|bijuli|garnu|chahiyo|tapai|mero|na-aako|jyotish|inar|pani|chuhiyo|chuhirako|aairacha|aairako|bhayeko|gayo|bhayo)\b/i.test(text)) return "nepali_devanagari";
+  if (/\b(dhara|bhairacha|bhairako|chha|cha|fohor|safa|paani|dhal|plumbingg|elctrician|batti|bijuli|garnu|chahiyo|tapai|mero|na-aako|jyotish|inar|pani|chuhiyo|chuhirako|aairacha|aairako|bhayeko|gayo|bhayo)\b/i.test(text)) return "nepali_devanagari";
   return "english";
 }
 
@@ -124,14 +129,3 @@ export const diagnosticBookingPrefillSchema = z.object({
   diagnostic: diagnosticDraftSchema,
 });
 export type DiagnosticBookingPrefill = z.infer<typeof diagnosticBookingPrefillSchema>;
-
-
-
-
-
-
-
-
-
-
-
