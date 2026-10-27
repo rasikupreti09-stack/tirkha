@@ -116,7 +116,7 @@ function QuoteForm({ bookingId }: { bookingId: string }) {
     const quoteInput = heroQuoteInputSchema.safeParse({ labor_paisa: Math.round(Number(labor) * 100), materials_paisa: Math.round(Number(materials) * 100), materials_breakdown: breakdown, scope });
     if (!quoteInput.success) { setError("Enter valid NPR amounts, itemize materials, and describe the inspected job scope (at least 10 characters)."); return; }
     setBusy(true);
-    const { data, error: rpcError } = await client.rpc("submit_professional_job_quote", { p_booking_id: bookingId, ...quoteInput.data });
+    const { data, error: rpcError } = await client.rpc("submit_professional_job_quote", { p_booking_id: bookingId, p_labor_paisa: quoteInput.data.labor_paisa, p_materials_paisa: quoteInput.data.materials_paisa, p_materials_breakdown: quoteInput.data.materials_breakdown, p_scope: quoteInput.data.scope });
     if (rpcError) setError(rpcError.message.includes("ON_SITE_INSPECTION_REQUIRED") ? "Only submit after the booking is in progress and you have inspected it on site." : rpcError.message);
     else setQuote(data);
     setBusy(false);

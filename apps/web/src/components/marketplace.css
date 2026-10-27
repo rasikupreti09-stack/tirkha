@@ -250,3 +250,14 @@
 .mk-diagnostic-checkout p,.mk-diagnostic-checkout small{margin:0;color:#64746b;font-size:11px;line-height:1.5}
 .mk-diagnostic-checkout>strong{color:#9a4f24;font-size:11px}
 .mk-diagnostic-checkout .mk-diagnostic-price{font-size:11px}
+
+.mk-portal-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.mk-portal-card{display:flex;flex-direction:column;min-width:0;padding:17px;border:1px solid #dce5df;border-radius:10px;background:linear-gradient(160deg,#fff,#f7faf8)}
+.mk-portal-label{color:#16815c;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+.mk-portal-card h3{margin:8px 0 5px;color:#202b25;font-size:16px}
+.mk-portal-card p{min-height:52px;margin:0 0 12px;color:#68776e;font-size:11px;line-height:1.55}
+.mk-portal-card>div{display:grid;gap:7px;margin-top:auto}
+.mk-portal-card a{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:7px 9px;border:1px solid #dce5df;border-radius:7px;color:#26372e;font-size:10px;font-weight:700;text-decoration:none}
+.mk-portal-card a:first-child{border-color:#167451;background:#167451;color:#fff}
+.mk-portal-card a:hover{filter:brightness(.96)}
+@media(max-width:700px){.mk-portal-grid{grid-template-columns:1fr}.mk-portal-card p{min-height:0}.mk-portal-card{padding:14px}.mk-auth-content{max-height:85dvh;overflow-y:auto}}

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { ArrowLeft, CalendarDays, Check, ChevronRight, Clock3, Copy, LocateFixed, MapPin, Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { buildDemoPaymentQrUrl, catalogMoney, codCommissionPaisa, serviceTotal, type Coordinates, type DemoOrder } from "@tirkha/shared";
 import { MarketplaceDialog } from "./marketplace-dialog";
@@ -86,17 +87,23 @@ export function MarketplaceOverlays(){
  const orderContent=<section className="mk-overlay-content"><div className="mk-overlay-heading"><div><span className="mk-kicker">SAVED ON THIS DEVICE</span><h2>My demo bookings</h2><p>Receipts and cancellation controls for this browser only.</p></div></div>
    {!state.orders.length?<div className="mk-empty-cart"><CalendarDays size={32}/><h3>No bookings yet</h3><p>Choose any service to create a demo booking.</p><button className="mk-primary" onClick={()=>setModal(null)}>Explore services</button></div>:
    <div className="mk-orders">{state.orders.map(order=><OrderReceipt key={order.id} order={order} onCancel={()=>cancel(order.id)}/>)}</div>}</section>;
- const authContent=<section className="mk-overlay-content mk-auth-content"><div className="mk-overlay-heading"><div><span className="mk-kicker">YOUR DEMO, YOUR WAY</span><h2>Welcome to Tirkha</h2><p>Try the complete checkout without waiting for an SMS.</p></div></div>
+ const authContent=<section className="mk-overlay-content mk-auth-content"><div className="mk-overlay-heading"><div><span className="mk-kicker">SIGN IN TO YOUR SPACE</span><h2>Choose your Tirkha portal</h2><p>Continue to the tools that match the way you use Tirkha.</p></div></div>
+   <div className="mk-portal-grid">
+    <article className="mk-portal-card"><span className="mk-portal-label">For customers</span><h3>Customer account</h3><p>Book help, track requests and manage your service details.</p><div><Link href="/login">Sign in</Link><Link href="/signup">Create account</Link></div></article>
+    <article className="mk-portal-card"><span className="mk-portal-label">For service professionals</span><h3>Service Hero portal</h3><p>Apply to become a verified Hero or open your job dashboard.</p><div><Link href="/hero/register">Register as a Hero</Link><Link href="/hero/dashboard">Hero dashboard</Link></div></article>
+    <article className="mk-portal-card"><span className="mk-portal-label">For Tirkha operations</span><h3>Admin &amp; finance</h3><p>Review operations, financial totals and retained transactions.</p><div><Link href="/admin">Admin dashboard</Link><Link href="/admin/finance">Finance ledger</Link></div></article>
+   </div>
+   <div className="mk-auth-divider"><span>or preview the customer demo</span></div>
    <form onSubmit={submitAuth}><label className="mk-label">Phone number<input autoComplete="tel" inputMode="tel" value={phone} onChange={e=>{setPhone(e.target.value);if(code==="123456"&&e.target.value.trim())login(e.target.value);}} placeholder="+977 9800 000 000" maxLength={64}/></label><label className="mk-label">Demo verification code<input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={e=>{const value=e.target.value;setCode(value);if(value==="123456"&&phone.trim())login(phone);}} placeholder="Enter 123456" maxLength={6}/></label>
    {authError&&<p className="mk-form-error" role="alert">{authError}</p>}<button className="mk-primary mk-primary-wide" type="submit">Continue with demo code <ChevronRight size={18}/></button></form>
-   <div className="mk-auth-divider"><span>or skip the code</span></div><button className="mk-one-click" onClick={oneClick}>One-Click Demo Login <span aria-hidden="true">→</span></button>
+   <button className="mk-one-click" onClick={oneClick}>One-Click Demo Login <span aria-hidden="true">→</span></button>
    <p className="mk-demo-caption">Demo identity is stored locally for seven days and never creates a Supabase user. No SMS is sent.</p></section>;
  return <>
    {current&&<MarketplaceDialog key={current.id} title={current.title} onClose={()=>setDetail(null)} wide><div className="mk-detail"><img className="mk-detail-image" src={current.image} alt={current.category_name+" activity"}/><div className="mk-detail-body"><span className="mk-kicker">{current.category_name} · {current.vertical}</span><h2>{current.title}</h2><p>{current.description}</p><div className="mk-rate-card"><div><small>Service rate</small><b>{catalogMoney(current.base_paisa)}</b></div><span>+</span><div><small>Visit fee</small><b>{catalogMoney(current.visit_paisa)}</b></div><i></i><div><small>Starting total</small><b>{catalogMoney(serviceTotal(current))}</b></div></div>
      <div className="mk-duration"><Clock3 size={16}/> Estimated time: {current.duration_minutes>=60?Math.floor(current.duration_minutes/60)+" hr"+(current.duration_minutes%60?" "+current.duration_minutes%60+" min":""):current.duration_minutes+" min"}</div>
      <div className="mk-scope-grid"><div><h3><Check size={16}/> What’s included</h3><ul>{current.included.map(x=><li key={x}>{x}</li>)}</ul></div><div><h3><X size={16}/> What’s excluded</h3><ul>{current.excluded.map(x=><li key={x}>{x}</li>)}</ul></div></div>
      <p className="mk-detail-disclaimer">Parts and extra work require a separate quote and your approval. Photos illustrate the activity; no provider availability is implied.</p><div className="mk-detail-actions"><button className="mk-outline" onClick={()=>add(current.id)}>Add to cart</button><button className="mk-primary" onClick={()=>add(current.id,true)}>Book now <ChevronRight size={17}/></button></div></div></div></MarketplaceDialog>}
-   {modal&&<MarketplaceDialog key={modal} title={modal==="cart"?"Your Tirkha cart":modal==="auth"?"Demo sign in":"My demo bookings"} onClose={()=>setModal(null)}>{modal==="cart"?cartContent:modal==="auth"?authContent:orderContent}</MarketplaceDialog>}
+   {modal&&<MarketplaceDialog key={modal} title={modal==="cart"?"Your Tirkha cart":modal==="auth"?"Tirkha portals":"My demo bookings"} onClose={()=>setModal(null)}>{modal==="cart"?cartContent:modal==="auth"?authContent:orderContent}</MarketplaceDialog>}
  </>;
 }
 function OrderReceipt({order,onCancel}:{order:DemoOrder;onCancel:()=>void}){
@@ -109,5 +116,4 @@ function OrderReceipt({order,onCancel}:{order:DemoOrder;onCancel:()=>void}){
    {order.status==="requested"&&<button className="mk-cancel-order" onClick={onCancel}>Cancel demo booking</button>}<p className="mk-demo-caption">This receipt is stored only in this browser. No payment, live provider tracking, or dispatch is connected.</p>
  </article>;
 }
-
 

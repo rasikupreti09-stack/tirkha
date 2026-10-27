@@ -180,11 +180,11 @@ export function ServiceAssistant() {
         }
       }
       setIntake(next);
-      setMessages(old => [...old, { id: crypto.randomUUID(), role: "assistant", text: answer, question, diagnosticAction, diagnostic, serviceId }].slice(-32));
+      setMessages(old => [...old, { id: crypto.randomUUID(), role: "assistant" as const, text: answer, question, diagnosticAction, diagnostic, serviceId }].slice(-32));
     } catch (error) {
       setIntake(null);
       const fallback = textFor(activeLanguage, "Assessment failed. Describe the issue in text; safety checks remain available. No photo or transcript was saved.", "जाँच हुन सकेन। जोखिम जाँचका लागि समस्या शब्दमा लेख्नुहोस्। तस्बिर वा संवाद सुरक्षित गरिएको छैन।");
-      setMessages(old => [...old, { id: crypto.randomUUID(), role: "assistant", text: fallback }].slice(-32));
+      setMessages(old => [...old, { id: crypto.randomUUID(), role: "assistant" as const, text: fallback }].slice(-32));
     } finally { setBusy(false); }
   }
   function continueToBooking(serviceId: string, diagnostic: DiagnosticDraft) {

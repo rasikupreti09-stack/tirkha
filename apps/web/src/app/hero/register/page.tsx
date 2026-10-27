@@ -69,7 +69,7 @@ export default function HeroRegisterPage() {
         p_operational_zone: registration.data.operational_zone, p_document_path: uploadedPath,
       });
       if (submitError) throw submitError;
-      setApplication({ verification_status: data ?? "pending", suspended_at: null, trade_code: trade, operational_zone: zone });
+      setApplication({ verification_status: data ?? "pending", suspended_at: null, trade_code: registration.data.trade_code, operational_zone: registration.data.operational_zone });
       setSuccess("Application submitted. Your account stays pending until Tirkha operations verifies your details.");
     } catch (failure) {
       if (uploadedPath) await client.storage.from("hero-kyc-documents").remove([uploadedPath]).catch(() => undefined);
