@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { faultServiceId, faultTreeQuestion, HOME_FAULT_TREE, matchHomeFault, resolveHomeFaultCode, type HomeFaultCode } from "./home-fault-tree";
+import { diagnosticQuestionCount as faultQuestionCount, faultServiceId, faultTreeQuestion, HOME_FAULT_TREE, matchHomeFault, resolveHomeFaultCode, type HomeFaultCode } from "./home-fault-tree";
 export { HOME_FAULT_TREE, matchHomeFault };
 export type { HomeFaultCode, HomeFaultNode } from "./home-fault-tree";
 
@@ -30,7 +30,8 @@ export const HOME_ISSUES = [
   { id: "overload", title: "Possible circuit overload", trade: "electrical", serviceId: "electrical-wiring", patterns: [/\b(overload|too many appliances|breaker trips when)\b/] },
   { id: "earthing", title: "Possible earthing or leakage concern", trade: "electrical", serviceId: "electrical-wiring", patterns: [/\b(earthing|grounding|earth leakage|tingle from|electric tingling)\b/] },
   { id: "appliance", title: "Home appliance fault", trade: "electrical", serviceId: null, patterns: [/\b(fridge|refrigerator|washing machine|washer|microwave|induction|appliance)\b.*\b(not working|fault|broken|noise|leak|power)\b/] },
-] as const;
+  { id: "plumbing-general", title: "General plumbing request", trade: "plumbing", serviceId: "pipe-fitting", patterns: [/\b(plumbing|plumber|water leak|leaking|pipework)\b/i, /पानी.*(चुह|चुग|बग)/u] },
+  { id: "electrical-general", title: "General electrical request", trade: "electrical", serviceId: "electrical-wiring", patterns: [/\b(electrical|electrician|short circuit|bijuli short|mcb tripped)\b/i, /बिजुली.*(सर्ट|छैन|गयो|गएन)/u] },] as const;
 
 export type HomeIssue = (typeof HOME_ISSUES)[number];
 export const SUGGESTED_PARTS_BY_SERVICE: Readonly<Record<string, readonly string[]>> = {
@@ -55,7 +56,7 @@ export const diagnosticDraftSchema = z.object({
   visual_material: z.string().trim().max(120).optional(), visual_mounting: z.string().trim().max(120).optional(),
   visual_defect: z.string().trim().max(160).optional(), visual_evidence: z.array(z.string().trim().min(1).max(160)).max(6).default([]),
   root_cause_hypothesis: z.string().trim().max(300).optional(),
-  urgency: z.enum(["routine", "soon", "urgent"]).default("routine"), severity: z.string().trim().max(300).optional(), trade: z.enum(["plumbing", "electrical"]).optional(), triage_answers: z.array(z.string().trim().min(1).max(180)).max(3).default([]),
+  urgency: z.enum(["routine", "soon", "urgent"]).default("routine"), severity: z.string().trim().max(300).optional(), trade: z.enum(["plumbing", "electrical"]).optional(), triage_answers: z.array(z.string().trim().min(1).max(180)).max(7).default([]),
   area: z.string().trim().max(180).optional(), preferred_time: z.string().trim().max(180).optional(),
   photo_assessed: z.boolean().default(false), safety_note: z.string().trim().max(500).optional(),
   suggested_parts: z.array(z.string().trim().min(1).max(100)).max(12).default([]),
@@ -75,14 +76,18 @@ export function diagnosticLanguageForText(text: string): DiagnosticLanguage {
 }
 
 export type DiagnosticQuestion = { prompt: string; choices: string[] };
-export type DiagnosticQuestionIndex = 0 | 1 | 2;
+export type DiagnosticQuestionIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 function tradeForIssue(issueId: string): "plumbing" | "electrical" | null {
   const trade = HOME_ISSUES.find(issue => issue.id === issueId)?.trade;
   return trade === "plumbing" || trade === "electrical" ? trade : null;
 }
 export function diagnosticQuestion(issueId: string, index: number, language: DiagnosticLanguage, previousAnswers: readonly number[] = [], faultCode?: string): DiagnosticQuestion | null {
   const trade = tradeForIssue(issueId);
-  return trade ? faultTreeQuestion(trade, issueId, index, language, faultCode) : null;
+  return trade ? faultTreeQuestion(trade, issueId, index, language, previousAnswers, faultCode) : null;
+}
+export function diagnosticQuestionCount(issueId: string, faultCode?: string): number {
+  const trade = tradeForIssue(issueId);
+  return trade ? faultQuestionCount(trade, issueId, faultCode) : 0;
 }
 export function diagnosticSeverityLabel(answer: number, language: DiagnosticLanguage): string {
   const labels = language === "english" ? ["Contained / currently stopped", "Recurring or worsening", "Widespread or significant service impact", "Unclear; Hero to assess on site"] : ["सीमित / अहिले रोकिएको", "दोहोरिने वा बढ्दै गएको", "धेरै क्षेत्रमा फैलिएको वा सेवामा ठूलो असर", "स्पष्ट छैन; Hero ले स्थलमै जाँच गर्ने"];

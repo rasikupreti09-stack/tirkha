@@ -30,67 +30,125 @@ export function matchHomeFault(text: string): HomeFaultNode | null {
 }
 
 export type FaultQuestion = { prompt: string; choices: string[] };
-export function faultTreeQuestion(trade: FaultTrade, issueId: string, index: number, language: "english" | "nepali_devanagari" | "nepali_romanized", faultCode?: string): FaultQuestion | null {
-  if (!Number.isInteger(index) || index < 0 || index > 2) return null;
-  const en = language === "english";
-  if (index === 0) {
-    if (issueId === "tap-leak") return en ? { prompt: "Where do you first observe the leak?", choices: ["Tap spout", "Tap base", "Visible under-sink joint", "Hidden / not sure"] } : { prompt: "चुहावट पहिलो पटक कहाँ देखिन्छ?", choices: ["धाराको मुख", "धाराको फेद", "सिङ्कमुनिको देखिने जोड", "लुकेको ठाउँ वा निश्चित छैन"] };
-    if (issueId === "pipe-leak") return en ? { prompt: "Where is moisture or water visible? Do not open a wall or floor.", choices: ["At a visible pipe joint", "On the pipe body", "On a wall/slab without an exposed pipe", "Not sure"] } : { prompt: "पानी वा ओस कहाँ देखिन्छ? भित्ता वा भुइँ नखोल्नुहोस्।", choices: ["देखिने पाइपको जोडमा", "पाइपको बीचको भागमा", "पाइप नदेखिने भित्ता/स्ल्याबमा", "निश्चित छैन"] };
-    return en ? { prompt: trade === "plumbing" ? "Which symptom best matches what you have already observed?" : "Which electrical symptom best matches what you have already observed?", choices: trade === "plumbing" ? ["Leak or dampness", "Low/interrupted water or water quality", "Pump, tank, fixture or heater", "Other / not sure"] : ["Breaker trip or power loss", "Dim/flicker or supply fluctuation", "Distribution board, socket, switch, appliance or backup power", "Other / not sure"] } : { prompt: trade === "plumbing" ? "तपाईंले देख्नुभएको लक्षण कुनसँग बढी मिल्छ?" : "तपाईंले देख्नुभएको विद्युतीय लक्षण कुनसँग बढी मिल्छ?", choices: trade === "plumbing" ? ["चुहावट वा ओस", "कम/अनियमित पानी वा पानीको गुणस्तर", "पम्प, ट्याङ्की, फिक्स्चर वा हिटर", "अर्को समस्या वा निश्चित छैन"] : ["ब्रेकर ट्रिप वा बिजुली बन्द", "बत्ती मधुरो वा झिम्किने", "सकेट, स्विच, उपकरण वा ब्याकअप बिजुली", "अर्को समस्या वा निश्चित छैन"] };
+type DiagnosticStep = "symptom" | "component" | "material" | "pressure" | "duration" | "environment" | "severity";
+const DEEP_FAULT_GROUPS = new Set(["pipe", "pump", "protection", "distribution", "supply", "wiring", "backup-power", "controls"]);
+const MEDIUM_FAULT_GROUPS = new Set(["tank", "water-quality", "fixture", "heater"]);
+function diagnosticPlan(trade: FaultTrade, issueId: string, faultCode?: string): DiagnosticStep[] {
+  const group = HOME_FAULT_TREE.find(node => node.code === faultCode)?.group;
+  if (DEEP_FAULT_GROUPS.has(group ?? "") || ["pipe-leak", "pump", "breaker-trip", "voltage", "low-pressure", "no-water", "no-power", "flicker", "hot-outlet", "inverter"].includes(issueId)) {
+    return ["symptom", "component", "material", "pressure", "duration", "environment", "severity"];
   }
-  const node = HOME_FAULT_TREE.find(item => item.code === faultCode);
-  if (index === 1) {
-    const group = node?.group;
-    const groups: Record<string, { en: string[]; ne: string[] }> = {
-      pipe: { en: ["PPR fused joint", "GI threaded section", "PVC/uPVC solvent weld", "Concealed / not sure"], ne: ["PPR फ्युजन जोड", "GI थ्रेडेड भाग", "PVC/uPVC सोल्भेन्ट जोड", "लुकेको भाग वा निश्चित छैन"] },
-      pump: { en: ["Submersible/well pump", "Booster pump", "Tank float/control", "Not sure"], ne: ["सबमर्सिबल/इनार पम्प", "बुस्टर पम्प", "ट्याङ्की फ्लोट/नियन्त्रण", "निश्चित छैन"] },
-      tank: { en: ["Float valve", "Overflow pipe", "Level sensor/control", "Not sure"], ne: ["फ्लोट भल्भ", "ओभरफ्लो पाइप", "लेभल सेन्सर/नियन्त्रण", "निश्चित छैन"] },
-      "water-quality": { en: ["Sump/stored water", "RO output", "Several supply taps", "Not sure"], ne: ["सम्प/भण्डारण पानी", "RO आउटपुट", "धेरै आपूर्ति धारा", "निश्चित छैन"] },
-      fixture: { en: ["Dual-flush cistern", "Basin/shower mixer", "Tap/connector", "Not sure"], ne: ["डुअल-फ्लस सिस्टर्न", "बेसिन/शावर मिक्सर", "धारा/कनेक्टर", "निश्चित छैन"] },
-      heater: { en: ["Solar heater PRV", "Instant gas geyser", "Another water heater", "Not sure"], ne: ["सोलार हिटर PRV", "इन्स्ट्यान्ट ग्यास गिजर", "अर्को पानी हिटर", "निश्चित छैन"] },
-      protection: { en: ["MCB", "RCCB/RCD/ELCB", "Both/another device", "Unknown; do not inspect panel"], ne: ["MCB", "RCCB/RCD/ELCB", "दुवै/अर्को उपकरण", "थाहा छैन; प्यानल नजाँच्नुहोस्"] },
-      distribution: { en: ["Power loss/trip", "Buzzing", "Visible heat/discoloration", "Not sure; keep away"], ne: ["बिजुली बन्द/ट्रिप", "भनभन आवाज", "पहिलेबाट देखिएको ताप/रङ परिवर्तन", "निश्चित छैन; टाढा रहनुहोस्"] },
-      supply: { en: ["One appliance", "Several rooms", "Whole-home supply changes", "Not sure; never measure live voltage"], ne: ["एउटा उपकरण", "धेरै कोठा", "घरभरि आपूर्ति बदलिन्छ", "निश्चित छैन; भोल्टेज ननाप्नुहोस्"] },
-      wiring: { en: ["Socket/outlet/switch", "Neutral-earth concern", "Heavy-load appliance connection", "Not sure; do not touch"], ne: ["सकेट/आउटलेट/स्विच", "न्युट्रल-अर्थ समस्या", "धेरै भारको उपकरण जडान", "निश्चित छैन; नछुनुहोस्"] },
-      "backup-power": { en: ["UPS/inverter changeover", "Only fails on backup", "Circuit differs on backup", "Not sure; do not open equipment"], ne: ["UPS/इन्भर्टर चेन्जओभर", "ब्याकअपमा मात्र बन्द हुन्छ", "ब्याकअपमा सर्किट फरक चल्छ", "निश्चित छैन; उपकरण नखोल्नुहोस्"] },
-      controls: { en: ["Tank level sensor", "Pump control wiring", "Visible corrosion", "Not sure; do not touch"], ne: ["ट्याङ्की लेभल सेन्सर", "पम्प नियन्त्रण तार", "देखिने खिया", "निश्चित छैन; नछुनुहोस्"] },
-    };
-    const options = groups[group ?? ""] ?? (trade === "plumbing" ? { en: ["Fixture/valve", "Pipe/joint", "Pump/tank/heater", "Not sure"], ne: ["फिक्स्चर/भल्भ", "पाइप/जोड", "पम्प/ट्याङ्की/हिटर", "निश्चित छैन"] } : { en: ["Breaker", "Socket/wiring", "Supply/inverter/appliance", "Not sure; do not touch"], ne: ["ब्रेकर", "सकेट/तार", "आपूर्ति/इन्भर्टर/उपकरण", "निश्चित छैन; नछुनुहोस्"] });
-    return { prompt: en ? "Which component or material do you already know? Do not touch, open or move anything." : "कुन भाग वा सामग्री तपाईंलाई पहिलेबाट थाहा छ? केही नछुनुहोस्, नखोल्नुहोस् वा नसार्नुहोस्।", choices: en ? options.en : options.ne };
+  if (MEDIUM_FAULT_GROUPS.has(group ?? "") || ["muddy-water", "toilet-flush", "water-heater", "solar-water-heater", "tank-overflow", "intermittent-supply", "blocked-drain"].includes(issueId)) {
+    return ["symptom", "component", "material", "duration", "severity"];
   }
-  return en ? { prompt: "How severe or widespread is the problem so far? Do not recreate the fault.", choices: ["One point; now stopped", "Recurring or worsening", "Several areas affected / major water or power impact", "Not sure"] } : { prompt: "अहिलेसम्म समस्या कति गम्भीर वा फैलिएको छ? जाँच्न समस्या फेरि नदोहोर्‍याउनुहोस्।", choices: ["एउटा ठाउँमा सीमित; अहिले रोकिएको", "दोहोरिन्छ वा बढ्दै गएको", "धेरै ठाउँ प्रभावित / पानी वा बिजुलीमा ठूलो असर", "निश्चित छैन"] };
+  return ["symptom", "component", "severity"];
 }
+export function diagnosticQuestionCount(trade: FaultTrade, issueId: string, faultCode?: string): number {
+  return diagnosticPlan(trade, issueId, faultCode).length;
+}
+export function faultTreeQuestion(trade: FaultTrade, issueId: string, index: number, language: "english" | "nepali_devanagari" | "nepali_romanized", _previousAnswers: readonly number[] = [], faultCode?: string): FaultQuestion | null {
+  const plan = diagnosticPlan(trade, issueId, faultCode);
+  if (!Number.isInteger(index) || index < 0 || index >= plan.length) return null;
+  const en = language === "english";
+  const node = HOME_FAULT_TREE.find(item => item.code === faultCode);
+  const componentOptions: Record<string, { en: string[]; ne: string[] }> = {
+    pipe: { en: ["A visible joint/fitting", "The pipe body", "A wall/slab with no exposed pipe", "Other / not sure"], ne: ["देखिने जोड/फिटिङ", "पाइपको बीचको भाग", "खुला पाइप नभएको भित्ता/स्ल्याब", "अर्को वा निश्चित छैन"] },
+    pump: { en: ["Submersible/centrifugal pump", "Booster pump", "Tank float/level control", "Other / not sure"], ne: ["सबमर्सिबल/सेन्ट्रिफ्युगल पम्प", "बुस्टर पम्प", "ट्याङ्की फ्लोट/लेभल नियन्त्रण", "अर्को वा निश्चित छैन"] },
+    tank: { en: ["Float valve", "Overflow outlet", "Level sensor/control", "Other / not sure"], ne: ["फ्लोट भल्भ", "ओभरफ्लो निकास", "लेभल सेन्सर/नियन्त्रण", "अर्को वा निश्चित छैन"] },
+    "water-quality": { en: ["Sump/stored water", "RO filtration", "Several supply taps", "Other / not sure"], ne: ["सम्प/भण्डारणको पानी", "RO फिल्टर प्रणाली", "धेरै आपूर्ति धारा", "अर्को वा निश्चित छैन"] },
+    fixture: { en: ["Dual-flush cistern", "Basin/shower mixer", "Tap/connector", "Other / not sure"], ne: ["डुअल-फ्लस सिस्टर्न", "बेसिन/शावर मिक्सर", "धारा/कनेक्टर", "अर्को वा निश्चित छैन"] },
+    heater: { en: ["Solar heater relief valve", "Instant gas geyser", "Another water heater", "Other / not sure"], ne: ["सोलार हिटरको प्रेसर रिलिफ भल्भ", "इन्स्ट्यान्ट ग्यास गिजर", "अर्को पानी हिटर", "अर्को वा निश्चित छैन"] },
+    protection: { en: ["MCB", "RCCB/RCD/ELCB", "Both / another device", "Not sure; do not inspect the panel"], ne: ["MCB", "RCCB/RCD/ELCB", "दुवै वा अर्को उपकरण", "निश्चित छैन; प्यानल नजाँच्नुहोस्"] },
+    distribution: { en: ["Distribution board/terminal area", "Buzzing near the board", "Visible heat/discoloration from a distance", "Other / not sure; keep away"], ne: ["वितरण बोर्ड/टर्मिनल क्षेत्र", "बोर्डनजिक भनभन आवाज", "टाढैबाट देखिने ताप/रङ परिवर्तन", "अर्को वा निश्चित छैन; टाढा रहनुहोस्"] },
+    supply: { en: ["One appliance is affected", "Several rooms are affected", "Whole-home supply changes", "Not sure; do not measure voltage"], ne: ["एउटा उपकरण प्रभावित", "धेरै कोठा प्रभावित", "घरभरि आपूर्ति बदलिन्छ", "निश्चित छैन; भोल्टेज ननाप्नुहोस्"] },
+    wiring: { en: ["Socket/outlet/switch", "Neutral-earth concern", "Heavy-load appliance connection", "Other / not sure; do not touch"], ne: ["सकेट/आउटलेट/स्विच", "न्युट्रल-अर्थसम्बन्धी समस्या", "धेरै भारको उपकरण जडान", "अर्को वा निश्चित छैन; नछुनुहोस्"] },
+    "backup-power": { en: ["UPS/inverter changeover", "Only fails on backup", "Circuit differs on backup", "Other / not sure; do not open equipment"], ne: ["UPS/इन्भर्टर चेन्जओभर", "ब्याकअपमा मात्र बन्द हुन्छ", "ब्याकअपमा सर्किट फरक चल्छ", "अर्को वा निश्चित छैन; उपकरण नखोल्नुहोस्"] },
+    controls: { en: ["Tank level sensor", "Pump control wiring", "Visible corrosion from a distance", "Other / not sure; do not touch"], ne: ["ट्याङ्की लेभल सेन्सर", "पम्प नियन्त्रण तार", "टाढैबाट देखिने खिया", "अर्को वा निश्चित छैन; नछुनुहोस्"] },
+  };
+  const materialOptions: Record<string, { en: string[]; ne: string[] }> = {
+    pipe: { en: ["PPR", "GI/threaded metal", "PVC/uPVC solvent-weld", "Not visible / not sure"], ne: ["PPR", "GI/थ्रेडेड धातु", "PVC/uPVC सोल्भेन्ट-जोड", "देखिँदैन वा निश्चित छैन"] },
+    pump: { en: ["Motor/jam concern", "Pressure control/short cycling", "Float/level control", "Not sure"], ne: ["मोटर/जाम समस्या", "प्रेसर नियन्त्रण/बारम्बार चल्ने", "फ्लोट/लेभल नियन्त्रण", "निश्चित छैन"] },
+    tank: { en: ["Mechanical float", "Overflow pipe", "Electrical level sensor", "Not sure"], ne: ["मेकानिकल फ्लोट", "ओभरफ्लो पाइप", "विद्युतीय लेभल सेन्सर", "निश्चित छैन"] },
+    "water-quality": { en: ["Stored/sump water", "RO membrane/filter", "Several taps/source water", "Not sure"], ne: ["भण्डारण/सम्पको पानी", "RO मेम्ब्रेन/फिल्टर", "धेरै धारा/स्रोतको पानी", "निश्चित छैन"] },
+    fixture: { en: ["Flush mechanism", "Mixer cartridge", "Tap/connector", "Not sure"], ne: ["फ्लस मेकानिजम", "मिक्सर कार्ट्रिज", "धारा/कनेक्टर", "निश्चित छैन"] },
+    heater: { en: ["Solar PRV/relief outlet", "Gas ignition/diaphragm", "Other heater type", "Not sure"], ne: ["सोलार PRV/रिलिफ निकास", "ग्यास इग्निसन/डायाफ्राम", "अर्को हिटर प्रकार", "निश्चित छैन"] },
+    protection: { en: ["Thermal/load-related trip pattern", "Immediate trip pattern", "Dampness-related trip already observed", "Not sure; do not reset or inspect"] , ne: ["ताप/भारसँग सम्बन्धित ट्रिप", "तुरुन्त ट्रिप हुने अवस्था", "पहिलेबाट देखिएको ओससँगको ट्रिप", "निश्चित छैन; रिसेट वा जाँच नगर्नुहोस्"] },
+    distribution: { en: ["Loose-terminal concern", "Busbar concern", "Burnt/discoloured faceplate nearby", "Not sure; keep away"], ne: ["टर्मिनल खुकुलो भएको आशङ्का", "बसबारसम्बन्धी आशङ्का", "नजिकै जलेको/रङ बदलिएको कभर", "निश्चित छैन; टाढा रहनुहोस्"] },
+    supply: { en: ["Low/dropped supply", "Fluctuating supply", "Phase imbalance suspected from existing symptoms", "Not sure; never measure live voltage"], ne: ["कम/घटेको आपूर्ति", "घटबढ हुने आपूर्ति", "पहिलेका लक्षणबाट फेज असन्तुलनको आशङ्का", "निश्चित छैन; करेन्ट भएको भोल्टेज ननाप्नुहोस्"] },
+    wiring: { en: ["Burnt socket/switch faceplate", "Neutral/earth symptom", "Heavy-load connection", "Not sure; do not touch"] , ne: ["जलेको सकेट/स्विच कभर", "न्युट्रल/अर्थ लक्षण", "धेरै भारको जडान", "निश्चित छैन; नछुनुहोस्"] },
+    "backup-power": { en: ["Automatic changeover", "Manual transfer", "Backfeed/transfer concern already observed", "Not sure; do not open"] , ne: ["स्वचालित चेन्जओभर", "म्यानुअल ट्रान्सफर", "पहिलेबाट देखिएको ब्याकफिड/ट्रान्सफर समस्या", "निश्चित छैन; नखोल्नुहोस्"] },
+    controls: { en: ["Tank level sensor", "Pump control wiring", "Corrosion on exposed sensor/control", "Not sure; do not touch"] , ne: ["ट्याङ्की लेभल सेन्सर", "पम्प नियन्त्रण तार", "देखिने सेन्सर/नियन्त्रणमा खिया", "निश्चित छैन; नछुनुहोस्"] },
+  };
+  const step = plan[index]!;
+  if (step === "symptom") {
+    if (issueId === "tap-leak") return en ? { prompt: "Where do you first observe the leak?", choices: ["Tap spout", "Tap base", "Visible under-sink joint", "Hidden / not sure"] } : { prompt: "चुहावट पहिलो पटक कहाँ देखिन्छ?", choices: ["धाराको मुख", "धाराको फेद", "सिङ्कमुनिको देखिने जोड", "लुकेको ठाउँ वा निश्चित छैन"] };
+    if (issueId === "pipe-leak") return en ? { prompt: "Where is moisture or water visible? Do not open a wall or floor.", choices: ["At a visible pipe joint", "On the pipe body", "On a wall/slab without an exposed pipe", "Not sure"] } : { prompt: "पानी वा ओस कहाँ देखिन्छ? भित्ता वा भुइँ नखोल्नुहोस्।", choices: ["देखिने पाइपको जोडमा", "पाइपको बीचको भागमा", "खुला पाइप नभएको भित्ता/स्ल्याबमा", "निश्चित छैन"] };
+    return en ? { prompt: `Which ${trade} symptom best matches what you have already observed?`, choices: trade === "plumbing" ? ["Leak or dampness", "Low/interrupted water or water quality", "Pump, tank, fixture or heater", "Other / not sure"] : ["Breaker trip or power loss", "Dim/flicker or supply fluctuation", "Distribution board, socket, switch, appliance or backup power", "Other / not sure"] } : { prompt: trade === "plumbing" ? "तपाईंले देख्नुभएको लक्षण कुनसँग बढी मिल्छ?" : "तपाईंले देख्नुभएको विद्युतीय लक्षण कुनसँग बढी मिल्छ?", choices: trade === "plumbing" ? ["चुहावट वा ओस", "कम/अनियमित पानी वा पानीको गुणस्तर", "पम्प, ट्याङ्की, फिक्स्चर वा हिटर", "अर्को वा निश्चित छैन"] : ["ब्रेकर ट्रिप वा बिजुली बन्द", "बत्ती मधुरो वा झिम्किने", "बोर्ड, सकेट, स्विच, उपकरण वा ब्याकअप बिजुली", "अर्को वा निश्चित छैन"] };
+  }
+  if (step === "component") {
+    const issueChoices = issueId === "tap-leak"
+      ? { en: ["Tap spout/internal valve", "Tap base", "Under-sink connector", "Other / not sure"], ne: ["धाराको मुख/भित्री भल्भ", "धाराको फेद", "सिङ्कमुनिको कनेक्टर", "अर्को वा निश्चित छैन"] }
+      : issueId === "pipe-leak"
+        ? { en: ["Visible joint/fitting", "Pipe body", "Concealed wall/slab line", "Other / not sure"], ne: ["देखिने जोड/फिटिङ", "पाइपको बीचको भाग", "लुकेको भित्ता/स्ल्याब पाइप", "अर्को वा निश्चित छैन"] }
+        : null;
+    const choices = issueChoices ?? componentOptions[node?.group ?? ""] ?? (trade === "plumbing" ? { en: ["Tap/fixture", "Supply pipe/joint", "Pump/tank/heater", "Other / not sure"], ne: ["धारा/फिक्स्चर", "आपूर्ति पाइप/जोड", "पम्प/ट्याङ्की/हिटर", "अर्को वा निश्चित छैन"] } : { en: ["Breaker/protection", "Socket/wiring", "Supply/inverter/appliance", "Other / not sure; do not touch"], ne: ["ब्रेकर/सुरक्षा उपकरण", "सकेट/तार", "आपूर्ति/इन्भर्टर/उपकरण", "अर्को वा निश्चित छैन; नछुनुहोस्"] });
+    return en ? { prompt: "Which component or sub-component is involved, based only on what you can already see or know? Do not touch or open anything.", choices: choices.en } : { prompt: "पहिलेबाट देखिएको वा थाहा भएको कुन भाग प्रभावित छ? केही नछुनुहोस् वा नखोल्नुहोस्।", choices: choices.ne };
+  }
+  if (step === "material") {
+    const choices = materialOptions[node?.group ?? ""] ?? (trade === "plumbing" ? { en: ["PPR/plastic", "GI/metal", "PVC/uPVC", "Not visible / not sure"] , ne: ["PPR/प्लास्टिक", "GI/धातु", "PVC/uPVC", "देखिँदैन वा निश्चित छैन"] } : { en: ["MCB/RCCB label already known", "Socket/switch type already known", "UPS/inverter type already known", "Not known; do not inspect"] , ne: ["पहिलेबाट थाहा भएको MCB/RCCB लेबल", "पहिलेबाट थाहा भएको सकेट/स्विच प्रकार", "पहिलेबाट थाहा भएको UPS/इन्भर्टर प्रकार", "थाहा छैन; जाँच नगर्नुहोस्"] });
+    return en ? { prompt: "Which material or type is already known? Do not remove covers, inspect a panel, or measure anything live.", choices: choices.en } : { prompt: "पहिलेबाट थाहा भएको सामग्री वा प्रकार कुन हो? कभर नखोल्नुहोस्, प्यानल नजाँच्नुहोस् वा करेन्ट भएको वस्तु ननाप्नुहोस्।", choices: choices.ne };
+  }
+  if (step === "pressure") return en ? { prompt: trade === "plumbing" ? "What water-flow pattern have you already noticed? Do not operate valves or pumps to test." : "What power pattern have you already noticed? Do not measure voltage or recreate the fault.", choices: trade === "plumbing" ? ["Only while supply/pump is running", "Only while a fixture drains", "At other times too", "Cannot tell; do not test"] : ["One known appliance", "Several rooms or whole home", "Only when backup supply is active", "Cannot tell; do not measure"] } : { prompt: trade === "plumbing" ? "पानीको बहावमा पहिलेबाट कस्तो अवस्था देख्नुभएको छ? जाँच्न भल्भ वा पम्प नचलाउनुहोस्।" : "बिजुलीमा पहिलेबाट कस्तो अवस्था देख्नुभएको छ? भोल्टेज ननाप्नुहोस् वा समस्या दोहोर्‍याएर नजाँच्नुहोस्।", choices: trade === "plumbing" ? ["आपूर्ति/पम्प चलेको बेला मात्र", "फिक्स्चरबाट पानी नालीमा बग्दा मात्र", "अन्य समयमा पनि", "थाहा छैन; जाँच नगर्नुहोस्"] : ["पहिलेबाट थाहा भएको एउटा उपकरण", "धेरै कोठा वा पूरै घर", "ब्याकअप आपूर्ति चलेको बेला मात्र", "थाहा छैन; ननाप्नुहोस्"] };
+  if (step === "duration") return en ? { prompt: "How often and for how long has this been happening?", choices: ["Started today / once", "Repeats occasionally", "Frequent or ongoing", "Not sure"] } : { prompt: "यो समस्या कति पटक र कति समयदेखि भइरहेको छ?", choices: ["आज सुरु भयो/एक पटक", "बीचबीचमा दोहोरिन्छ", "बारम्बार वा निरन्तर", "निश्चित छैन"] };
+  if (step === "environment") return en ? { prompt: "What condition has been present when it occurs? Do not recreate the issue.", choices: trade === "plumbing" ? ["After supply resumes", "After stored-tank use", "Rain/damp conditions", "No clear pattern / not sure"] : ["A heavy-load appliance was already running", "Damp/rainy conditions", "Only on backup supply", "No clear pattern / not sure"] } : { prompt: "समस्या हुँदा कुन अवस्था पहिलेबाट देखिएको छ? जाँच्न समस्या नदोहोर्‍याउनुहोस्।", choices: trade === "plumbing" ? ["आपूर्ति फेरि आएपछि", "भण्डारण ट्याङ्की प्रयोगपछि", "वर्षा/ओस भएको बेला", "स्पष्ट ढाँचा छैन/निश्चित छैन"] : ["धेरै भारको उपकरण पहिलेबाट चलेको थियो", "ओस/वर्षा भएको बेला", "ब्याकअप आपूर्तिमा मात्र", "स्पष्ट ढाँचा छैन/निश्चित छैन"] };
+  return en ? { prompt: "How severe or widespread is the problem so far? Do not recreate the fault.", choices: ["One point; now stopped", "Recurring or worsening", "Several areas affected / major water or power impact", "Not sure"] } : { prompt: "अहिलेसम्म समस्या कति गम्भीर वा फैलिएको छ? जाँच्न समस्या फेरि नदोहोर्‍याउनुहोस्।", choices: ["एउटा ठाउँमा सीमित; अहिले रोकिएको", "दोहोरिन्छ वा बढ्दै गएको", "धेरै ठाउँ प्रभावित/सेवामा ठूलो असर", "निश्चित छैन"] };
+}
+
 export function resolveHomeFaultCode(trade: FaultTrade, issueId: string, answers: number[], faultCode?: string): string | null {
-  if (answers.length !== 3 || answers.some(answer => answer < 0 || answer > 3)) return null;
+  if (answers.length < 3 || answers.length > 7 || answers.some(answer => answer < 0 || answer > 3)) return null;
   if (answers.includes(3)) return trade === "plumbing" ? "PL-ONSITE-INSPECTION" : "EL-ONSITE-INSPECTION";
   const node = HOME_FAULT_TREE.find(item => item.code === faultCode && item.trade === trade);
   if (node) {
     const component = answers[1]!;
+    const type = answers[2]!;
     const symptomChoice = answers[0]!;
     const expectedSymptom: Record<string, number> = { pump: 2, tank: 2, fixture: 2, heater: 2, "water-quality": 1, protection: 0, distribution: 2, supply: 1, wiring: 2, "backup-power": 2, controls: 2 };
     if (expectedSymptom[node.group] !== undefined && expectedSymptom[node.group] !== symptomChoice) return trade === "plumbing" ? "PL-ONSITE-INSPECTION" : "EL-ONSITE-INSPECTION";
-    const byGroup: Record<string, Array<string | null>> = {
-      pipe: ["PL-PPR-FUSION-JOINT-LEAK", "PL-GI-THREADED-CORROSION-LEAK", "PL-PVC-SOLVENT-WELD-LEAK", answers[0] === 2 ? "PL-CONCEALED-WALL-SLAB-LEAK" : null],
-      pump: ["PL-SUBMERSIBLE-PUMP-MOTOR-FAULT", "PL-BOOSTER-PUMP-SHORT-CYCLE", "PL-TANK-FLOAT-VALVE-OVERFLOW", null],
-      tank: ["PL-TANK-FLOAT-VALVE-OVERFLOW", null, null, null],
-      "water-quality": ["PL-SUMP-CONTAMINATION", "PL-RO-MEMBRANE-FOULING", null, null],
-      fixture: ["PL-DUAL-FLUSH-CISTERN-FAULT", "PL-MIXER-CARTRIDGE-WEAR", null, null],
-      heater: ["PL-SOLAR-PRV-DISCHARGE", "PL-GAS-GEYSER-IGNITION-DIAPHRAGM", null, null],
-      protection: ["EL-MCB-THERMAL-SHORT-TRIP", "EL-RCCB-NUISANCE-TRIP", null, null],
-      distribution: [null, null, "EL-DB-BUSBAR-LOOSE-TERMINAL", null],
-      supply: ["EL-PHASE-VOLTAGE-DROP", "EL-PHASE-VOLTAGE-DROP", "EL-PHASE-VOLTAGE-DROP", null],
-      wiring: ["EL-BURNT-OUTLET-HEAVY-LOAD", "EL-NEUTRAL-EARTH-LEAKAGE", "EL-BURNT-OUTLET-HEAVY-LOAD", null],
-      "backup-power": ["EL-UPS-CHANGEOVER-WIRING", "EL-UPS-CHANGEOVER-WIRING", "EL-UPS-CHANGEOVER-WIRING", null],
-      controls: [null, null, "EL-WATER-LEVEL-SENSOR-CORROSION", null],
+    const routeByGroup: Record<string, string | null> = {
+      pipe: component === 2 && symptomChoice === 2 ? "PL-CONCEALED-WALL-SLAB-LEAK"
+        : component === 0 && symptomChoice === 0 ? ["PL-PPR-FUSION-JOINT-LEAK", "PL-GI-THREADED-CORROSION-LEAK", "PL-PVC-SOLVENT-WELD-LEAK"][type] ?? null
+          : null,
+      pump: component === 0 && type === 0 ? "PL-SUBMERSIBLE-PUMP-MOTOR-FAULT" : component === 1 && type === 1 ? "PL-BOOSTER-PUMP-SHORT-CYCLE" : component === 2 && type === 2 ? "PL-TANK-FLOAT-VALVE-OVERFLOW" : null,
+      tank: component === 0 && type === 0 ? "PL-TANK-FLOAT-VALVE-OVERFLOW" : null,
+      "water-quality": component === 0 && type === 0 ? "PL-SUMP-CONTAMINATION" : component === 1 && type === 1 ? "PL-RO-MEMBRANE-FOULING" : null,
+      fixture: component === 0 && type === 0 ? "PL-DUAL-FLUSH-CISTERN-FAULT" : component === 1 && type === 1 ? "PL-MIXER-CARTRIDGE-WEAR" : null,
+      heater: component === 0 && type === 0 ? "PL-SOLAR-PRV-DISCHARGE" : component === 1 && type === 1 ? "PL-GAS-GEYSER-IGNITION-DIAPHRAGM" : null,
+      protection: component === 0 && type < 2 ? "EL-MCB-THERMAL-SHORT-TRIP" : component === 1 ? "EL-RCCB-NUISANCE-TRIP" : null,
+      distribution: component === 0 && type < 2 ? "EL-DB-BUSBAR-LOOSE-TERMINAL" : null,
+      supply: component < 3 && type < 3 ? "EL-PHASE-VOLTAGE-DROP" : null,
+      wiring: component === 0 && type === 0 ? "EL-BURNT-OUTLET-HEAVY-LOAD" : component === 1 && type === 1 ? "EL-NEUTRAL-EARTH-LEAKAGE" : component === 2 && type === 2 ? "EL-BURNT-OUTLET-HEAVY-LOAD" : null,
+      "backup-power": component < 3 && type < 3 ? "EL-UPS-CHANGEOVER-WIRING" : null,
+      controls: component === 0 && type === 0 || component === 2 && type === 2 ? "EL-WATER-LEVEL-SENSOR-CORROSION" : null,
     };
-    const resolved = byGroup[node.group]?.[component];
+    const resolved = routeByGroup[node.group];
     return resolved && HOME_FAULT_TREE.some(item => item.code === resolved && item.trade === trade) ? resolved : (trade === "plumbing" ? "PL-ONSITE-INSPECTION" : "EL-ONSITE-INSPECTION");
   }
   if (trade === "electrical") return "EL-SITE-INSPECTION";
-  if (issueId === "tap-leak" && answers[0] === 0) return answers[1] === 0 ? "PL-TAP-CLOSURE-LEAK" : "PL-TAP-BASE-LEAK";
-  if (issueId === "pipe-leak") return answers[1] === 0 ? "PL-EXPOSED-JOINT-LEAK" : "PL-EXPOSED-PIPE-LEAK";
-  return "PL-ONSITE-INSPECTION";
+  if (issueId === "tap-leak") {
+    if (answers[0] === 0 && answers[1] === 0) return "PL-TAP-CLOSURE-LEAK";
+    if (answers[0] === 1 && answers[1] === 1) return "PL-TAP-BASE-LEAK";
+    if (answers[0] === 2 && answers[1] === 2) return "PL-UNDER-SINK-JOINT-LEAK";
+  }
+  if (issueId === "pipe-leak") {
+    if (answers[0] === 2 && answers[1] === 2) return "PL-CONCEALED-WALL-SLAB-LEAK";
+    if (answers[0] === 0 && answers[1] === 0 && answers[2] === 0) return "PL-PPR-FUSION-JOINT-LEAK";
+    if (answers[0] === 0 && answers[1] === 0 && answers[2] === 1) return "PL-GI-THREADED-CORROSION-LEAK";
+    if (answers[0] === 0 && answers[1] === 0 && answers[2] === 2) return "PL-PVC-SOLVENT-WELD-LEAK";
+    if (answers[0] === 1 && answers[1] === 1) return "PL-EXPOSED-PIPE-LEAK";
+  }
+  return trade === "plumbing" ? "PL-ONSITE-INSPECTION" : "EL-ONSITE-INSPECTION";
 }
+
 export function faultServiceId(code: string): string | null {
   const node = HOME_FAULT_TREE.find(item => item.code === code);
   if (node) return node.serviceId;
