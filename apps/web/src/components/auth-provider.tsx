@@ -1,12 +1,12 @@
 "use client";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
-import { configurationMessage, DEMO_PHONE_AUTH_NUMBERS, isDemoPhoneAuthNumber, normalizeNepalPhoneNumber, observeAuthSession, type AuthSnapshot, type Database } from "@tirkha/shared";
+import { configurationMessage, DEMO_PHONE_AUTH_NUMBERS, isDemoPhoneAuthNumber, normalizeNepalPhoneNumber, observeAuthSession, type AuthSnapshot, type Database, type HeroTrade } from "@tirkha/shared";
 import { getSupabase } from "@/lib/supabase";
 
 type DemoRole = "customer" | "professional";
-type DemoIdentity = { phone: string; role: DemoRole; fullName: string; createdAt: string };
-type AuthState = AuthSnapshot<Session> & { client: SupabaseClient<Database> | null; demoSignIn: (phone: string, role: DemoRole, fullName?: string) => void };
+type DemoIdentity = { phone: string; role: DemoRole; fullName: string; tradeCategory?: HeroTrade; createdAt: string };
+type AuthState = AuthSnapshot<Session> & { client: SupabaseClient<Database> | null; demoSignIn: (phone: string, role: DemoRole, fullName?: string, tradeCategory?: HeroTrade) => void };
 const demoStorageKey = "tirkha.demo-auth.v1";
 const activeRoleStorageKey = "tirkha.demo-auth.active-role";
 const demoAuthEnabled = process.env.NEXT_PUBLIC_TIRKHA_DEMO_AUTH === "1" || (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_TIRKHA_LOCAL_MOCK === "1");
@@ -38,7 +38,7 @@ function sessionFromIdentity(identity: DemoIdentity): Session | null {
     user: {
       id: `00000000-0000-4000-8000-${digits}`,
       app_metadata: { provider: "phone", providers: ["phone"], demo_auth: true },
-      user_metadata: { phone: identity.phone, full_name: identity.fullName, requested_role: identity.role, demo_auth: true },
+      user_metadata: { phone: identity.phone, full_name: identity.fullName, requested_role: identity.role, ...(identity.tradeCategory ? { trade_category: identity.tradeCategory } : {}), demo_auth: true },
       aud: "authenticated",
       created_at: createdAt.toISOString(),
       phone: identity.phone,
@@ -80,10 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!savedDemo) setState({ session: null, loading: false, error: demoAuthEnabled ? null : configurationMessage(error, "Sign-in is unavailable. Please contact Tirkha support.") });
     }
   }, []);
-  function demoSignIn(phone: string, role: DemoRole, fullName = "Tirkha Demo User") {
+  function demoSignIn(phone: string, role: DemoRole, fullName = "Tirkha Demo User", tradeCategory?: HeroTrade) {
     const normalizedPhone = normalizeNepalPhoneNumber(phone);
     if (!isDemoPhoneAuthNumber(normalizedPhone, demoAuthEnabled, demoPhoneAllowlist)) throw new Error("Demo sign-in is disabled for this number.");
-    const identity: DemoIdentity = { phone: normalizedPhone, role, fullName: fullName.trim() || "Tirkha Demo User", createdAt: new Date().toISOString() };
+    const identity: DemoIdentity = { phone: normalizedPhone, role, fullName: fullName.trim() || "Tirkha Demo User", ...(tradeCategory ? { tradeCategory } : {}), createdAt: new Date().toISOString() };
     try {
       window.localStorage.setItem(roleStorageKey(role), JSON.stringify(identity));
       window.sessionStorage.setItem(activeRoleStorageKey, role);

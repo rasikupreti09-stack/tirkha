@@ -7,9 +7,9 @@ import { HERO_OPERATIONAL_ZONES, HERO_TRADES, heroRegistrationSchema, type HeroO
 import { useAuth } from "@/components/auth-provider";
 
 const zoneLabels: Record<HeroOperationalZone, string> = { Kathmandu: "Kathmandu", Lalitpur: "Lalitpur", Bhaktapur: "Bhaktapur", Baneshwor: "Baneshwor / New Baneshwor", Thamel: "Thamel", Kirtipur: "Kirtipur" };
-const tradeLabels: Record<HeroTrade, string> = { PLUMBING: "Plumbing", ELECTRICAL: "Electrical" };
+const tradeLabels: Record<HeroTrade, string> = { PLUMBING: "Plumber", ELECTRICAL: "Electrician", BEAUTICIAN: "Beautician", APPLIANCE_TECHNICIAN: "Appliance Technician" };
 
-type ExistingApplication = { verification_status: "pending" | "verified" | "rejected"; suspended_at: string | null; operational_zone: HeroOperationalZone | null; trade_code: HeroTrade | null };
+type ExistingApplication = { verification_status: "pending" | "verified" | "rejected"; suspended_at: string | null; operational_zone: HeroOperationalZone | null; trade_code: HeroTrade | null; trade_category: HeroTrade | null };
 
 export default function HeroRegisterPage() {
   const { client, session, loading } = useAuth();
@@ -26,16 +26,21 @@ export default function HeroRegisterPage() {
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    if (!client || !session) return;
+    if (!session) return;
     setPhone(session.user.phone ?? "");
+    const metadataName = session.user.user_metadata.full_name;
+    if (typeof metadataName === "string") setFullName(metadataName);
+    const metadataTrade = session.user.user_metadata.trade_category;
+    if (typeof metadataTrade === "string" && HERO_TRADES.includes(metadataTrade as HeroTrade)) setTrade(metadataTrade as HeroTrade);
+    if (!client) return;
     void client.from("profiles").select("full_name,phone").eq("id", session.user.id).maybeSingle().then(({ data }) => {
       if (data?.full_name) setFullName(data.full_name);
       if (data?.phone) setPhone(data.phone);
     });
-    void client.from("professional_profiles").select("verification_status,suspended_at,operational_zone,trade_code").eq("profile_id", session.user.id).maybeSingle().then(({ data }) => {
+    void client.from("professional_profiles").select("verification_status,suspended_at,operational_zone,trade_code,trade_category").eq("profile_id", session.user.id).maybeSingle().then(({ data }) => {
       if (!data) return;
       setApplication(data as ExistingApplication);
-      setTrade(data.trade_code ?? ""); setZone(data.operational_zone ?? "");
+      setTrade(data.trade_category ?? data.trade_code ?? ""); setZone(data.operational_zone ?? "");
       if (data.verification_status === "verified" && !data.suspended_at) router.replace("/hero/dashboard");
     });
   }, [client, session, router]);
@@ -53,8 +58,9 @@ export default function HeroRegisterPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault(); setError(""); setSuccess("");
-    if (!client || !session) return;
-    const registration = heroRegistrationSchema.safeParse({ full_name: fullName, phone, trade_code: trade, operational_zone: zone });
+    if (!client || !session) { setError("A live Supabase-authenticated Hero account is required to upload identity documents and submit verification."); return; }
+    if (session.user.user_metadata.demo_auth === true) { setError("Demo sign-in is for portal preview only. Use a live verified-phone account to submit Hero registration."); return; }
+    const registration = heroRegistrationSchema.safeParse({ full_name: fullName, phone, trade_category: trade, operational_zone: zone });
     if (!registration.success || !document) { setError("Complete your name, verified phone, trade and operational zone, then attach a citizenship or government ID document."); return; }
     if (!/^(image\/(jpeg|png|webp)|application\/pdf)$/.test(document.type) || document.size > 10 * 1024 * 1024) { setError("Choose a JPG, PNG, WebP or PDF file under 10 MB."); return; }
     setBusy(true);
@@ -65,11 +71,11 @@ export default function HeroRegisterPage() {
       const upload = await client.storage.from("hero-kyc-documents").upload(uploadedPath, document, { contentType: document.type, upsert: false });
       if (upload.error) throw upload.error;
       const { data, error: submitError } = await client.rpc("submit_hero_registration", {
-        p_full_name: registration.data.full_name, p_phone: registration.data.phone, p_trade_code: registration.data.trade_code,
+        p_full_name: registration.data.full_name, p_phone: registration.data.phone, p_trade_code: registration.data.trade_category,
         p_operational_zone: registration.data.operational_zone, p_document_path: uploadedPath,
       });
       if (submitError) throw submitError;
-      setApplication({ verification_status: data ?? "pending", suspended_at: null, trade_code: registration.data.trade_code, operational_zone: registration.data.operational_zone });
+      setApplication({ verification_status: data ?? "pending", suspended_at: null, trade_code: registration.data.trade_category, trade_category: registration.data.trade_category, operational_zone: registration.data.operational_zone });
       setSuccess("Application submitted. Your account stays pending until Tirkha operations verifies your details.");
     } catch (failure) {
       if (uploadedPath) await client.storage.from("hero-kyc-documents").remove([uploadedPath]).catch(() => undefined);
@@ -80,7 +86,7 @@ export default function HeroRegisterPage() {
   if (loading) return <main className="mx-auto max-w-2xl p-6"><p role="status">Checking your Tirkha account…</p></main>;
   if (!session) return <main className="mx-auto max-w-xl p-6 py-16"><section className="rounded-2xl border bg-white p-7 shadow-sm"><p className="text-xs font-bold uppercase tracking-[.2em] text-emerald-800">Tirkha | तिर्खा</p><h1 className="mt-3 text-3xl font-semibold">Become a Hero</h1><p className="mt-2 text-slate-600">Sign in with your verified Nepal phone number to submit your professional application.</p><Link href="/login?next=%2Fhero%2Fregister" className="mt-6 inline-flex rounded-lg bg-slate-900 px-5 py-3 font-semibold text-white">Sign in to continue</Link></section></main>;
   if (application?.suspended_at) return <main className="mx-auto max-w-xl p-6 py-16"><section className="rounded-2xl border border-rose-200 bg-white p-7"><p className="text-xs font-bold uppercase tracking-[.2em] text-emerald-800">Tirkha | तिर्खा</p><h1 className="mt-3 text-2xl font-semibold">Hero access is suspended</h1><p className="mt-2 text-slate-600">Only Tirkha operations can restore a suspended account. Contact the admin team for a review; submitting a new application cannot bypass the suspension.</p><Link href="/" className="mt-6 inline-flex text-sm font-semibold text-emerald-800 underline">Return to Tirkha</Link></section></main>;
-  if (success || (application?.verification_status === "pending")) return <main className="mx-auto max-w-2xl p-6 py-12"><section className="rounded-2xl border bg-white p-7 shadow-sm"><div className="grid size-12 place-items-center rounded-full bg-amber-100 text-amber-800"><FileCheck2 /></div><h1 className="mt-4 text-2xl font-semibold">Application pending verification</h1><p className="mt-2 text-slate-600">{success || "Your submitted Hero profile and identity document are with Tirkha operations for review."}</p><div className="mt-5 grid gap-3 rounded-xl bg-slate-50 p-4 text-sm"><p><strong>Trade:</strong> {application?.trade_code ? tradeLabels[application.trade_code] : "Submitted"}</p><p><strong>Operational zone:</strong> {application?.operational_zone ? zoneLabels[application.operational_zone] : "Submitted"}</p><p><strong>Availability:</strong> Offline until approved</p></div><Link href="/" className="mt-6 inline-flex text-sm font-semibold text-emerald-800 underline">Return to Tirkha</Link></section></main>;
+  if (success || (application?.verification_status === "pending")) return <main className="mx-auto max-w-2xl p-6 py-12"><section className="rounded-2xl border bg-white p-7 shadow-sm"><div className="grid size-12 place-items-center rounded-full bg-amber-100 text-amber-800"><FileCheck2 /></div><h1 className="mt-4 text-2xl font-semibold">Application pending verification</h1><p className="mt-2 text-slate-600">{success || "Your submitted Hero profile and identity document are with Tirkha operations for review."}</p><div className="mt-5 grid gap-3 rounded-xl bg-slate-50 p-4 text-sm"><p><strong>Trade:</strong> {application?.trade_category || application?.trade_code ? tradeLabels[(application.trade_category ?? application.trade_code)!] : "Submitted"}</p><p><strong>Operational zone:</strong> {application?.operational_zone ? zoneLabels[application.operational_zone] : "Submitted"}</p><p><strong>Availability:</strong> Offline until approved</p></div><Link href="/" className="mt-6 inline-flex text-sm font-semibold text-emerald-800 underline">Return to Tirkha</Link></section></main>;
 
   return <main className="mx-auto max-w-2xl p-4 py-8 sm:p-8"><Link href="/" className="inline-flex items-center gap-2 text-sm text-slate-600"><ArrowLeft size={16} /> Back to Tirkha</Link><section className="mt-5 rounded-2xl border bg-white p-5 shadow-sm sm:p-8">
     <p className="text-xs font-bold uppercase tracking-[.2em] text-emerald-800">Tirkha | तिर्खा · Hero registration</p><h1 className="mt-2 text-3xl font-semibold">Work with care. Earn with Tirkha.</h1><p className="mt-2 text-sm text-slate-600">Complete these three steps. Your profile remains pending until an admin verifies your identity.</p>

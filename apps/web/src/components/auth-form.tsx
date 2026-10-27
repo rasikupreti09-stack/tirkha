@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { createPhoneAuth, isDemoPhoneAuthNumber, phoneAuthError, phoneSchema, phoneSignupSchema, verifyDemoPhoneAuthCode, DEMO_PHONE_AUTH_NUMBERS, DEMO_PHONE_AUTH_CODE, normalizeNepalPhoneNumber } from "@tirkha/shared";
+import { createPhoneAuth, HERO_TRADES, isDemoPhoneAuthNumber, phoneAuthError, phoneSchema, phoneSignupSchema, verifyDemoPhoneAuthCode, DEMO_PHONE_AUTH_NUMBERS, DEMO_PHONE_AUTH_CODE, normalizeNepalPhoneNumber, type HeroTrade } from "@tirkha/shared";
 import { useAuth } from "./auth-provider";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -16,10 +16,11 @@ const demoPhoneAllowlist = (process.env.NEXT_PUBLIC_TIRKHA_DEMO_PHONES || DEMO_P
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const signup = mode === "signup";
   const { client, error: sessionError, demoSignIn, session, loading } = useAuth();
-  const [phone, setPhone] = useState("+977");
+  const [phone, setPhone] = useState("");
   const [token, setToken] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<"customer" | "professional">("customer");
+  const [tradeCategory, setTradeCategory] = useState<HeroTrade | "">("");
   const [sent, setSent] = useState(false);
   const [demoCodeSent, setDemoCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -28,7 +29,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [returnTo, setReturnTo] = useState("/dashboard");
   const [returnToReady, setReturnToReady] = useState(false);
   const lock = useRef(false);
-  const normalizedPhone = normalizeNepalPhoneNumber(phone);
+  const normalizedPhone = normalizeNepalPhoneNumber(`+977${phone}`);
   const isDemoPhone = isDemoPhoneAuthNumber(normalizedPhone, demoAuthEnabled, demoPhoneAllowlist);
   const canUseDemo = demoAuthEnabled;
   useEffect(() => { const timer = setInterval(() => setCooldown(n => Math.max(0, n - 1)), 1000); return () => clearInterval(timer); }, []);
@@ -38,7 +39,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     lock.current = true; setBusy(true); setError("");
     try {
       const canonicalPhone = phoneSchema.parse(normalizedPhone);
-      if (!verify && signup) phoneSignupSchema.parse({ full_name: name, role });
+      if (!verify && signup) {
+        if (role === "professional" && !tradeCategory) throw new Error("Choose your Hero trade before continuing.");
+        phoneSignupSchema.parse({ full_name: name, role, ...(role === "professional" ? { trade_category: tradeCategory || undefined } : {}) });
+      }
       if (isDemoPhone) {
         if (!verify) {
           setSent(true); setDemoCodeSent(true); setToken(""); setCooldown(0);
@@ -48,17 +52,17 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           throw new Error(`For this demo number, enter ${DEMO_PHONE_AUTH_CODE}.`);
         }
         const demoRole = signup ? role : returnTo.startsWith("/hero/") ? "professional" : "customer";
-        demoSignIn(canonicalPhone, demoRole, name || "Tirkha Demo User");
+        demoSignIn(canonicalPhone, demoRole, name || "Tirkha Demo User", signup && role === "professional" ? tradeCategory || undefined : undefined);
         return;
       }
       if (!client) throw new Error("Supabase phone authentication is not configured. Enable the local demo option or configure Supabase.");
       const auth = createPhoneAuth(client);
       const result = verify ? await auth.verifyPhoneOtp(canonicalPhone, token)
-        : await auth.signInWithPhone(canonicalPhone, signup ? { full_name: name, role } : undefined);
+        : await auth.signInWithPhone(canonicalPhone, signup ? { full_name: name, role, ...(role === "professional" ? { trade_category: tradeCategory || undefined } : {}) } : undefined);
       if (result.error) throw result.error;
       if (!verify) { setSent(true); setDemoCodeSent(false); setToken(""); setCooldown(60); }
     } catch (failure) {
-      setError(failure instanceof Error && failure.message.startsWith("For this demo")
+      setError(failure instanceof Error && (failure.message.startsWith("For this demo") || failure.message.startsWith("Choose your Hero trade"))
         ? failure.message : phoneAuthError(failure));
     } finally { lock.current = false; setBusy(false); }
   }
@@ -88,9 +92,9 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       <form onSubmit={e => { e.preventDefault(); void submit(); }} className="space-y-4">
         <fieldset disabled={busy || (!client && !canUseDemo)} className="space-y-4">
           {signup && !sent && <><Label htmlFor="full-name">Full name</Label><Input id="full-name" value={name} onChange={e => setName(e.target.value)} maxLength={100} autoComplete="name" required />
-          <Label htmlFor="role">Account type</Label><select id="role" className="w-full rounded-md border bg-background p-3" value={role} onChange={e => setRole(e.target.value as typeof role)}><option value="customer">Customer</option><option value="professional">Professional (verification required)</option></select></>}
-          <Label htmlFor="phone">Mobile number (+977)</Label><Input id="phone" type="tel" autoComplete="tel" placeholder="+97798XXXXXXXX" value={phone} readOnly={sent} onChange={e => setPhone(e.target.value)} maxLength={14} required />
-          {sent && <><p role="status" className="text-sm">{demoCodeSent ? `Demo code ${DEMO_PHONE_AUTH_CODE} is ready for ${phone}.` : `Enter the SMS code for ${phone}.`}</p><Label htmlFor="otp">Six-digit code</Label><Input id="otp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={token} onChange={e => setToken(e.target.value.replace(/\D/g, ""))} required /></>}
+          <Label htmlFor="role">Account type</Label><select id="role" className="w-full rounded-md border bg-background p-3" value={role} onChange={e => setRole(e.target.value as typeof role)}><option value="customer">Customer</option><option value="professional">Service Hero (verification required)</option></select>{role === "professional" && <><Label htmlFor="trade-category">Your trade</Label><select id="trade-category" className="w-full rounded-md border bg-background p-3" value={tradeCategory} onChange={e => setTradeCategory(e.target.value as HeroTrade | "")} required><option value="">Choose a trade</option><option value="PLUMBING">Plumber</option><option value="ELECTRICAL">Electrician</option><option value="BEAUTICIAN">Beautician</option><option value="APPLIANCE_TECHNICIAN">Appliance Technician</option></select></>}</>}
+          <Label htmlFor="phone">Mobile number</Label><div className="flex overflow-hidden rounded-md border bg-background focus-within:ring-2 focus-within:ring-ring"><span className="flex items-center border-r bg-muted px-3 text-sm font-medium text-foreground" aria-hidden="true">+977</span><Input id="phone" className="rounded-none border-0 shadow-none focus-visible:ring-0" type="tel" inputMode="numeric" autoComplete="tel-national" placeholder="98XXXXXXXX" value={phone} readOnly={sent} onChange={e => { const digits = e.target.value.replace(/\D/g, ""); setPhone((digits.startsWith("977") ? digits.slice(3) : digits).slice(-10)); }} maxLength={10} pattern="9[0-9]{9}" aria-describedby="phone-help" required /></div><small id="phone-help" className="text-xs text-muted-foreground">Enter your 10-digit Nepal mobile number. The +977 country code is added automatically.</small>
+          {sent && <><p role="status" className="text-sm">{demoCodeSent ? `Demo code ${DEMO_PHONE_AUTH_CODE} is ready for ${normalizedPhone}.` : `Enter the SMS code for ${normalizedPhone}.`}</p><Label htmlFor="otp">Six-digit code</Label><Input id="otp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={token} onChange={e => setToken(e.target.value.replace(/\D/g, ""))} required /></>}
           <Button type="submit" className="w-full" disabled={busy || (!client && !canUseDemo) || (!sent && cooldown > 0)}>{busy ? "Please wait…" : sent ? "Verify and continue" : cooldown ? `Wait ${cooldown}s` : "Send SMS code"}</Button>
           {sent && !demoCodeSent && <div className="flex gap-3"><Button type="button" variant="outline" disabled={cooldown > 0} onClick={() => void submit(false)}>{cooldown ? `Resend in ${cooldown}s` : "Resend code"}</Button><Button type="button" variant="outline" onClick={() => { setSent(false); setDemoCodeSent(false); setToken(""); setError(""); }}>Change number</Button></div>}
           {sent && demoCodeSent && <Button type="button" variant="outline" onClick={() => { setSent(false); setDemoCodeSent(false); setToken(""); setError(""); }}>Change number</Button>}

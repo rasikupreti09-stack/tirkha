@@ -9,8 +9,9 @@ import { HeroDispatchInbox } from "@/components/hero-dispatch-inbox";
 import { HeroGpsTracker } from "@/components/hero-gps-tracker";
 import { Button } from "@/components/ui/button";
 
+const tradeLabels: Record<HeroTrade, string> = { PLUMBING: "Plumber", ELECTRICAL: "Electrician", BEAUTICIAN: "Beautician", APPLIANCE_TECHNICIAN: "Appliance Technician" };
 const zoneLabels: Record<HeroOperationalZone, string> = { Kathmandu: "Kathmandu", Lalitpur: "Lalitpur", Bhaktapur: "Bhaktapur", Baneshwor: "Baneshwor / New Baneshwor", Thamel: "Thamel", Kirtipur: "Kirtipur" };
-type HeroAccess = { verification_status: "pending" | "verified" | "rejected"; suspended_at: string | null; operational_zone: HeroOperationalZone | null; trade_code: HeroTrade | null };
+type HeroAccess = { verification_status: "pending" | "verified" | "rejected"; suspended_at: string | null; operational_zone: HeroOperationalZone | null; trade_code: HeroTrade | null; trade_category: HeroTrade | null };
 type WorkBooking = Pick<WorkflowBooking, "id" | "category_id" | "service_address" | "job_details" | "status" | "total_price_paisa" | "scheduled_at">;
 
 function getCurrentCoordinates() {
@@ -30,23 +31,32 @@ export default function HeroDashboardPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [demoProfile, setDemoProfile] = useState(false);
   const heroId = session?.user.id;
 
   const refresh = useCallback(async () => {
+    if (session?.user.user_metadata.demo_auth === true && heroId) {
+      const metadataTrade = session.user.user_metadata.trade_category;
+      const trade = typeof metadataTrade === "string" && ["PLUMBING", "ELECTRICAL", "BEAUTICIAN", "APPLIANCE_TECHNICIAN"].includes(metadataTrade) ? metadataTrade as HeroTrade : null;
+      setDemoProfile(true);
+      setAccess({ verification_status: "pending", suspended_at: null, operational_zone: null, trade_code: trade, trade_category: trade });
+      setOnline(false); setJobs([]); setLoadingData(false); return;
+    }
     if (!client || !heroId) { setLoadingData(false); return; }
     const [profileResult, locationResult, activeResult, categoryResult] = await Promise.all([
-      client.from("professional_profiles").select("verification_status,suspended_at,operational_zone,trade_code").eq("profile_id", heroId).maybeSingle(),
+      client.from("professional_profiles").select("verification_status,suspended_at,operational_zone,trade_code,trade_category").eq("profile_id", heroId).maybeSingle(),
       client.from("hero_locations").select("updated_at").eq("professional_id", heroId).maybeSingle(),
       client.from("bookings").select("id,category_id,service_address,job_details,status,total_price_paisa,scheduled_at").eq("professional_id", heroId).in("status", ["accepted", "on_the_way", "in_progress"]).order("scheduled_at", { ascending: true }),
       client.from("service_categories").select("id,name"),
     ]);
     if (profileResult.error) { setError("Could not load Hero verification. Ensure migration 21 is applied."); setLoadingData(false); return; }
+    setDemoProfile(false);
     setAccess(profileResult.data as HeroAccess | null);
     setOnline(!!locationResult.data && Date.now() - Date.parse(locationResult.data.updated_at) < 90_000);
     if (activeResult.error) setError("Could not load your active work list."); else setJobs((activeResult.data ?? []) as WorkBooking[]);
     if (!categoryResult.error) setCategories(new Map((categoryResult.data ?? []).map(row => [row.id, row.name])));
     setLoadingData(false);
-  }, [client, heroId]);
+  }, [client, heroId, session]);
 
   useEffect(() => { if (!loading && !session) router.replace("/login?next=%2Fhero%2Fdashboard"); }, [loading, session, router]);
   useEffect(() => { void refresh(); }, [refresh]);
@@ -82,10 +92,11 @@ export default function HeroDashboardPage() {
   if (loading || loadingData) return <main className="mx-auto max-w-6xl p-6" role="status">Loading your Hero workspace…</main>;
   if (!session) return null;
   if (!access) return <main className="mx-auto max-w-xl p-6 py-16"><section className="rounded-2xl border bg-white p-7"><h1 className="text-2xl font-semibold">Hero profile not found</h1><p className="mt-2 text-slate-600">Submit a Hero registration before opening the work dashboard.</p><Link className="mt-5 inline-block text-emerald-800 underline" href="/hero/register">Start registration</Link></section></main>;
-  if (access.verification_status !== "verified" || access.suspended_at) return <main className="mx-auto max-w-3xl space-y-5 p-4 py-10 sm:p-8"><div className="rounded-2xl border bg-white p-7"><ShieldCheck className="text-amber-700"/><h1 className="mt-3 text-2xl font-semibold">{access.suspended_at ? "Hero access suspended" : access.verification_status === "rejected" ? "Application needs attention" : "Verification in progress"}</h1><p className="mt-2 text-slate-600">{access.suspended_at ? "Contact Tirkha operations to review your account status." : access.verification_status === "rejected" ? "Your application was not approved. You can update your details and resubmit identity verification." : "Your account remains offline until Tirkha operations verifies your identity and trade."}</p><Link className="mt-5 inline-block rounded-lg border px-4 py-2 font-medium" href="/hero/register">Review application</Link></div></main>;
+  if (access.verification_status !== "verified" || access.suspended_at) return <main className="mx-auto max-w-3xl space-y-5 p-4 py-10 sm:p-8"><div className="rounded-2xl border bg-white p-7"><ShieldCheck className="text-amber-700"/><h1 className="mt-3 text-2xl font-semibold">{access.suspended_at ? "Hero access suspended" : access.verification_status === "rejected" ? "Application needs attention" : "Verification in progress"}</h1><p className="mt-2 text-slate-600">{demoProfile ? "Your demo OTP sign-in is complete. Demo sessions do not create a Supabase Hero profile or receive live requests; use a verified Supabase phone account to submit identity documents and activate dispatch." : access.suspended_at ? "Contact Tirkha operations to review your account status." : access.verification_status === "rejected" ? "Your application was not approved. You can update your details and resubmit identity verification." : "Your account remains offline until Tirkha operations verifies your identity and trade."}</p>{demoProfile && <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm"><strong>Selected trade:</strong> {(access.trade_category ?? access.trade_code) ? tradeLabels[(access.trade_category ?? access.trade_code)!] : "Not selected during this sign-in"}</p>}<Link className="mt-5 inline-block rounded-lg border px-4 py-2 font-medium" href="/hero/register">Review application</Link></div></main>;
 
   return <main className="mx-auto max-w-7xl space-y-6 p-4 py-8 sm:p-8">
-    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-800">Tirkha | तिर्खा · Hero portal</p><h1 className="mt-2 text-3xl font-semibold">Your work, clearly organized.</h1><p className="mt-1 text-sm text-slate-600">{access.trade_code} · {access.operational_zone ? zoneLabels[access.operational_zone] : "Zone not set"} · Nearby jobs use trade, zone and GPS eligibility.</p></div><button type="button" disabled={busy || (online && jobs.length > 0)} onClick={() => void toggleAvailability()} className={`inline-flex min-h-12 items-center gap-2 rounded-xl px-5 font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-55 ${online ? "bg-emerald-700 hover:bg-emerald-800" : "bg-slate-800 hover:bg-slate-900"}`}><Power size={18}/>{busy ? "Updating…" : online ? "Online · Go offline" : "Offline · Go online"}</button></header>
+    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-800">Tirkha | तिर्खा · Hero portal</p><h1 className="mt-2 text-3xl font-semibold">Your work, clearly organized.</h1><p className="mt-1 text-sm text-slate-600">{(access.trade_category ?? access.trade_code) ? tradeLabels[(access.trade_category ?? access.trade_code)!] : "Trade not selected"} · {access.operational_zone ? zoneLabels[access.operational_zone] : "Zone not set"} · Nearby jobs use trade, zone and GPS eligibility.</p></div><button type="button" disabled={busy || (online && jobs.length > 0)} onClick={() => void toggleAvailability()} className={`inline-flex min-h-12 items-center gap-2 rounded-xl px-5 font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-55 ${online ? "bg-emerald-700 hover:bg-emerald-800" : "bg-slate-800 hover:bg-slate-900"}`}><Power size={18}/>{busy ? "Updating…" : online ? "Online · Go offline" : "Offline · Go online"}</button></header>
+    {demoProfile && <p role="status" className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">Demo Hero sign-in is active. This local session has no live Supabase profile or dispatch access; complete registration with a Supabase-authenticated account to receive real jobs.</p>}
     {error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
     <section className="grid gap-4 sm:grid-cols-3"><Stat icon={<Activity/>} label="Availability" value={online ? "Online" : "Offline"}/><Stat icon={<BriefcaseBusiness/>} label="Active work" value={String(jobs.length)}/><Stat icon={<MapPin/>} label="Service zone" value={access.operational_zone ? zoneLabels[access.operational_zone] : "Not set"}/></section>
     <HeroGpsTracker enabled={online}/>

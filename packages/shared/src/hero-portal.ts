@@ -1,13 +1,13 @@
 import { z } from "zod";
 
-export const HERO_TRADES = ["PLUMBING", "ELECTRICAL"] as const;
+export const HERO_TRADES = ["PLUMBING", "ELECTRICAL", "BEAUTICIAN", "APPLIANCE_TECHNICIAN"] as const;
 export const HERO_OPERATIONAL_ZONES = ["Kathmandu", "Lalitpur", "Bhaktapur", "Baneshwor", "Thamel", "Kirtipur"] as const;
 export const heroTradeSchema = z.enum(HERO_TRADES);
 export const heroOperationalZoneSchema = z.enum(HERO_OPERATIONAL_ZONES);
 export const heroRegistrationSchema = z.strictObject({
   full_name: z.string().trim().min(2).max(100),
   phone: z.string().regex(/^\+9779[0-9]{9}$/),
-  trade_code: heroTradeSchema,
+  trade_category: heroTradeSchema,
   operational_zone: heroOperationalZoneSchema,
 });
 export const heroQuoteInputSchema = z.strictObject({
@@ -40,7 +40,7 @@ export type CompletedTransaction = {
   timestamp: string;
   hero_id: string;
   hero_name: string;
-  hero_trade: 'PLUMBING' | 'ELECTRICAL';
+  hero_trade: 'PLUMBING' | 'ELECTRICAL' | 'BEAUTICIAN' | 'APPLIANCE_TECHNICIAN';
   gross_amount: number;
   commission_rate: number;
   company_income: number;
