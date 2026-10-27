@@ -6,7 +6,7 @@ import { getSupabase } from "@/lib/supabase";
 import { isDemoAuthPhone } from "@/lib/auth";
 
 type DemoRole = "customer" | "professional";
-type DemoIdentity = { phone: string; role: DemoRole; fullName: string; tradeCategory?: HeroTrade; createdAt: string };
+type DemoIdentity = { id?: string; phone: string; role: DemoRole; fullName: string; trade?: string; tradeCategory?: HeroTrade; createdAt: string };
 type AuthState = AuthSnapshot<Session> & { client: SupabaseClient<Database> | null; demoSignIn: (phone: string, role: DemoRole, fullName?: string, tradeCategory?: HeroTrade) => void };
 const demoStorageKey = "tirkha.demo-auth.v1";
 const activeRoleStorageKey = "tirkha.demo-auth.active-role";
@@ -17,7 +17,7 @@ function expectedDemoRole(): DemoRole {
   if (typeof window === "undefined") return "customer";
   const url = new URL(window.location.href);
   const next = url.searchParams.get("next");
-  if (window.location.pathname.startsWith("/hero/") || next?.startsWith("/hero/") || url.searchParams.get("role") === "professional") return "professional";
+  if (window.location.pathname.startsWith("/hero/") || next?.toLowerCase().includes("hero") || url.searchParams.get("role") === "professional") return "professional";
   try {
     const active = window.sessionStorage.getItem(activeRoleStorageKey);
     if (active === "customer" || active === "professional") return active;
@@ -84,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   function demoSignIn(phone: string, role: DemoRole, fullName = "Tirkha Demo User", tradeCategory?: HeroTrade) {
     const normalizedPhone = normalizeNepalPhoneNumber(phone);
     if (!isDemoAuthPhone(normalizedPhone, demoAuthEnabled, demoPhoneAllowlist)) throw new Error("Demo sign-in is disabled for this number.");
-    const identity: DemoIdentity = { phone: normalizedPhone, role, fullName: fullName.trim() || "Tirkha Demo User", ...(tradeCategory ? { tradeCategory } : {}), createdAt: new Date().toISOString() };
+    const identity: DemoIdentity = { id: role === "professional" ? "demo-hero-id" : "demo-customer-id", phone: normalizedPhone, role, fullName: fullName.trim() || "Tirkha Demo User", trade: tradeCategory?.toLowerCase() ?? (role === "professional" ? "plumber" : undefined), ...(tradeCategory ? { tradeCategory } : {}), createdAt: new Date().toISOString() };
     try {
       window.localStorage.setItem(roleStorageKey(role), JSON.stringify(identity));
       window.localStorage.setItem("tirkha_demo_user", JSON.stringify(identity));

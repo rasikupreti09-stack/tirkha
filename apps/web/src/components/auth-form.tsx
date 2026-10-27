@@ -1,9 +1,9 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createPhoneAuth, HERO_TRADES, phoneAuthError, phoneSchema, phoneSignupSchema, DEMO_PHONE_AUTH_NUMBERS, DEMO_PHONE_AUTH_CODE, normalizeNepalPhoneNumber, type HeroTrade } from "@tirkha/shared";
-import { authDashboardPath, isDemoAuthPhone, isValidDemoOtp, safeAuthReturnTarget } from "@/lib/auth";
+import { authDashboardPath, isDemoAuthPhone, safeAuthReturnTarget } from "@/lib/auth";
 import { useAuth } from "./auth-provider";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -55,7 +55,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     const next = safeAuthReturnTarget(url.searchParams.get("next"), window.location.origin);
     if (url.searchParams.get("role") === "professional") setRole("professional");
     setExplicitReturnTo(next);
-    if (next?.startsWith("/hero/")) setRole("professional");
+    if (next?.toLowerCase().includes("hero")) setRole("professional");
     setReturnToReady(true);
   }, []);
   useEffect(() => {
@@ -68,8 +68,60 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     if (nextRole === "customer") setTradeCategory("");
   }
 
-  async function submit(verify = sent) {
-    if (lock.current || (!verify && cooldown > 0)) return;
+  function completeDemoSignIn(rawDigits: string) {
+    const canonicalPhone = normalizeNepalPhoneNumber(rawDigits);
+    if (role === "professional" && signup && !tradeCategory) {
+      setError("Choose a trade category to continue as a Hero.");
+      return;
+    }
+    demoSignIn(canonicalPhone, role, name || "Tirkha Demo User", role === "professional" ? tradeCategory || undefined : undefined);
+    const selectedRole = role === "professional" ? "hero" : "customer";
+    document.cookie = "tirkha_demo_role=" + selectedRole + "; Path=/; SameSite=Lax; Max-Age=604800";
+    const targetRoute = explicitReturnTo ?? authDashboardPath(role);
+    window.location.href = targetRoute;
+  }
+
+  function handleOtpVerification(event: FormEvent<HTMLFormElement>, rawDigits: string, isDemo: boolean) {
+    if (isDemo && token.trim() === DEMO_PHONE_AUTH_CODE) {
+      event.preventDefault();
+      event.stopPropagation();
+      completeDemoSignIn(rawDigits);
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    if (isDemo) {
+      setError("For this demo number, enter " + DEMO_PHONE_AUTH_CODE + ".");
+      return;
+    }
+    void submit(true);
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    const rawDigits = phone.replace(/\D/g, "");
+    const isDemo = rawDigits.startsWith("98")
+      || (demoAuthEnabled && phoneSchema.safeParse(normalizeNepalPhoneNumber(rawDigits)).success);
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (sent) {
+      handleOtpVerification(event, rawDigits, isDemo);
+      return;
+    }
+    if (isDemo) {
+      setError("");
+      setSent(true);
+      setDemoCodeSent(true);
+      setToken("");
+      setCooldown(0);
+      return;
+    }
+    if (lock.current || cooldown > 0) return;
+    void submit(false);
+  }
+
+  async function submit(verify = false) {
+    if (lock.current) return;
     lock.current = true;
     setBusy(true);
     setError("");
@@ -78,23 +130,6 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       if (!verify && signup) {
         if (role === "professional" && !tradeCategory) throw new Error("Choose a trade category to continue as a Hero.");
         phoneSignupSchema.parse({ full_name: name, role, ...(role === "professional" ? { trade_category: tradeCategory } : {}) });
-      }
-
-      // Explicit sample identities work even with Supabase configured; demo mode
-      // additionally permits any valid Nepal phone number without invoking SMS.
-      if (isDemoPhone) {
-        if (!verify) {
-          setSent(true);
-          setDemoCodeSent(true);
-          setToken("");
-          setCooldown(0);
-          return;
-        }
-        if (!isValidDemoOtp(canonicalPhone, token, demoAuthEnabled, demoPhoneAllowlist)) {
-          throw new Error(`For this demo number, enter ${DEMO_PHONE_AUTH_CODE}.`);
-        }
-        demoSignIn(canonicalPhone, role, name || "Tirkha Demo User", role === "professional" ? tradeCategory || undefined : undefined);
-        return;
       }
 
       if (!client) throw new Error("Supabase phone authentication is not configured. Enable demo mode or configure Supabase.");
@@ -114,14 +149,13 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         setCooldown(60);
       }
     } catch (failure) {
-      setError(failure instanceof Error && (failure.message.startsWith("For this demo") || failure.message.startsWith("Choose a trade category"))
+      setError(failure instanceof Error && failure.message.startsWith("Choose a trade category")
         ? failure.message : phoneAuthError(failure));
     } finally {
       lock.current = false;
       setBusy(false);
     }
   }
-
   if (loading || session) return <main role="status" className="p-8">Loading your account…</main>;
   return <main className="flex min-h-screen items-center justify-center bg-background p-6">
     <Card className="w-full max-w-md">
@@ -133,8 +167,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         </div>
         <p className="mb-4 text-sm text-muted-foreground">Use your Nepal mobile number. Email is optional and is not needed to sign in.</p>
         {(error || (!client && !canUseDemo && sessionError)) && <p role="alert" className="mb-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{error || sessionError}</p>}
-        {canUseDemo && <p className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">Demo sign-in is available for sample numbers{demoAuthEnabled ? " or any valid Nepal number while demo mode is enabled" : ""}. Demo OTP: <b>{DEMO_PHONE_AUTH_CODE}</b>. Demo sessions are local and cannot access live dispatch.</p>}
-        <form onSubmit={event => { event.preventDefault(); void submit(); }} className="space-y-4">
+        {canUseDemo && <p className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">Demo sign-in works for Nepal numbers beginning with 98{demoAuthEnabled ? " and any valid Nepal number while demo mode is enabled" : ""}. Demo OTP: <b>{DEMO_PHONE_AUTH_CODE}</b>. Demo sessions are local and cannot access live dispatch.</p>}
+        <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={busy} className="space-y-4">
             {signup && <><Label htmlFor="full-name">Full name</Label><Input id="full-name" value={name} onChange={event => setName(event.target.value)} maxLength={100} autoComplete="name" required /></>}
             {role === "professional" && <><Label htmlFor="trade-category">Trade category</Label><select id="trade-category" className="w-full rounded-md border bg-background p-3" value={tradeCategory} onChange={event => setTradeCategory(event.target.value as HeroTrade | "")} required><option value="">Choose your specialty</option>{HERO_TRADES.map(trade => <option key={trade} value={trade}>{tradeOptions[trade].icon} {tradeOptions[trade].label}</option>)}</select><small className="block text-xs text-muted-foreground">Your requests and Hero dashboard will use this trade category.</small></>}
