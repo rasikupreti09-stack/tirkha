@@ -251,7 +251,7 @@
 .mk-diagnostic-checkout>strong{color:#9a4f24;font-size:11px}
 .mk-diagnostic-checkout .mk-diagnostic-price{font-size:11px}
 
-.mk-portal-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.mk-portal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .mk-portal-card{display:flex;flex-direction:column;min-width:0;padding:17px;border:1px solid #dce5df;border-radius:10px;background:linear-gradient(160deg,#fff,#f7faf8)}
 .mk-portal-label{color:#16815c;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
 .mk-portal-card h3{margin:8px 0 5px;color:#202b25;font-size:16px}
