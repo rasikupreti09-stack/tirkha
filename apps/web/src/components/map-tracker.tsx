@@ -5,7 +5,7 @@ import { divIcon } from "leaflet";
 import { Clock3, Crosshair, Navigation } from "lucide-react";
 import type { Coordinates } from "@tirkha/shared";
 import { useAuth } from "./auth-provider";
-import { TirkhaMapArtwork, TirkhaMapSignature } from "./tirkha-map-artwork";
+import { TirkhaMapArtwork, TirkhaMapSignature, TirkhaMapZoomControl } from "./tirkha-map-artwork";
 
 export type TrackedPoint = { id: string; label: string; kind: "hero" | "customer"; coordinates: Coordinates; updatedAt?: string; heading?: number | null };
 function pointIcon(kind: TrackedPoint["kind"], heading = 0) {
@@ -37,7 +37,7 @@ function FitPoints({ points }: { points: TrackedPoint[] }) {
   const fitted = useRef(false);
   useEffect(() => {
     if (fitted.current || points.length < 2) return;
-    map.fitBounds(points.map(p => [p.coordinates.latitude, p.coordinates.longitude]), { padding: [70, 70], maxZoom: 15, animate: true, duration: 0.7 });
+    map.fitBounds(points.map(p => [p.coordinates.latitude, p.coordinates.longitude]), { padding: [52, 52], maxZoom: 16, animate: true, duration: 0.7 });
     fitted.current = true;
   }, [map, points]);
   return null;
@@ -46,8 +46,8 @@ function MapActions({ points }: { points: TrackedPoint[] }) {
   const map = useMap();
   return <div className="leaflet-top leaflet-right tirkha-map-actions">
     <div className="leaflet-control"><button type="button" aria-label="Recenter map on your trip" title="Recenter map" onClick={() => {
-      if (points.length > 1) map.fitBounds(points.map(point => [point.coordinates.latitude, point.coordinates.longitude]), { padding: [70, 70], maxZoom: 15, animate: true, duration: 0.7 });
-      else if (points[0]) map.setView([points[0].coordinates.latitude, points[0].coordinates.longitude], 15, { animate: true });
+      if (points.length > 1) map.fitBounds(points.map(point => [point.coordinates.latitude, point.coordinates.longitude]), { padding: [52, 52], maxZoom: 16, animate: true, duration: 0.7 });
+      else if (points[0]) map.setView([points[0].coordinates.latitude, points[0].coordinates.longitude], 16, { animate: true });
     }}><Crosshair size={18} aria-hidden="true" /></button></div>
   </div>;
 }
@@ -104,8 +104,9 @@ export function MapTracker({ points, origin, destination, navigation = false, na
   if (typeof window === "undefined") return <div className="h-[360px] animate-pulse rounded-xl bg-muted" role="status">Loading live map…</div>;
   return <section className="tirkha-map-surface">
     <div className="tirkha-map-frame tirkha-live-map-canvas">
-      <MapContainer center={view} zoom={13} minZoom={6} maxZoom={19} scrollWheelZoom attributionControl={false} className="tirkha-vector-map !h-full !w-full" aria-label="Live service map">
+      <MapContainer center={view} zoom={16} minZoom={6} maxZoom={19} zoomControl={false} zoomSnap={0.5} zoomDelta={0.75} wheelPxPerZoomLevel={100} touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} className="tirkha-vector-map !h-full !w-full" aria-label="Live service map">
       <TirkhaMapArtwork />
+      <TirkhaMapZoomControl />
       <FitPoints points={points} />
       <MapActions points={points} />
       {points.map(point => point.kind === "hero"

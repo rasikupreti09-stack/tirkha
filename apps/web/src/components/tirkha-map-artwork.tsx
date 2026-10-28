@@ -51,17 +51,33 @@ export function TirkhaMapArtwork() {
     {tirkhaParks.map((park, index) => <Polygon key={`park-${index}`} positions={park} pathOptions={{ color: "#b8d3bf", weight: 1, fillColor: "#dcebdd", fillOpacity: 0.8, interactive: false }} />)}
     {tirkhaWaterways.map((line, index) => <Polyline key={`water-${index}`} positions={line} pathOptions={{ color: "#a9c9ce", weight: 8, opacity: 0.42, lineCap: "round", lineJoin: "round", interactive: false }} />)}
     {tirkhaWaterways.map((line, index) => <Polyline key={`water-core-${index}`} positions={line} pathOptions={{ color: "#8db8c0", weight: 2.4, opacity: 0.82, lineCap: "round", lineJoin: "round", interactive: false }} />)}
-    {!roadData && tirkhaRoads.map((road, index) => {
-      const width = road.kind === "expressway" ? 8 : road.kind === "arterial" ? 6 : road.kind === "connector" ? 4.4 : 2.4;
-      const color = road.kind === "expressway" ? "#4b7778" : road.kind === "arterial" ? "#829d99" : road.kind === "connector" ? "#b2c0b9" : "#d1d9d2";
-      return <Fragment key={`road-${index}`}>
-        <Polyline positions={road.points} pathOptions={{ color: "#fbfcf9", weight: width + 3, opacity: 0.94, lineCap: "round", lineJoin: "round", interactive: false }} />
-        <Polyline positions={road.points} pathOptions={{ color, weight: width, opacity: road.kind === "local" ? 0.85 : 1, lineCap: "round", lineJoin: "round", interactive: false }} />
-      </Fragment>;
-    })}
+    {!roadData && <CuratedRoadNetwork />}
     {roadData && <DetailedRoadNetwork data={roadData} />}
     <DetailedBuildingFootprints />
     <CuratedLandmarkLabels />
+  </>;
+}
+
+function CuratedRoadNetwork() {
+  const map = useMap();
+  const [zoom, setZoom] = useState(map.getZoom());
+  useEffect(() => {
+    const update = () => setZoom(map.getZoom());
+    map.on("zoomend", update);
+    return () => { map.off("zoomend", update); };
+  }, [map]);
+  return <>
+    {tirkhaRoads.map((road, index) => {
+      const width = road.kind === "expressway" ? 8 : road.kind === "arterial" ? 6 : road.kind === "connector" ? 4.4 : 2.4;
+      const color = road.kind === "expressway" ? "#4b7778" : road.kind === "arterial" ? "#829d99" : road.kind === "connector" ? "#b2c0b9" : "#d1d9d2";
+      const labelZoom = road.kind === "expressway" ? 11 : road.kind === "arterial" ? 13 : road.kind === "connector" ? 15 : 16;
+      return <Fragment key={`road-${index}`}>
+        <Polyline positions={road.points} pathOptions={{ color: "#fbfcf9", weight: width + 3, opacity: 0.94, lineCap: "round", lineJoin: "round", interactive: false }} />
+        <Polyline positions={road.points} pathOptions={{ color, weight: width, opacity: road.kind === "local" ? 0.85 : 1, lineCap: "round", lineJoin: "round", interactive: zoom >= labelZoom }}>
+          {road.name && zoom >= labelZoom && <Tooltip sticky direction="top" className="tirkha-road-label">{road.name}</Tooltip>}
+        </Polyline>
+      </Fragment>;
+    })}
   </>;
 }
 
@@ -137,7 +153,7 @@ function CuratedLandmarkLabels() {
       .sort((a, b) => b.minZoom - a.minZoom)
       .filter((place) => {
         const point = map.latLngToContainerPoint(place.point);
-        const cell = `${Math.floor(point.x / 102)}:${Math.floor(point.y / 42)}`;
+        const cell = `${Math.floor(point.x / 78)}:${Math.floor(point.y / 32)}`;
         if (occupied.has(cell)) return false;
         occupied.add(cell);
         return true;
@@ -152,9 +168,16 @@ function CuratedLandmarkLabels() {
 
 function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
   const map = useMap();
+  const [zoom, setZoom] = useState(map.getZoom());
   const renderer = useMemo(() => canvas({ padding: 0.5 }), []);
-  useEffect(() => { map.invalidateSize({ pan: false }); }, [map]);
+  useEffect(() => {
+    map.invalidateSize({ pan: false });
+    const updateZoom = () => setZoom(map.getZoom());
+    map.on("zoomend", updateZoom);
+    return () => { map.off("zoomend", updateZoom); };
+  }, [map]);
   return <GeoJSON
+    key={Math.floor(zoom)}
     data={data as never}
     style={(feature) => {
       const properties = feature?.properties as RoadProperties | undefined;
@@ -172,7 +195,8 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
     onEachFeature={(feature, layer) => {
       const props = feature.properties as RoadProperties | undefined;
       const label = props?.name || props?.ref;
-      if (label) layer.bindTooltip(label, { sticky: true, direction: "top", className: "tirkha-road-label" });
+      const minimumLabelZoom = props?.class === "expressway" ? 11 : props?.class === "arterial" ? 13 : props?.class === "connector" ? 15 : 17;
+      if (label) layer.bindTooltip(label, { permanent: zoom >= minimumLabelZoom, sticky: zoom < minimumLabelZoom, direction: "top", className: "tirkha-road-label" });
     }}
   />;
 }
@@ -185,6 +209,19 @@ export function TirkhaMapRegionControl() {
     <div className="tirkha-region-pills">{tirkhaCityViews.map((city) => <button key={city.label} type="button" onClick={(event) => { event.stopPropagation(); map.flyTo(city.center, city.zoom, { duration: 0.7 }); }} aria-label={`Show ${city.label}`}>
       <span className="tirkha-region-dot" />{city.label}
     </button>)}</div>
+  </div>;
+}
+
+/** Shared animated zoom controls sized for mouse, stylus, and touch use. */
+export function TirkhaMapZoomControl() {
+  const map = useMap();
+  const controlRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (controlRef.current) DomEvent.disableClickPropagation(controlRef.current); }, []);
+  return <div ref={controlRef} className="leaflet-top leaflet-left tirkha-zoom-control" aria-label="Map zoom controls">
+    <div className="tirkha-zoom-stack">
+      <button type="button" aria-label="Zoom in" title="Zoom in" onClick={(event) => { event.stopPropagation(); map.zoomIn(0.75, { animate: true }); }}>+</button>
+      <button type="button" aria-label="Zoom out" title="Zoom out" onClick={(event) => { event.stopPropagation(); map.zoomOut(0.75, { animate: true }); }}>−</button>
+    </div>
   </div>;
 }
 
