@@ -26,8 +26,7 @@ function nepalInputFromDate(date:Date){
  return value.year+"-"+value.month+"-"+value.day+"T"+value.hour+":"+value.minute;
 }
 export function MarketplaceOverlays(){
- const {state,services,modal,detail,setModal,setDetail,add,quantity,login,place,cancel,ready,setRegion,requireCheckoutAuth}=useMarketplace();
- const [phone,setPhone]=useState(""),[code,setCode]=useState(""),[authError,setAuthError]=useState("");
+ const {state,services,modal,detail,setModal,setDetail,add,quantity,place,cancel,ready,setRegion,requireCheckoutAuth}=useMarketplace();
  const [stage,setStage]=useState<"cart"|"address"|"payment">("cart"),[address,setAddress]=useState(""),[pin,setPin]=useState<Coordinates|null>(null),[scheduled,setScheduled]=useState("");
  const [paymentMethod,setPaymentMethod]=useState<NonNullable<DemoOrder["payment_method"]>>("COD"),[paymentReference,setPaymentReference]=useState(""),[copyNotice,setCopyNotice]=useState("");
  const [busy,setBusy]=useState(false),[formError,setFormError]=useState(""),[geoBusy,setGeoBusy]=useState(false);
@@ -36,8 +35,6 @@ export function MarketplaceOverlays(){
  const total=rows.reduce((sum,{line,service})=>sum+line.quantity*serviceTotal(service),0);
  const subtotal=rows.reduce((sum,{line,service})=>sum+line.quantity*service.base_paisa,0);
  const visitFees=rows.reduce((sum,{line,service})=>sum+line.quantity*service.visit_paisa,0);
- function submitAuth(event:FormEvent){event.preventDefault();setAuthError("");if(!phone.trim()){setAuthError("Enter any phone number to continue.");return;}if(code!=="123456"){setAuthError("For this demo, enter 123456 or choose One-Click Demo Login.");return;}login(phone);}
- function oneClick(){login(phone||"+9779800000000");}
  function selectLandmark(item:typeof landmarks[number]){setAddress(item.name+", "+item.region);setPin({latitude:item.latitude,longitude:item.longitude});setRegion(item.region);}
  function locate(){
    if(!navigator.geolocation){setFormError("This browser does not support location detection. Choose a landmark or place the pin.");return;}
@@ -87,16 +84,12 @@ export function MarketplaceOverlays(){
  const orderContent=<section className="mk-overlay-content"><div className="mk-overlay-heading"><div><span className="mk-kicker">SAVED ON THIS DEVICE</span><h2>My demo bookings</h2><p>Receipts and cancellation controls for this browser only.</p></div></div>
    {!state.orders.length?<div className="mk-empty-cart"><CalendarDays size={32}/><h3>No bookings yet</h3><p>Choose any service to create a demo booking.</p><button className="mk-primary" onClick={()=>setModal(null)}>Explore services</button></div>:
    <div className="mk-orders">{state.orders.map(order=><OrderReceipt key={order.id} order={order} onCancel={()=>cancel(order.id)}/>)}</div>}</section>;
- const authContent=<section className="mk-overlay-content mk-auth-content"><div className="mk-overlay-heading"><div><span className="mk-kicker">SIGN IN TO YOUR SPACE</span><h2>Choose your Tirkha portal</h2><p>Continue to the tools that match the way you use Tirkha.</p></div></div>
+ const authContent=<section className="mk-overlay-content mk-auth-content"><div className="mk-overlay-heading"><div><span className="mk-kicker">WELCOME TO TIRKHA</span><h2>Choose your portal</h2><p>Select the account that fits you. Phone verification appears after you continue.</p></div></div>
    <div className="mk-portal-grid">
-    <article className="mk-portal-card"><span className="mk-portal-label">For customers</span><h3>Customer account</h3><p>Book help, track requests and manage your service details.</p><div><Link href="/login">Sign in</Link><Link href="/signup">Create account</Link></div></article>
-    <article className="mk-portal-card"><span className="mk-portal-label">For service professionals</span><h3>Service Hero portal</h3><p>Apply to become a verified Hero or open your job dashboard.</p><div><Link href="/hero/register">Register as a Hero</Link><Link href="/hero/dashboard">Hero dashboard</Link></div></article>
+    <article className="mk-portal-card"><span className="mk-portal-label">For customers</span><h3>Customer Account</h3><p>Book help, follow requests and manage your service details.</p><div><Link href="/login">Sign In</Link><Link href="/signup">Create Account</Link></div></article>
+    <article className="mk-portal-card"><span className="mk-portal-label">For service professionals</span><h3>Service Hero Portal</h3><p>Join the local service network or return to your Hero workspace.</p><div><Link href="/signup?role=professional&next=%2Fhero%2Fregister">Register as a Hero</Link><Link href="/login?role=professional&next=%2Fhero%2Fdashboard">Hero Sign In</Link></div></article>
    </div>
-   <div className="mk-auth-divider"><span>or preview the customer demo</span></div>
-   <form onSubmit={submitAuth}><label className="mk-label">Phone number<input autoComplete="tel" inputMode="tel" value={phone} onChange={e=>{setPhone(e.target.value);if(code==="123456"&&e.target.value.trim())login(e.target.value);}} placeholder="+977 9800 000 000" maxLength={64}/></label><label className="mk-label">Demo verification code<input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={e=>{const value=e.target.value;setCode(value);if(value==="123456"&&phone.trim())login(phone);}} placeholder="Enter 123456" maxLength={6}/></label>
-   {authError&&<p className="mk-form-error" role="alert">{authError}</p>}<button className="mk-primary mk-primary-wide" type="submit">Continue with demo code <ChevronRight size={18}/></button></form>
-   <button className="mk-one-click" onClick={oneClick}>One-Click Demo Login <span aria-hidden="true">→</span></button>
-   <p className="mk-demo-caption">Demo identity is stored locally for seven days and never creates a Supabase user. No SMS is sent.</p></section>;
+ </section>;
  return <>
    {current&&<MarketplaceDialog key={current.id} title={current.title} onClose={()=>setDetail(null)} wide><div className="mk-detail"><img className="mk-detail-image" src={current.image} alt={current.category_name+" service in a Kathmandu home"}/><div className="mk-detail-body"><span className="mk-kicker">{current.category_name} · {current.vertical}</span><h2>{current.title}</h2><p>{current.description}</p><div className="mk-rate-card"><div><small>Listed rate · सेवा दर</small><b>{catalogPriceLabel(current)}</b></div>{current.visit_paisa>0?<><span>+</span><div><small>Visit fee</small><b>{catalogMoney(current.visit_paisa)}</b></div><i></i><div><small>Starting total</small><b>{catalogMoney(serviceTotal(current))}</b></div></>:<><i></i><div><small>Scope</small><b>As listed</b></div></>}</div>{current.pricing_note&&<p className="mk-pricing-note">{current.pricing_note}</p>}
      <div className="mk-duration"><Clock3 size={16}/> Estimated time: {current.duration_minutes>=60?Math.floor(current.duration_minutes/60)+" hr"+(current.duration_minutes%60?" "+current.duration_minutes%60+" min":""):current.duration_minutes+" min"}</div>

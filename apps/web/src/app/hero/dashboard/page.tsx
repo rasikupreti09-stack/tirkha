@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Activity, Banknote, BriefcaseBusiness, MapPin, Power, ReceiptText, ShieldCheck } from "lucide-react";
-import { catalogMoney, heroQuoteInputSchema, type HeroOperationalZone, type HeroTrade, type ProfessionalJobQuote, type WorkflowBooking } from "@tirkha/shared";
+import { catalogMoney, heroQuoteInputSchema, nextBookingStatus, type CompletedTransaction, type HeroOperationalZone, type HeroTrade, type ProfessionalJobQuote, type WorkflowBooking } from "@tirkha/shared";
 import { useAuth } from "@/components/auth-provider";
 import { HeroDispatchInbox } from "@/components/hero-dispatch-inbox";
 import { HeroGpsTracker } from "@/components/hero-gps-tracker";
@@ -13,6 +13,10 @@ const tradeLabels: Record<HeroTrade, string> = { PLUMBING: "🚰 Plumber (प्
 const zoneLabels: Record<HeroOperationalZone, string> = { Kathmandu: "Kathmandu", Lalitpur: "Lalitpur", Bhaktapur: "Bhaktapur", Baneshwor: "Baneshwor / New Baneshwor", Thamel: "Thamel", Kirtipur: "Kirtipur" };
 type HeroAccess = { verification_status: "pending" | "verified" | "rejected"; suspended_at: string | null; operational_zone: HeroOperationalZone | null; trade_code: HeroTrade | null; trade_category: HeroTrade | null };
 type WorkBooking = Pick<WorkflowBooking, "id" | "category_id" | "service_address" | "job_details" | "status" | "total_price_paisa" | "scheduled_at">;
+const demoEarningsKey = "tirkha.demo-hero-earnings.v1";
+const demoJobsKey = "tirkha.demo-hero-jobs.v1";
+const demoAvailabilityKey = "tirkha.demo-hero-online.v1";
+function readDemoArray<T>(key: string): T[] { try { const value: unknown = JSON.parse(localStorage.getItem(key) ?? "[]"); return Array.isArray(value) ? value as T[] : []; } catch { return []; } }
 
 function getCurrentCoordinates() {
   return new Promise<{ latitude: number; longitude: number }>((resolve, reject) => {
@@ -32,6 +36,7 @@ export default function HeroDashboardPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [demoProfile, setDemoProfile] = useState(false);
+  const [demoEarnings, setDemoEarnings] = useState<CompletedTransaction[]>([]);
   const heroId = session?.user.id;
 
   const refresh = useCallback(async () => {
@@ -40,7 +45,12 @@ export default function HeroDashboardPage() {
       const trade = typeof metadataTrade === "string" && ["PLUMBING", "ELECTRICAL", "APPLIANCE_TECHNICIAN", "BEAUTICIAN", "PAINTER", "CLEANER", "HANDYMAN"].includes(metadataTrade) ? metadataTrade as HeroTrade : null;
       setDemoProfile(true);
       setAccess({ verification_status: "pending", suspended_at: null, operational_zone: null, trade_code: trade, trade_category: trade });
-      setOnline(false); setJobs([]); setLoadingData(false); return;
+      setOnline(localStorage.getItem(demoAvailabilityKey) === "true");
+      setJobs(readDemoArray<WorkBooking>(demoJobsKey));
+      setDemoEarnings(readDemoArray<CompletedTransaction>(demoEarningsKey));
+      const categoryName = trade === "ELECTRICAL" ? "Electrical" : trade === "APPLIANCE_TECHNICIAN" ? "Appliance Repair" : "Plumbing";
+      setCategories(new Map([[`demo-${trade?.toLowerCase() ?? "plumbing"}`, categoryName]]));
+      setLoadingData(false); return;
     }
     if (!client || !heroId) { setLoadingData(false); return; }
     const [profileResult, locationResult, activeResult, categoryResult] = await Promise.all([
@@ -71,7 +81,13 @@ export default function HeroDashboardPage() {
   }, [client, heroId, refresh]);
 
   async function toggleAvailability() {
-    if (!client || busy) return;
+    if (busy) return;
+    if (demoProfile) {
+      setOnline(value => { const next = !value; localStorage.setItem(demoAvailabilityKey, String(next)); return next; });
+      setError("");
+      return;
+    }
+    if (!client) return;
     setBusy(true); setError("");
     try {
       if (online) {
@@ -89,19 +105,48 @@ export default function HeroDashboardPage() {
     finally { setBusy(false); }
   }
 
+  function acceptDemoJob(booking?: WorkBooking) {
+    if (!demoProfile || !booking) { void refresh(); return; }
+    setJobs(current => {
+      const next = [booking, ...current.filter(job => job.id !== booking.id)];
+      localStorage.setItem(demoJobsKey, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function advanceDemoJob(booking: WorkBooking) {
+    const nextStatus = nextBookingStatus(booking.status);
+    if (!demoProfile || !nextStatus) return;
+    if (nextStatus === "completed") {
+      const grossNpr = 1500;
+      const companyIncomeNpr = Math.round(grossNpr * 0.125 * 100) / 100;
+      const earning: CompletedTransaction = {
+        transaction_id: `demo-tx-${Date.now()}`, booking_id: booking.id, timestamp: new Date().toISOString(),
+        hero_id: heroId ?? "demo-hero", hero_name: session?.user.user_metadata.full_name ?? "Demo Hero",
+        hero_trade: access?.trade_category ?? access?.trade_code ?? "PLUMBING", gross_amount: grossNpr,
+        commission_rate: 12.5, company_income: companyIncomeNpr, hero_payout: grossNpr - companyIncomeNpr, payment_type: "CASH",
+      };
+      setDemoEarnings(current => { const next = [earning, ...current]; localStorage.setItem(demoEarningsKey, JSON.stringify(next)); return next; });
+      setJobs(current => { const next = current.filter(job => job.id !== booking.id); localStorage.setItem(demoJobsKey, JSON.stringify(next)); return next; });
+      return;
+    }
+    setJobs(current => { const next = current.map(job => job.id === booking.id ? { ...job, status: nextStatus } : job); localStorage.setItem(demoJobsKey, JSON.stringify(next)); return next; });
+  }
+
   if (loading || loadingData) return <main className="mx-auto max-w-6xl p-6" role="status">Loading your Hero workspace…</main>;
   if (!session) return null;
   if (!access) return <main className="mx-auto max-w-xl p-6 py-16"><section className="rounded-2xl border bg-white p-7"><h1 className="text-2xl font-semibold">Hero profile not found</h1><p className="mt-2 text-slate-600">Submit a Hero registration before opening the work dashboard.</p><Link className="mt-5 inline-block text-emerald-800 underline" href="/hero/register">Start registration</Link></section></main>;
-  if (access.verification_status !== "verified" || access.suspended_at) return <main className="mx-auto max-w-3xl space-y-5 p-4 py-10 sm:p-8"><div className="rounded-2xl border bg-white p-7"><ShieldCheck className="text-amber-700"/><h1 className="mt-3 text-2xl font-semibold">{access.suspended_at ? "Hero access suspended" : access.verification_status === "rejected" ? "Application needs attention" : "Verification in progress"}</h1><p className="mt-2 text-slate-600">{demoProfile ? "Your demo OTP sign-in is complete. Demo sessions do not create a Supabase Hero profile or receive live requests; use a verified Supabase phone account to submit identity documents and activate dispatch." : access.suspended_at ? "Contact Tirkha operations to review your account status." : access.verification_status === "rejected" ? "Your application was not approved. You can update your details and resubmit identity verification." : "Your account remains offline until Tirkha operations verifies your identity and trade."}</p>{demoProfile && <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm"><strong>Selected trade:</strong> {(access.trade_category ?? access.trade_code) ? tradeLabels[(access.trade_category ?? access.trade_code)!] : "Not selected during this sign-in"}</p>}<Link className="mt-5 inline-block rounded-lg border px-4 py-2 font-medium" href="/hero/register">Review application</Link></div></main>;
+  if (!demoProfile && (access.verification_status !== "verified" || access.suspended_at)) return <main className="mx-auto max-w-3xl space-y-5 p-4 py-10 sm:p-8"><div className="rounded-2xl border bg-white p-7"><ShieldCheck className="text-amber-700"/><h1 className="mt-3 text-2xl font-semibold">{access.suspended_at ? "Hero access suspended" : access.verification_status === "rejected" ? "Application needs attention" : "Verification in progress"}</h1><p className="mt-2 text-slate-600">{access.suspended_at ? "Contact Tirkha operations to review your account status." : access.verification_status === "rejected" ? "Your application was not approved. You can update your details and resubmit identity verification." : "Your account remains offline until Tirkha operations verifies your identity and trade."}</p><Link className="mt-5 inline-block rounded-lg border px-4 py-2 font-medium" href="/hero/register">Review application</Link></div></main>;
 
   return <main className="mx-auto max-w-7xl space-y-6 p-4 py-8 sm:p-8">
     <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-emerald-800">Tirkha | तिर्खा · Hero portal</p><h1 className="mt-2 text-3xl font-semibold">Your work, clearly organized.</h1><p className="mt-1 text-sm text-slate-600">{(access.trade_category ?? access.trade_code) ? tradeLabels[(access.trade_category ?? access.trade_code)!] : "Trade not selected"} · {access.operational_zone ? zoneLabels[access.operational_zone] : "Zone not set"} · Nearby jobs use trade, zone and GPS eligibility.</p></div><button type="button" disabled={busy || (online && jobs.length > 0)} onClick={() => void toggleAvailability()} className={`inline-flex min-h-12 items-center gap-2 rounded-xl px-5 font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-55 ${online ? "bg-emerald-700 hover:bg-emerald-800" : "bg-slate-800 hover:bg-slate-900"}`}><Power size={18}/>{busy ? "Updating…" : online ? "Online · Go offline" : "Offline · Go online"}</button></header>
-    {demoProfile && <p role="status" className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">Demo Hero sign-in is active. This local session has no live Supabase profile or dispatch access; complete registration with a Supabase-authenticated account to receive real jobs.</p>}
+    {demoProfile && <p role="status" className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">Demo Hero workspace: requests, availability, job status and earnings below are simulated and saved only in this browser. They do not dispatch a real provider or create financial records.</p>}
     {error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
     <section className="grid gap-4 sm:grid-cols-3"><Stat icon={<Activity/>} label="Availability" value={online ? "Online" : "Offline"}/><Stat icon={<BriefcaseBusiness/>} label="Active work" value={String(jobs.length)}/><Stat icon={<MapPin/>} label="Service zone" value={access.operational_zone ? zoneLabels[access.operational_zone] : "Not set"}/></section>
-    <HeroGpsTracker enabled={online}/>
-    <HeroDispatchInbox onAccepted={() => void refresh()}/>
-    <section className="space-y-3"><div><h2 className="text-xl font-semibold">My active jobs</h2><p className="text-sm text-slate-600">Written estimates can be submitted only after the job is marked in progress and physically inspected.</p></div>{jobs.length === 0 ? <div className="rounded-xl border bg-white p-6 text-sm text-slate-600">No assigned active jobs yet. Keep availability online to see nearby eligible requests.</div> : jobs.map(job => <article key={job.id} className="grid gap-4 rounded-xl border bg-white p-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,.8fr)]"><div><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold uppercase">{job.status.replaceAll("_", " ")}</span><h3 className="mt-3 font-semibold">{categories.get(job.category_id) ?? "Service"}</h3><p className="mt-1 text-sm text-slate-600">{job.service_address}</p><p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{job.job_details}</p><p className="mt-3 text-xs text-slate-500">Scheduled {new Date(job.scheduled_at).toLocaleString()}</p>{job.status === "in_progress" && <QuoteForm bookingId={job.id}/>}</div>{job.status === "in_progress" ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5"><h4 className="flex items-center gap-2 font-semibold"><ReceiptText size={18}/> On-site written quote</h4><p className="mt-2 text-sm text-emerald-950">Inspect the work in person, then submit labour and materials as separate NPR amounts. The customer must review the written scope before any extra work starts.</p></div> : <div className="rounded-xl bg-slate-50 p-5 text-sm text-slate-600">{job.status === "accepted" ? "Mark the job in progress from My Bookings after reaching the customer and beginning the inspection." : "Use the booking workflow to update the current job status."}<Link className="mt-3 block font-medium text-emerald-800 underline" href="/jobs">Open Job Board / Bookings</Link></div>}</article>)}</section>
+    <HeroGpsTracker enabled={online && !demoProfile}/>
+    <HeroDispatchInbox demo={demoProfile} trade={access.trade_category ?? access.trade_code} onAccepted={acceptDemoJob}/>
+    {demoProfile && <section className="grid gap-3 rounded-xl border bg-white p-5 sm:grid-cols-3"><div><small className="text-slate-500">Demo gross receipts</small><strong className="mt-1 block text-xl">{catalogMoney(Math.round(demoEarnings.reduce((sum, row) => sum + row.gross_amount, 0) * 100))}</strong></div><div><small className="text-slate-500">Demo commission · 12.5%</small><strong className="mt-1 block text-xl">{catalogMoney(Math.round(demoEarnings.reduce((sum, row) => sum + row.company_income, 0) * 100))}</strong></div><div><small className="text-slate-500">Demo net earnings</small><strong className="mt-1 block text-xl text-emerald-800">{catalogMoney(Math.round(demoEarnings.reduce((sum, row) => sum + row.hero_payout, 0) * 100))}</strong></div></section>}
+    <section className="space-y-3"><div><h2 className="text-xl font-semibold">My active jobs</h2><p className="text-sm text-slate-600">Written estimates can be submitted only after the job is marked in progress and physically inspected.</p></div>{jobs.length === 0 ? <div className="rounded-xl border bg-white p-6 text-sm text-slate-600">No assigned active jobs yet. Keep availability online to see nearby eligible requests.</div> : jobs.map(job => <article key={job.id} className="grid gap-4 rounded-xl border bg-white p-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,.8fr)]"><div><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold uppercase">{job.status.replaceAll("_", " ")}</span><h3 className="mt-3 font-semibold">{categories.get(job.category_id) ?? "Service"}</h3><p className="mt-1 text-sm text-slate-600">{job.service_address}</p><p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{job.job_details}</p><p className="mt-3 text-xs text-slate-500">Scheduled {new Date(job.scheduled_at).toLocaleString()}</p>{job.status === "in_progress" && !demoProfile && <QuoteForm bookingId={job.id}/>}</div>{job.status === "in_progress" ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5"><h4 className="flex items-center gap-2 font-semibold"><ReceiptText size={18}/>{demoProfile ? "Demo inspection stage" : "On-site written quote"}</h4><p className="mt-2 text-sm text-emerald-950">{demoProfile ? "Advance this sample job to completion to see a simulated receipt in your demo earnings." : "Inspect the work in person, then submit labour and materials as separate NPR amounts. The customer must review the written scope before any extra work starts."}</p></div> : <div className="rounded-xl bg-slate-50 p-5 text-sm text-slate-600">{job.status === "accepted" ? "Mark the job in progress from My Bookings after reaching the customer and beginning the inspection." : "Use the booking workflow to update the current job status."}<Link className="mt-3 block font-medium text-emerald-800 underline" href="/jobs">Open Job Board / Bookings</Link></div>}{demoProfile && job.status !== "in_progress" && <div className="lg:col-span-2"><Button type="button" onClick={() => advanceDemoJob(job)}>{job.status === "accepted" ? "Simulate Hero on the way" : job.status === "on_the_way" ? "Start demo inspection" : "Advance demo job"}</Button></div>}{demoProfile && job.status === "in_progress" && <div className="lg:col-span-2"><Button type="button" onClick={() => advanceDemoJob(job)}>Complete demo job</Button></div>}</article>)}</section>
     <div className="flex justify-end"><Link href="/hero/history" className="inline-flex items-center gap-2 rounded-lg border bg-white px-4 py-3 font-semibold"><Banknote size={18}/> View completed-job earnings</Link></div>
   </main>;
 }

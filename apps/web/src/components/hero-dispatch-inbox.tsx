@@ -1,19 +1,31 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { formatBookingDate, type Database } from "@tirkha/shared";
+import { formatBookingDate, type Database, type HeroTrade, type WorkflowBooking } from "@tirkha/shared";
 import { changeBooking } from "@/lib/bookings";
 import { useAuth } from "./auth-provider";
 import { Button } from "./ui/button";
 
 type DispatchNotice = Database["public"]["Tables"]["hero_dispatch_notifications"]["Row"];
-export function HeroDispatchInbox({ onAccepted }: { onAccepted: () => void }) {
+type DemoAcceptedBooking = Pick<WorkflowBooking, "id" | "category_id" | "service_address" | "job_details" | "status" | "total_price_paisa" | "scheduled_at">;
+export function HeroDispatchInbox({ onAccepted, demo = false, trade = "PLUMBING" }: { onAccepted: (booking?: DemoAcceptedBooking) => void; demo?: boolean; trade?: HeroTrade | null }) {
   const { client, session } = useAuth();
   const userId = session?.user.id;
   const [items, setItems] = useState<DispatchNotice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [demoAccepted, setDemoAccepted] = useState(false);
+  const demoNotice: DispatchNotice = {
+    id: "tirkha-demo-dispatch", booking_id: "tirkha-demo-booking", professional_id: userId ?? "tirkha-demo-hero", status: "new",
+    service_name: trade === "ELECTRICAL" ? "Switchboard safety inspection" : trade === "APPLIANCE_TECHNICIAN" ? "Water pump inspection" : "Under-sink leak repair",
+    diagnostic_summary: "Demo request · Customer reports a household fault. Confirm details and scope with the customer before work.",
+    diagnostic_severity: "Routine · Demo", diagnostic_urgency: "routine", suggested_parts: trade === "ELECTRICAL" ? ["Inspect breaker and accessible terminals"] : ["Check accessible joints; confirm parts on site"],
+    service_address: "New Baneshwor, Kathmandu · near the main junction", latitude: 27.6915, longitude: 85.342,
+    distance_meters: 1800, scheduled_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(), created_at: new Date().toISOString(),
+  };
+  const visibleItems = demo ? (demoAccepted ? [] : [demoNotice]) : items;
   const refresh = useCallback(async () => {
+    if (demo) { setLoading(false); return; }
     if (!client || !userId) return;
     const { data, error: loadError } = await client.from("hero_dispatch_notifications")
       .select("*").eq("professional_id", userId).in("status", ["new", "seen"])
@@ -21,8 +33,9 @@ export function HeroDispatchInbox({ onAccepted }: { onAccepted: () => void }) {
     if (loadError) { setError("Nearby job alerts are temporarily unavailable. Refresh the jobs list to check for requests."); }
     else { setItems(data ?? []); setError(""); }
     setLoading(false);
-  }, [client, userId]);
+  }, [client, userId, demo]);
   useEffect(() => {
+    if (demo) { setLoading(false); return; }
     if (!client || !userId) return;
     let active = true;
     const load = async () => { if (active) await refresh(); };
@@ -33,20 +46,26 @@ export function HeroDispatchInbox({ onAccepted }: { onAccepted: () => void }) {
     const timer = window.setInterval(() => void load(), 30_000);
     window.addEventListener("focus", load);
     return () => { active = false; window.clearInterval(timer); window.removeEventListener("focus", load); void client.removeChannel(channel); };
-  }, [client, userId, refresh]);
+  }, [client, userId, refresh, demo]);
   async function accept(item: DispatchNotice) {
     if (busy) return;
     setBusy(item.id); setError("");
+    if (demo) {
+      setDemoAccepted(true);
+      onAccepted({ id: item.booking_id, category_id: `demo-${trade?.toLowerCase() ?? "plumbing"}`, service_address: item.service_address, job_details: item.diagnostic_summary ?? "Demo service request", status: "accepted", total_price_paisa: null, scheduled_at: item.scheduled_at });
+      setBusy(null);
+      return;
+    }
     try { await changeBooking(item.booking_id, "accepted"); await refresh(); onAccepted(); }
     catch (failure) { setError(failure instanceof Error ? failure.message : "This request is no longer available. Refresh and try again."); await refresh(); }
     finally { setBusy(null); }
   }
-  if (loading && !items.length) return <section className="mb-6 rounded-xl border bg-card p-5" aria-label="Nearby job dispatch"><h2 className="text-lg font-semibold">Nearby requests</h2><p className="mt-2 text-sm text-muted-foreground">Checking for nearby service requests…</p></section>;
+  if (!demo && loading && !items.length) return <section className="mb-6 rounded-xl border bg-card p-5" aria-label="Nearby job dispatch"><h2 className="text-lg font-semibold">Nearby requests</h2><p className="mt-2 text-sm text-muted-foreground">Checking for nearby service requests…</p></section>;
   return <section className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50/70 p-5" aria-label="Nearby job dispatch">
-    <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">Hero Dispatch</p><h2 className="mt-1 text-lg font-semibold text-slate-900">Nearby service requests</h2></div><span className="rounded-full bg-white px-3 py-1 text-xs text-slate-600">Live alerts · within 20 km</span></div>
+    <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">{demo ? "Demo Dispatch" : "Hero Dispatch"}</p><h2 className="mt-1 text-lg font-semibold text-slate-900">Nearby service requests</h2></div><span className="rounded-full bg-white px-3 py-1 text-xs text-slate-600">{demo ? "Interactive preview · local only" : "Live alerts · within 20 km"}</span></div>
     {error && <p role="alert" className="mt-3 rounded-md border border-amber-300 bg-white p-3 text-sm text-amber-900">{error}</p>}
-    {!error && !items.length && <p className="mt-3 text-sm text-slate-600">No nearby requests right now. Keep your availability on to receive matching jobs.</p>}
-    {items.length > 0 && <div className="mt-4 space-y-3">{items.map(item => <article key={item.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    {!error && !visibleItems.length && <p className="mt-3 text-sm text-slate-600">{demo ? "Demo request accepted. Its status is now in your active job list." : "No nearby requests right now. Keep your availability on to receive matching jobs."}</p>}
+    {visibleItems.length > 0 && <div className="mt-4 space-y-3">{visibleItems.map(item => <article key={item.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-semibold text-slate-900">{item.service_name}</h3><p className="mt-1 text-sm text-slate-600">{item.distance_meters == null ? "Assigned directly to you" : `${(item.distance_meters / 1000).toFixed(1)} km away`} · {formatBookingDate(item.scheduled_at)}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.diagnostic_urgency === "urgent" ? "bg-rose-100 text-rose-800" : item.diagnostic_urgency === "soon" ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-700"}`}>{item.diagnostic_severity || (item.diagnostic_urgency ? item.diagnostic_urgency.toUpperCase() : "Routine")}</span></div>
       <p className="mt-3 text-sm text-slate-700">{item.diagnostic_summary || "Customer has not added an AI triage summary. Review the request details before accepting."}</p>
       <p className="mt-2 text-sm text-slate-700"><strong>Customer location:</strong> {item.service_address}</p>
