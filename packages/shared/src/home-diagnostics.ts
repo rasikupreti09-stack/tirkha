@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { detectUniversalLanguage } from "./universal-diagnostics";
 import { diagnosticQuestionCount as faultQuestionCount, detectHomeFaultTrade, faultServiceId, faultTreeQuestion, HOME_FAULT_TREE, matchHomeFault, normalizeHomeDiagnosticText, resolveHomeFaultCode, type HomeFaultCode } from "./home-fault-tree";
 export { HOME_FAULT_TREE, detectHomeFaultTrade, matchHomeFault, normalizeHomeDiagnosticText };
 export type { HomeFaultCode, HomeFaultNode } from "./home-fault-tree";
@@ -78,9 +79,7 @@ export function matchHomeIssue(text: string): HomeIssue | null {
 }
 export type DiagnosticLanguage = "english" | "nepali_devanagari" | "nepali_romanized";
 export function diagnosticLanguageForText(text: string): DiagnosticLanguage {
-  if (/[\u0900-\u097f]/u.test(text)) return "nepali_devanagari";
-  if (/\b(dhara|bhairacha|bhairako|chha|cha|fohor|safa|paani|dhal|plumbingg|elctrician|batti|bijuli|garnu|chahiyo|tapai|mero|na-aako|jyotish|inar|pani|chuhiyo|chuhirako|aairacha|aairako|bhayeko|gayo|bhayo|sump|motor|aayena|gandha|lagyo|jaleyo|diverter|regulator|seepage|dhal)\b/i.test(text)) return "nepali_devanagari";
-  return "english";
+  return detectUniversalLanguage(text);
 }
 
 export type DiagnosticQuestion = { prompt: string; choices: string[] };

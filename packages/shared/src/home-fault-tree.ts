@@ -1,3 +1,5 @@
+import { normalizeDiagnosticText } from "./universal-diagnostics";
+
 export type FaultTrade = "plumbing" | "electrical";
 export const HOME_FAULT_TREE = [
   { code: "PL-PPR-FUSION-JOINT-LEAK", issueId: "pipe-leak", trade: "plumbing", group: "pipe", title: "PPR thermal-fusion joint leak", serviceId: "pipe-fitting", patterns: [/\bppr\b.*\b(fusion|joint|leak|leaking|chuh)/i, /\b(fusion|welded)\s+joint\b/i] },
@@ -41,26 +43,9 @@ export const HOME_FAULT_TREE = [
 export type HomeFaultNode = (typeof HOME_FAULT_TREE)[number];
 export type HomeFaultCode = HomeFaultNode["code"];
 
-const TYPO_ALIASES: Readonly<Record<string, string>> = {
-  plumbng: "plumbing", pluming: "plumbing", plumer: "plumber", plumbr: "plumber",
-  elctrician: "electrician", electrcian: "electrician", electrican: "electrician", electical: "electrical",
-  paani: "pani", leakage: "leak", leeking: "leaking", leek: "leak", dhal: "drain", sewage: "drain",
-  bijli: "bijuli", bati: "light", batti: "light", dharaa: "dhara", dhaal: "drain", triped: "trip", tripped: "trip", fohor: "dirty",
-};
-
 /** Normalize common spelling variants before deterministic local fault-tree matching. */
 export function normalizeHomeDiagnosticText(text: string): string {
-  const cleaned = text.normalize("NFKC").toLocaleLowerCase("ne-NP")
-    .replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim();
-  return cleaned.split(" ").map(token => {
-    const alias = TYPO_ALIASES[token];
-    if (alias) return alias;
-    const collapsed = token.replace(/([a-z])\1+/g, "$1");
-    const collapsedAlias = TYPO_ALIASES[collapsed];
-    if (collapsedAlias) return collapsedAlias;
-    const knownIntent = [...PLUMBING_INTENT_TERMS, ...ELECTRICAL_INTENT_TERMS].some(term => collapsed === term || (term.length >= 4 && collapsed.startsWith(term)));
-    return knownIntent ? collapsed : token;
-  }).join(" ");
+  return normalizeDiagnosticText(text);
 }
 const PLUMBING_INTENT_TERMS = ["plumb", "leak", "pipe", "tap", "dhara", "pani", "tank", "drain", "sewage", "fohor", "dirty", "dirt", "muddy", "sewer", "drain", "odor", "odour", "smell", "dhal", "sump", "diverter", "flush", "seepage", "geyser", "solar", "पानी", "धारा", "पाइप", "ढल", "नाली", "चुह"];
 const ELECTRICAL_INTENT_TERMS = ["electr", "light", "spark", "mcb", "rccb", "rcd", "elcb", "fuse", "wire", "bijuli", "short", "shock", "power", "burn", "burning", "jaleyo", "current", "neutral", "phase", "inverter", "bypass", "starter", "regulator", "बिजुली", "बत्ती", "झिल्का", "तार", "करेन्ट"];

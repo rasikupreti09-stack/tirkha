@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Bot, ImagePlus, Mic, Send, Sparkles, X } from "lucide-react";
-import { diagnosticBookingPrefillSchema, detectHomeFaultTrade, diagnosticLanguageForText, diagnosticQuestion, diagnosticQuestionCount, diagnosticSeverityLabel, detectHomeSafetyRisk, DIAGNOSTIC_PREFILL_STORAGE_KEY, HOME_ISSUES, matchHomeFault, matchHomeIssue, normalizeHomeDiagnosticText, resolveDiagnosticCode, serviceIdForDiagnosticCode, type DiagnosticDraft, type DiagnosticLanguage, type DiagnosticQuestion, type HomeFaultCode, type SupportedDiagnosticCode } from "@tirkha/shared";
+import { diagnosticBookingPrefillSchema, detectHomeFaultTrade, diagnosticLanguageForText, diagnosticQuestion, diagnosticQuestionCount, diagnosticSeverityLabel, detectHomeSafetyRisk, DIAGNOSTIC_PREFILL_STORAGE_KEY, extractDiagnosticSeverity, hasMedicalEmergencyCue, HOME_ISSUES, matchHomeFault, matchHomeIssue, normalizeHomeDiagnosticText, resolveDiagnosticCode, resolveDiagnosticTarget, romanizeNepaliText, serviceIdForDiagnosticCode, universalDiagnosticDepth, universalDiagnosticQuestion, type DiagnosticDraft, type DiagnosticLanguage, type DiagnosticQuestion, type HomeFaultCode, type SupportedDiagnosticCode } from "@tirkha/shared";
 import { useRouter } from "next/navigation";
 import { useMarketplace } from "./marketplace-provider";
 
@@ -9,12 +9,32 @@ type SpeechResultEvent = Event & { results: ArrayLike<ArrayLike<{ transcript: st
 type SpeechRecognitionLike = { continuous: boolean; interimResults: boolean; lang: string; onresult: ((event: SpeechResultEvent) => void) | null; onerror: ((event: Event) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void };
 type SpeechWindow = Window & { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
 type VisualEvidence = { visual_clarity: "clear" | "limited" | "poor" | "not_applicable"; visual_material: string; visual_mounting: string; visual_defect: string; visual_evidence: string[]; root_cause_hypothesis: string };
-type Intake = { serviceId: string; issueId: string; step: "diagnostic" | "diagnosis-review" | "area" | "time"; symptom: string; issueTitle: string; explanation: string; urgency: "routine" | "soon" | "urgent"; safetyNote?: string; photoAssessed: boolean; area?: string; diagnosticCode?: SupportedDiagnosticCode; faultCode?: HomeFaultCode; answers: number[]; language: DiagnosticLanguage; visual?: VisualEvidence; inspectionSummary?: DiagnosticDraft };
+type Intake = { serviceId: string; issueId: string; step: "diagnostic" | "diagnosis-review" | "area" | "time"; symptom: string; issueTitle: string; explanation: string; urgency: "routine" | "soon" | "urgent"; safetyNote?: string; photoAssessed: boolean; area?: string; diagnosticCode?: SupportedDiagnosticCode; faultCode?: HomeFaultCode; answers: number[]; language: DiagnosticLanguage; visual?: VisualEvidence; inspectionSummary?: DiagnosticDraft; universal?: { categorySlug: string; categoryName: string; answers: string[] } };
 type QuickReply = { label: string; query: string; action?: "inspection" };
 type Message = { id: string; role: "assistant" | "user"; text: string; question?: DiagnosticQuestion; quickReplies?: QuickReply[]; diagnosticAction?: "review" | "dispatch" | "fallback"; diagnostic?: DiagnosticDraft; serviceId?: string; fallbackTrade?: "plumbing" | "electrical" | null };
 type PhotoAssessment = { issue_title: string; explanation: string; issue_id: string; visual_clarity: VisualEvidence["visual_clarity"]; visual_material: string; visual_mounting: string; visual_defect: string; visual_evidence: string[]; root_cause_hypothesis: string; urgency: "routine" | "soon" | "urgent"; safety_note: string; photo_assessed: boolean; request_closer_photo: boolean; clarification_question: string; clarification_choices: string[]; language: DiagnosticLanguage };
+const SESSION_KEY = "tirkha_diagnostic_session_v1";
+function readDiagnosticSession(): { language: DiagnosticLanguage | null; intake: Intake | null } | null {
+  try {
+    const parsed: unknown = JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? "null");
+    if (!parsed || typeof parsed !== "object") return null;
+    const value = parsed as { language?: unknown; intake?: unknown };
+    const language = value.language === "english" || value.language === "nepali_devanagari" || value.language === "nepali_romanized" ? value.language : null;
+    const candidate = value.intake;
+    if (!candidate || typeof candidate !== "object") return { language, intake: null };
+    const state = candidate as Partial<Intake>;
+    if (typeof state.serviceId !== "string" || typeof state.issueId !== "string" || typeof state.symptom !== "string" || !Array.isArray(state.answers) || !["diagnostic", "diagnosis-review", "area", "time"].includes(state.step ?? "")) return { language, intake: null };
+    if (state.universal && (typeof state.universal.categorySlug !== "string" || typeof state.universal.categoryName !== "string" || !Array.isArray(state.universal.answers))) return { language, intake: null };
+    return { language, intake: state as Intake };
+  } catch { return null; }
+}
 function fileAsDataUrl(file: File) { return new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onerror = () => reject(new Error("Could not read this image.")); reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Could not read this image.")); reader.readAsDataURL(file); }); }
 function riskMessage(risk: "electric" | "water-electric" | "gas", language: DiagnosticLanguage) {
+  if (language === "nepali_romanized") {
+    if (risk === "gas") return "Yo turuntai gas hazard huna sakcha. Sabailai bahira surakshit thau ma lanu hos; aago wa switch nachalaunu. Bahira pugera emergency service wa gas supplier lai samparka garnu hos.";
+    if (risk === "water-electric") return "Pani ra bijuli wa current ko jhatka khatarnak huna sakcha. Tyo thau bata tada basnu hos, pani wa equipment nachhunu hos, ra qualified emergency help bolaaunu hos. Asurakshit thau ko main switch nachhunu hos.";
+    return "Spark, dhuwa, jalyeko wire wa tato socket turuntai khatra huna sakcha. Tada basnu hos. Sukha ra safe thau bata hazard najik nagai main breaker banda garna milcha bhane matra garnu hos; natra nachhunu hos. Qualified emergency wa utility help samparka garnu hos.";
+  }
   if (language !== "english") {
     if (risk === "gas") return "यो ग्याससम्बन्धी तत्काल जोखिम हुन सक्छ। सबैलाई बाहिर सुरक्षित ठाउँमा लैजानुहोस्; आगो वा स्विच नचलाउनुहोस्। बाहिर पुगेपछि स्थानीय आपतकालीन सेवा वा ग्यास आपूर्तिकर्तालाई सम्पर्क गर्नुहोस्।";
     if (risk === "water-electric") return "पानी र बिजुली वा करेन्टको झट्का खतरनाक हुन सक्छ। त्यस ठाउँबाट टाढा रहनुहोस्, पानी वा उपकरण नछुनुहोस्, र योग्य आपतकालीन सहायता बोलाउनुहोस्। असुरक्षित ठाउँको मेन स्विच नछुनुहोस्।";
@@ -24,7 +44,10 @@ function riskMessage(risk: "electric" | "water-electric" | "gas", language: Diag
   if (risk === "water-electric") return "Water near electricity or an electric shock can be dangerous. Keep away, do not touch the water or equipment, and contact qualified emergency help. Do not approach a main switch if the area is unsafe.";
   return "Sparks, smoke, a burning wire or a hot/burnt socket can signal an immediate hazard. Keep away. If the main breaker is reachable from a dry, safe place without approaching the hazard, switch it off; otherwise leave it alone. Contact qualified emergency or utility help.";
 }
-function textFor(language: DiagnosticLanguage, english: string, nepali: string) { return language === "english" ? english : nepali; }
+function urgentAssessmentMessage(language: DiagnosticLanguage) {
+  return textFor(language, "The report indicates an urgent impact. Contact a qualified professional promptly; if anyone is in immediate danger, contact local emergency services now. Do not wait for this chat to resolve it.", "बताइएको असर तत्काल ध्यान दिनुपर्ने देखिन्छ। योग्य प्राविधिकलाई छिट्टै सम्पर्क गर्नुहोस्; कसैलाई तत्काल खतरा भए स्थानीय आपतकालीन सेवा अहिले नै सम्पर्क गर्नुहोस्। यो संवादबाट समाधान पर्खेर नबस्नुहोस्।");
+}
+function textFor(language: DiagnosticLanguage, english: string, nepali: string) { return language === "english" ? english : language === "nepali_romanized" ? romanizeNepaliText(nepali) : nepali; }
 function questionFor(issueId: string, step: number, language: DiagnosticLanguage, previousAnswers: readonly number[] = [], faultCode?: string): DiagnosticQuestion | null {
   return diagnosticQuestion(issueId, step, language, previousAnswers, faultCode);
 }
@@ -67,10 +90,30 @@ export function ServiceAssistant() {
   const router = useRouter();
   const [open, setOpen] = useState(false), [language, setLanguage] = useState<DiagnosticLanguage | null>(null), [input, setInput] = useState(""), [listening, setListening] = useState(false), [busy, setBusy] = useState(false), [voiceError, setVoiceError] = useState(""), [photo, setPhoto] = useState<File | null>(null), [photoPreview, setPhotoPreview] = useState<string | null>(null), [intake, setIntake] = useState<Intake | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const scrollRef = useRef<HTMLDivElement>(null), recognitionRef = useRef<SpeechRecognitionLike | null>(null), fileRef = useRef<HTMLInputElement>(null), previewUrls = useRef<string[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null), recognitionRef = useRef<SpeechRecognitionLike | null>(null), fileRef = useRef<HTMLInputElement>(null), previewUrls = useRef<string[]>([]), requestControllerRef = useRef<AbortController | null>(null), mountedRef = useRef(true), restoredSessionRef = useRef(false);
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, open, busy]);
   useEffect(() => { const reveal = () => setOpen(true); window.addEventListener("tirkha:open-assistant", reveal); return () => window.removeEventListener("tirkha:open-assistant", reveal); }, []);
-  useEffect(() => () => { recognitionRef.current?.stop(); previewUrls.current.forEach(url => URL.revokeObjectURL(url)); }, []);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; requestControllerRef.current?.abort(); recognitionRef.current?.stop(); previewUrls.current.forEach(url => URL.revokeObjectURL(url)); previewUrls.current = []; }; }, []);
+  useEffect(() => {
+    const restored = readDiagnosticSession();
+    if (restored?.language) setLanguage(restored.language);
+    if (restored?.intake) {
+      setIntake(restored.intake);
+      const state = restored.intake;
+      const prompt = state.universal
+        ? universalDiagnosticQuestion({ categorySlug: state.universal.categorySlug, categoryName: state.universal.categoryName, symptom: state.symptom, step: state.universal.answers.length, answers: state.universal.answers, language: state.language })?.prompt
+        : state.step === "diagnostic" ? questionFor(state.issueId, state.answers.length, state.language, state.answers, state.faultCode)?.prompt : undefined;
+      setMessages([{ id: "restored-session", role: "assistant", text: prompt ? textFor(state.language, `Your diagnostic session has been restored. ${prompt}`, `तपाईंको जाँच सत्र पुनः सुरु भयो। ${prompt}`) : textFor(state.language, "Your diagnostic draft has been restored. Continue with the next step or describe what changed.", "तपाईंको जाँच मस्यौदा पुनः सुरु भयो। अर्को चरणमा जानुहोस् वा के परिवर्तन भयो बताउनुहोस्।") }]);
+    }
+    restoredSessionRef.current = true;
+  }, []);
+  useEffect(() => {
+    if (!restoredSessionRef.current) return;
+    try {
+      if (!language && !intake) sessionStorage.removeItem(SESSION_KEY);
+      else sessionStorage.setItem(SESSION_KEY, JSON.stringify({ language, intake }));
+    } catch { /* Session storage can be disabled; the in-memory diagnostic still works. */ }
+  }, [intake, language]);
   function onPhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null; event.target.value = ""; if (!file) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { setVoiceError(textFor(language ?? "english", "Choose a JPG, PNG or WebP photo.", "JPG, PNG वा WebP तस्बिर छान्नुहोस्।")); return; }
@@ -81,7 +124,7 @@ export function ServiceAssistant() {
   function selectLanguage(selected: DiagnosticLanguage) {
     if (language) return;
     setLanguage(selected);
-    setMessages([{ id: "welcome", role: "assistant", text: selected === "english" ? "Describe the fault or attach a clear photo. I will check immediate hazards first, then ask three to seven trade-specific questions depending on the issue. Photos are optional. I provide a limited routing summary for your review, not a confirmed diagnosis or AI-generated price." : "समस्या छोटकरीमा लेख्नुहोस् वा स्पष्ट तस्बिर जोड्नुहोस्। पहिले तत्काल जोखिम जाँचेर, समस्याअनुसार तीनदेखि सातसम्म सम्बन्धित प्रश्न सोध्छु। तस्बिर वैकल्पिक हो। म सीमित प्रारम्भिक वर्गीकरण देखाउँछु, पुष्टि भएको निदान वा एआई मूल्य अनुमान होइन।" }]);
+    setMessages([{ id: "welcome", role: "assistant", text: selected === "english" ? "Describe the issue or attach an optional photo. I will check hazards first, then ask service-specific questions. I provide a limited routing summary, not a confirmed diagnosis or AI-generated price." : selected === "nepali_romanized" ? "Samasya describe garnu hos wa photo optional rupma pathaunu hos. Pahila safety herera, chhaneko service anusar targeted questions sodhchu. Yo limited triage ho, confirmed diagnosis wa AI price hoina." : "समस्या छोटकरीमा लेख्नुहोस् वा स्पष्ट तस्बिर जोड्नुहोस्। पहिले तत्काल जोखिम जाँचेर, छानिएको सेवाअनुसार सम्बन्धित प्रश्न सोध्छु। म सीमित प्रारम्भिक वर्गीकरण देखाउँछु, पुष्टि भएको निदान वा एआई मूल्य अनुमान होइन।" }]);
   }
   async function send(event?: FormEvent, forcedQuery?: string) {
     event?.preventDefault();
@@ -94,18 +137,21 @@ export function ServiceAssistant() {
     const activeLanguage = lockedLanguage ?? diagnosticLanguageForText(query);
     if (!lockedLanguage) {
       setLanguage(activeLanguage);
-      setMessages(old => old.length ? old : [{ id: "welcome", role: "assistant", text: activeLanguage === "english" ? "I detected English. I will check safety first and ask up to seven adaptive questions only if needed. Photos are optional." : "तपाईंको सन्देश नेपालीमा छ भनेर पहिचान भयो। पहिले सुरक्षा जाँचेर आवश्यक परेमा सातसम्म अनुकूलित प्रश्न सोध्छु। तस्बिर वैकल्पिक हो।" }]);
+      setMessages(old => old.length ? old : [{ id: "welcome", role: "assistant", text: activeLanguage === "english" ? "I detected English. I will check safety first and ask adaptive service-specific questions only if needed. Photos are optional." : activeLanguage === "nepali_romanized" ? "Romanized Nepali bujhe. Pahila safety herchu, ani jaruri bhaye service-anusar questions sodhchu. Photo optional ho." : "तपाईंको सन्देश नेपालीमा छ भनेर पहिचान भयो। पहिले सुरक्षा जाँचेर आवश्यक परेमा सेवाअनुसार प्रश्न सोध्छु। तस्बिर वैकल्पिक हो।" }]);
     }
     const currentQuestion = intake?.step === "diagnostic" ? questionFor(intake.issueId, intake.answers.length, activeLanguage, intake.answers, intake.faultCode) : null;
     const acceptedText = forcedQuery === "[[confirm-diagnosis]]" ? textFor(activeLanguage, "Accepted classification; continue", "वर्गीकरण स्वीकार गरियो; अगाडि बढ्नुहोस्") : query;
     const userMessage: Message = { id: crypto.randomUUID(), role: "user", text: acceptedText || (activeLanguage === "english" ? "Photo submitted for triage." : "जाँचका लागि तस्बिर पठाइयो।") };
     setMessages(old => [...old, userMessage].slice(-32));
     setInput(""); setPhoto(null); setPhotoPreview(null); setVoiceError(""); setBusy(true);
+    const requestController = new AbortController();
+    requestControllerRef.current?.abort(); requestControllerRef.current = requestController;
     if (currentPreview) { URL.revokeObjectURL(currentPreview); previewUrls.current = previewUrls.current.filter(url => url !== currentPreview); }
     try {
       let next: Intake | null = intake, answer = "", question: DiagnosticQuestion | undefined, quickReplies: QuickReply[] | undefined, diagnostic: DiagnosticDraft | undefined, diagnosticAction: Message["diagnosticAction"], serviceId: string | undefined, fallbackTrade: Message["fallbackTrade"];
       const risk = detectHomeSafetyRisk(query);
       if (risk) { answer = riskMessage(risk, activeLanguage); next = null; }
+      else if (hasMedicalEmergencyCue(query)) { next = null; answer = activeLanguage === "english" ? "This may be a medical emergency. Contact local emergency medical services now or go to the nearest emergency department. Do not wait for an in-home booking or rely on this assistant for diagnosis." : activeLanguage === "nepali_romanized" ? "Yo medical emergency huna sakcha. Ahile nai local emergency medical service samparka garnu hos wa najik ko emergency department janu hos. Ghar visit booking ko lagi parkhinu wa yo assistant ma diagnosis ko lagi bhar naparnu hos." : "यो स्वास्थ्य आपतकाल हुन सक्छ। अहिले नै स्थानीय आपतकालीन स्वास्थ्य सेवा सम्पर्क गर्नुहोस् वा नजिकको आकस्मिक कक्ष जानुहोस्। घरमै आउने सेवा बुकिङ पर्खेर नबस्नुहोस् र यस सहायकबाट निदान नलिनुहोस्।"; }
       else if (forcedQuery === "[[onsite-inspection]]") {
         const originalSymptom = intake?.symptom ?? query;
         const trade = intake ? HOME_ISSUES.find(candidate => candidate.id === intake.issueId)?.trade as "plumbing" | "electrical" | undefined : detectHomeFaultTrade(originalSymptom) ?? undefined;
@@ -113,9 +159,45 @@ export function ServiceAssistant() {
         diagnostic = { symptom: originalSymptom, issue_title: textFor(activeLanguage, "On-site technical inspection", "स्थलगत प्राविधिक जाँच"), explanation: textFor(activeLanguage, "A qualified professional will inspect the reported issue and confirm the scope on site. No component failure or price is inferred.", "योग्य प्राविधिकले स्थलमै समस्या जाँच गरी कामको दायरा पुष्टि गर्नुहुनेछ। कुनै पार्ट बिग्रिएको वा मूल्य अनुमान गरिएको छैन।"), urgency: "routine", trade, severity: diagnosticSeverityLabel(1, activeLanguage), visual_evidence: [], photo_assessed: intake?.photoAssessed ?? false, safety_note: intake?.safetyNote, triage_answers: intake?.answers.map(String) ?? [], suggested_parts: [] };
         answer = textFor(activeLanguage, "On-site inspection selected. You can choose the appropriate trade below.", "स्थलगत जाँच छानियो। तल उपयुक्त सेवा छान्नुहोस्।");
       }
+      else if (intake?.universal && intake.step === "diagnostic" && !currentPhoto) {
+        const planDepth = universalDiagnosticDepth({ categorySlug: intake.universal.categorySlug, categoryName: intake.universal.categoryName, symptom: intake.symptom });
+        const planQuestion = universalDiagnosticQuestion({ categorySlug: intake.universal.categorySlug, categoryName: intake.universal.categoryName, symptom: intake.symptom, step: intake.universal.answers.length, answers: intake.universal.answers, language: activeLanguage, depth: planDepth });
+        if (!planQuestion) {
+          next = null;
+          answer = activeLanguage === "english" ? "This category needs a qualified on-site assessment. No fault or price has been inferred." : activeLanguage === "nepali_romanized" ? "Yo service ko lagi qualified on-site assessment chahincha. Fault wa price anuman gareko chaina." : "यो सेवाका लागि योग्य प्राविधिकको स्थलमै जाँच आवश्यक छ। खराबी वा मूल्य अनुमान गरिएको छैन।";
+        } else {
+          const picked = optionIndex(forcedQuery ?? query, planQuestion.choices);
+          const detail = picked >= 0 ? planQuestion.choices[picked]! : query.slice(0, 180);
+          const medicalCategory = /medical|doctor|health|nurse|physio/i.test(`${intake.universal.categorySlug} ${intake.universal.categoryName}`);
+          if (medicalCategory && extractDiagnosticSeverity(detail) === "urgent") {
+            next = null;
+            answer = activeLanguage === "english" ? "This may be a medical emergency. Contact local emergency medical services now or go to the nearest emergency department. Do not wait for an in-home booking or rely on this assistant for diagnosis." : activeLanguage === "nepali_romanized" ? "Yo medical emergency huna sakcha. Ahile nai local emergency medical service samparka garnu hos wa najik ko emergency department janu hos. Ghar visit booking ko lagi parkhinu wa yo assistant ma diagnosis ko lagi bhar naparnu hos." : "यो स्वास्थ्य आपतकाल हुन सक्छ। अहिले नै स्थानीय आपतकालीन स्वास्थ्य सेवा सम्पर्क गर्नुहोस् वा नजिकको आकस्मिक कक्ष जानुहोस्। घरमै आउने सेवा बुकिङ पर्खेर नबस्नुहोस् र यस सहायकबाट निदान नलिनुहोस्।";
+          }
+          else if (!detail) {
+            next = intake; question = planQuestion; answer = planQuestion.prompt;
+          } else {
+            const answers = [...intake.universal.answers, detail];
+            if (answers.length < planDepth) {
+              next = { ...intake, universal: { ...intake.universal, answers } };
+              question = universalDiagnosticQuestion({ categorySlug: intake.universal.categorySlug, categoryName: intake.universal.categoryName, symptom: intake.symptom, step: answers.length, answers, language: activeLanguage, depth: planDepth }) ?? undefined;
+              answer = question?.prompt ?? (activeLanguage === "english" ? "Add one detail in your own words so I can keep this assessment focused." : activeLanguage === "nepali_romanized" ? "Assessment focused rakhna euta detail afnai sabda ma bhannus." : "जाँचलाई केन्द्रित राख्न आफ्नै शब्दमा एउटा विवरण दिनुहोस्।");
+            } else {
+              const severity = extractDiagnosticSeverity(`${intake.symptom} ${answers.at(-1) ?? ""} ${answers.join(" ")}`);
+              const urgency = severity;
+              const severityLabel = activeLanguage === "english" ? severity === "urgent" ? "Broad impact or potential hazard; professional should assess promptly" : severity === "soon" ? "Recurring or worsening; arrange a timely assessment" : "Currently limited; confirm scope during assessment" : activeLanguage === "nepali_romanized" ? severity === "urgent" ? "Thulo asar wa sambhavit khatra; professional le chhito assess garnu parcha" : severity === "soon" ? "Dohorine wa badhdai; samayamai assessment garnu hos" : "Ahile simit cha; assessment ma scope confirm garnu hos" : severity === "urgent" ? "ठूलो असर वा सम्भावित जोखिम; प्राविधिकले छिट्टै जाँच गर्नुपर्छ" : severity === "soon" ? "दोहोरिने वा बढ्दै गएको; समयमै जाँच गराउनुहोस्" : "अहिले सीमित; जाँचमा कामको दायरा पुष्टि गर्नुहोस्";
+              const explanation = activeLanguage === "english" ? `Preliminary ${intake.universal.categoryName} triage from the reported symptom and answers. This does not confirm a failed part. A qualified professional must inspect and agree the scope before work.` : activeLanguage === "nepali_romanized" ? `${intake.universal.categoryName} ko symptom ra jawab bata preliminary triage matra ho. Kunai part bigreko confirm bhayeko chaina. Kaam agadi qualified professional le inspect gari scope ma sahmati linu parcha.` : `${intake.universal.categoryName} को लक्षण र जवाफका आधारमा प्रारम्भिक वर्गीकरण मात्र हो। कुनै भाग बिग्रिएको पुष्टि भएको छैन। कामअघि योग्य प्राविधिकले जाँच गरी दायरा सहमत गर्नुपर्छ।`;
+              const title = activeLanguage === "english" ? `${intake.universal.categoryName} · ${intake.symptom}`.slice(0, 120) : activeLanguage === "nepali_romanized" ? `${intake.universal.categoryName} · ${intake.symptom}`.slice(0, 120) : `${intake.universal.categoryName} · ${intake.symptom}`.slice(0, 120);
+              next = { ...intake, step: "diagnosis-review", universal: { ...intake.universal, answers }, issueTitle: title, explanation, urgency };
+              diagnostic = { symptom: intake.symptom, issue_title: title, explanation, urgency, severity: severityLabel, photo_assessed: intake.photoAssessed, visual_material: intake.visual?.visual_material, visual_mounting: intake.visual?.visual_mounting, visual_defect: intake.visual?.visual_defect, visual_evidence: intake.visual?.visual_evidence ?? [], root_cause_hypothesis: intake.visual?.root_cause_hypothesis, triage_answers: answers, safety_note: intake.safetyNote, suggested_parts: [] };
+              diagnosticAction = "review"; serviceId = intake.serviceId;
+              answer = activeLanguage === "english" ? "Here is the limited triage summary. Confirm it to continue to service area and scheduling; no price has been guessed." : activeLanguage === "nepali_romanized" ? "Yo limited triage summary ho. Service area ra time ko lagi confirm garnu hos; price anuman gareko chaina." : "यो सीमित प्रारम्भिक वर्गीकरण हो। सेवा क्षेत्र र समयका लागि पुष्टि गर्नुहोस्; मूल्य अनुमान गरिएको छैन।";
+            }
+          }
+        }
+      }
       else if (intake?.step === "diagnosis-review" && forcedQuery === "[[confirm-diagnosis]]" && !currentPhoto) {
         next = { ...intake, step: "area" };
-        answer = textFor(activeLanguage, "Classification accepted for dispatch. Which Kathmandu area or landmark should the professional visit?", "सीमित वर्गीकरण स्वीकार गरियो। प्राविधिक कुन टोल वा landmark मा आउनुपर्छ?");
+        answer = activeLanguage === "english" ? "Summary accepted for dispatch. Which area or nearby landmark should the professional visit?" : activeLanguage === "nepali_romanized" ? "Limited summary dispatch ko lagi accept bhayo. Professional kun area wa najik ko landmark ma aaunu parcha?" : "सीमित वर्गीकरण dispatch का लागि स्वीकार भयो। प्राविधिक कुन क्षेत्र वा नजिकको landmark मा आउनुपर्छ?";
       } else if (intake?.step === "diagnostic" && !currentPhoto) {
         if (!currentQuestion) {
           next = null;
@@ -185,10 +267,10 @@ export function ServiceAssistant() {
         }
       } else if (intake?.step === "area" && !currentPhoto) {
         if (query.length < 2) answer = textFor(activeLanguage, "Enter a neighborhood or nearby landmark.", "टोल वा नजिकको landmark लेख्नुहोस्।");
-        else { next = { ...intake, area: query.slice(0, 180), step: "time" }; answer = textFor(activeLanguage, "What day and time in Nepal time would suit you?", "नेपालको समयअनुसार कुन दिन र समय तपाईंलाई उपयुक्त हुन्छ?"); }
+        else { next = { ...intake, area: query.slice(0, 180), step: "time" }; answer = activeLanguage === "nepali_romanized" ? "Nepal time anusar kun din ra samaya tapai lai thik huncha?" : textFor(activeLanguage, "What day and time in Nepal time would suit you?", "नेपालको समयअनुसार कुन दिन र समय तपाईंलाई उपयुक्त हुन्छ?"); }
       } else if (intake?.step === "time" && !currentPhoto) {
         const matchedService = services.find(item => item.id === intake.serviceId);
-        if (!matchedService || !intake.diagnosticCode || !intake.area) { next = null; answer = textFor(activeLanguage, "The inspection request cannot be prepared from the available details. Please start a new triage.", "उपलब्ध विवरणबाट जाँच अनुरोध तयार गर्न सकिएन। कृपया नयाँ जाँच सुरु गर्नुहोस्।"); }
+        if (!matchedService || (!intake.diagnosticCode && !intake.universal) || !intake.area) { next = null; answer = textFor(activeLanguage, "The inspection request cannot be prepared from the available details. Please start a new triage.", "उपलब्ध विवरणबाट जाँच अनुरोध तयार गर्न सकिएन। कृपया नयाँ जाँच सुरु गर्नुहोस्।"); }
         else {
           diagnostic = {
             ...intake.inspectionSummary,
@@ -216,12 +298,13 @@ export function ServiceAssistant() {
         }
       } else if (currentPhoto) {
         const imageDataUrl = await fileAsDataUrl(currentPhoto);
-        const response = await fetch("/api/diagnostics", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ symptom: query || intake?.symptom || "", imageDataUrl, language: activeLanguage, ...(intake ? { expectedIssueId: intake.issueId } : {}) }) });
+      const response = await fetch("/api/diagnostics", { method: "POST", signal: requestController.signal, headers: { "content-type": "application/json" }, body: JSON.stringify({ symptom: query || intake?.symptom || "", imageDataUrl, language: activeLanguage, ...(intake ? { expectedIssueId: intake.issueId } : {}) }) });
         const result = await response.json() as PhotoAssessment | { error?: string };
         if (!response.ok) throw new Error((result as { error?: string }).error || "Photo assessment is unavailable.");
         const assessment = result as PhotoAssessment;
         const photoRisk = detectHomeSafetyRisk(`${query} ${assessment.issue_title} ${assessment.safety_note}`);
-        if (photoRisk || assessment.urgency === "urgent") { answer = riskMessage(photoRisk ?? "electric", activeLanguage); next = null; }
+        if (photoRisk) { answer = riskMessage(photoRisk, activeLanguage); next = null; }
+        else if (assessment.urgency === "urgent") { answer = urgentAssessmentMessage(activeLanguage); next = null; }
         else {
           const classified = HOME_ISSUES.find(candidate => candidate.id === assessment.issue_id) ?? null;
           const textLockedIssue = matchHomeIssue(query);
@@ -236,10 +319,22 @@ export function ServiceAssistant() {
           const answers = intake?.answers ?? [];
           const faultCode = intake?.faultCode ?? (matchedFault?.issueId === issueId ? matchedFault.code : undefined);
           const followup = questionFor(issueId, answers.length, activeLanguage, answers, faultCode);
-          if (!selectedIssue || !followup) {
+          const universalTarget = !selectedIssue ? resolveDiagnosticTarget(`${query} ${assessment.issue_title} ${assessment.explanation} ${assessment.visual_defect} ${assessment.visual_material}`, services) : null;
+          const universalFirst = universalTarget ? universalDiagnosticQuestion({ categorySlug: universalTarget.categorySlug, categoryName: universalTarget.categoryName, symptom, step: 0, answers: [], language: activeLanguage }) : null;
+          if (!selectedIssue && universalTarget && universalFirst) {
+            next = { serviceId: universalTarget.service.id, issueId: "universal", step: "diagnostic", symptom, issueTitle: universalTarget.categoryName, explanation: assessment.explanation, urgency: assessment.urgency, safetyNote: assessment.safety_note || undefined, photoAssessed: true, answers: [], language: activeLanguage, visual, universal: { categorySlug: universalTarget.categorySlug, categoryName: universalTarget.categoryName, answers: [] } };
+            question = universalFirst;
+            const note = activeLanguage === "english" ? `Photo evidence is preliminary. Category matched: ${universalTarget.categoryName}. ` : activeLanguage === "nepali_romanized" ? `Photo evidence preliminary ho. Category match: ${universalTarget.categoryName}. ` : `तस्बिरका प्रमाण प्रारम्भिक हुन्। सेवा वर्ग: ${universalTarget.categoryName}। `;
+            answer = `${note}${universalFirst.prompt}`;
+          } else if (!selectedIssue || !followup) {
   next = null;
   fallbackTrade = selectedIssue?.trade ?? (intake ? (HOME_ISSUES.find(item => item.id === intake.issueId)?.trade as "plumbing" | "electrical" | undefined) ?? null : null);
-  if (!fallbackTrade) quickReplies = [{ label: "🚰 Water Leakage / खानेपानी लीक", query: "paani leakage" }, { label: "⚡ Power Outage / बिजुली अबरोध", query: "power outage" }, { label: "🛠️ On-Site Inspection / स्थलगत जाँच", query: "[[onsite-inspection]]", action: "inspection" }];
+  if (!fallbackTrade) {
+    const categories = [...new Map(services.map(item => [item.category_slug, item.category_name])).entries()].slice(0, 4);
+    quickReplies = categories.map(([, name]) => ({ label: name, query: name }));
+
+    quickReplies.push({ label: "🛠️ On-Site Assessment / स्थलगत जाँच", query: "[[onsite-inspection]]", action: "inspection" });
+  }
   diagnostic = { symptom, issue_title: textFor(activeLanguage, "On-site technical inspection", "स्थलमै प्राविधिक जाँच"), explanation: textFor(activeLanguage, "The available text/photo does not safely resolve a standard fault branch. A Hero should inspect the reported issue and confirm the component on site.", "उपलब्ध विवरण वा तस्बिरबाट मानक खराबी शाखा सुरक्षित रूपमा छुट्याउन सकिएन। Hero ले स्थलमै जाँच गरी भाग पुष्टि गर्नुपर्छ।"), urgency: assessment.urgency, visual_material: visual.visual_material, visual_mounting: visual.visual_mounting, visual_defect: visual.visual_defect, visual_evidence: visual.visual_evidence, root_cause_hypothesis: visual.root_cause_hypothesis, photo_assessed: true, safety_note: assessment.safety_note || undefined, triage_answers: [], suggested_parts: [] };
   diagnosticAction = "fallback";
   answer = textFor(activeLanguage, "This does not match a supported fault branch. Choose the inspection trade below; the original description and visual findings will be included for the Hero. No cause or price is guessed.", "यो समर्थित खराबी शाखासँग मिलेन। तल जाँचको काम छान्नुहोस्; मूल विवरण र तस्बिरबाट देखिएका कुरा Hero लाई पठाइनेछ। कारण वा मूल्य अनुमान गरिने छैन।");
@@ -253,27 +348,41 @@ export function ServiceAssistant() {
         }
       } else {
         let issue = matchHomeIssue(query), textAssessment: PhotoAssessment | null = null;
-        if (!issue) {
+        let universalTarget = !issue ? resolveDiagnosticTarget(query, services) : null;
+        if (!issue && !universalTarget) {
           try {
-            const response = await fetch("/api/diagnostics", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ symptom: query, language: activeLanguage }) });
+            const response = await fetch("/api/diagnostics", { method: "POST", signal: requestController.signal, headers: { "content-type": "application/json" }, body: JSON.stringify({ symptom: query, language: activeLanguage }) });
             if (response.ok) { textAssessment = await response.json() as PhotoAssessment; issue = HOME_ISSUES.find(candidate => candidate.id === textAssessment!.issue_id) ?? null; }
           } catch { /* Text-only trade-specific clarification remains available if the model is unavailable. */ }
         }
+        if (!issue && !universalTarget) universalTarget = resolveDiagnosticTarget(`${query} ${textAssessment?.issue_title ?? ""} ${textAssessment?.explanation ?? ""}`, services);
         const issueId = issue?.id ?? "unknown";
         const matchedFault = matchHomeFault(`${query} ${textAssessment?.issue_title ?? ""} ${textAssessment?.explanation ?? ""} ${textAssessment?.visual_defect ?? ""}`);
         const faultCode = matchedFault?.issueId === issueId ? matchedFault.code : undefined;
         const first = questionFor(issueId, 0, activeLanguage, [], faultCode);
         const textRisk = textAssessment ? detectHomeSafetyRisk(`${query} ${textAssessment.issue_title} ${textAssessment.safety_note}`) : null;
-        if (textRisk || textAssessment?.urgency === "urgent") { next = null; answer = riskMessage(textRisk ?? "electric", activeLanguage); }
+        if (textRisk) { next = null; answer = riskMessage(textRisk, activeLanguage); }
+        else if (textAssessment?.urgency === "urgent") { next = null; answer = urgentAssessmentMessage(activeLanguage); }
+        else if (!issue && universalTarget) {
+          const prompt = universalDiagnosticQuestion({ categorySlug: universalTarget.categorySlug, categoryName: universalTarget.categoryName, symptom: query, step: 0, answers: [], language: activeLanguage });
+          if (prompt) {
+            next = { serviceId: universalTarget.service.id, issueId: "universal", step: "diagnostic", symptom: query, issueTitle: universalTarget.categoryName, explanation: textAssessment?.explanation ?? textFor(activeLanguage, "The service category is identified. Follow-up questions will narrow the affected component and observed failure pattern; this is not a confirmed diagnosis.", "सेवा वर्ग पहिचान भयो। थप प्रश्नले प्रभावित भाग र देखिएको खराबीको ढाँचा छुट्याउनेछ; यो पुष्टि भएको निदान होइन।"), urgency: textAssessment?.urgency ?? extractDiagnosticSeverity(query), safetyNote: textAssessment?.safety_note || undefined, photoAssessed: false, answers: [], language: activeLanguage, universal: { categorySlug: universalTarget.categorySlug, categoryName: universalTarget.categoryName, answers: [] } };
+            question = prompt;
+            answer = activeLanguage === "english" ? `I matched this to ${universalTarget.categoryName}. I’ll keep questions specific to this service and the issue you described. ${prompt.prompt}` : activeLanguage === "nepali_romanized" ? `Yo ${universalTarget.categoryName} service sanga match bhayo. Tapai le bhannu bhayeko issue anusar targeted questions sodhchu. ${prompt.prompt}` : `यो ${universalTarget.categoryName} सेवासँग मिल्यो। तपाईंले बताउनुभएको समस्याअनुसार सम्बन्धित प्रश्न सोध्छु। ${prompt.prompt}`;
+          } else {
+            next = null; answer = textFor(activeLanguage, "The selected service needs a qualified on-site assessment.", "छानिएको सेवाका लागि योग्य प्राविधिकको स्थलमै जाँच आवश्यक छ।");
+          }
+        }
         else if (!issue || !first) {
           const inferredTrade = detectHomeFaultTrade(query) ?? issue?.trade;
           next = null; fallbackTrade = inferredTrade ?? null; diagnosticAction = "fallback";
           diagnostic = { symptom: query, issue_title: textFor(activeLanguage, "On-site technical inspection", "स्थलगत प्राविधिक जाँच"), explanation: textAssessment?.explanation ?? textFor(activeLanguage, "The symptom does not fit a supported fault branch. A qualified Hero should inspect the reported component on site.", "लक्षण समर्थित खराबी शाखासँग मिलेन। योग्य Hero ले बताइएको भाग स्थलमै जाँच गर्नुपर्छ।"), urgency: textAssessment?.urgency ?? "routine", trade: inferredTrade, visual_material: textAssessment?.visual_material, visual_mounting: textAssessment?.visual_mounting, visual_defect: textAssessment?.visual_defect, visual_evidence: textAssessment?.visual_evidence ?? [], root_cause_hypothesis: textAssessment?.root_cause_hypothesis, photo_assessed: false, safety_note: textAssessment?.safety_note || undefined, triage_answers: [], suggested_parts: [] };
-          if (!inferredTrade) quickReplies = [
-            { label: "🚰 Water Leakage / खानेपानी लीक", query: "paani leakage" },
-            { label: "⚡ Power Outage / बिजुली अबरोध", query: "power outage" },
-            { label: "🛠️ On-Site Inspection / स्थलगत जाँच", query: "[[onsite-inspection]]", action: "inspection" },
-          ];
+          if (!inferredTrade) {
+            const categories = [...new Map(services.map(item => [item.category_slug, item.category_name])).entries()].slice(0, 4);
+            quickReplies = categories.map(([, name]) => ({ label: name, query: name }));
+
+            quickReplies.push({ label: "🛠️ On-Site Assessment / स्थलगत जाँच", query: "[[onsite-inspection]]", action: "inspection" });
+          }
           answer = textFor(activeLanguage, "I could not confidently match that description to a supported fault tree. Choose a quick reply or request an on-site inspection below; no cause or price is guessed.", "यो विवरणलाई समर्थित खराबी शाखामा विश्वासपूर्वक राख्न सकिएन। छिटो विकल्प वा तलको स्थलमै जाँच छान्नुहोस्; कारण वा मूल्य अनुमान गरिएको छैन।");
         } else {
           const match = issue.serviceId ? services.find(item => item.id === issue!.serviceId) : undefined;
@@ -286,10 +395,11 @@ export function ServiceAssistant() {
       setIntake(next);
       setMessages(old => [...old, { id: crypto.randomUUID(), role: "assistant" as const, text: answer, question, quickReplies, diagnosticAction, diagnostic, serviceId, fallbackTrade }].slice(-32));
     } catch (error) {
-      setIntake(null);
+      if (requestController.signal.aborted || !mountedRef.current) return;
+      setIntake(intake);
       const fallback = textFor(activeLanguage, "Assessment failed. Describe the issue in text; safety checks remain available. No photo or transcript was saved.", "जाँच हुन सकेन। जोखिम जाँचका लागि समस्या शब्दमा लेख्नुहोस्। तस्बिर वा संवाद सुरक्षित गरिएको छैन।");
       setMessages(old => [...old, { id: crypto.randomUUID(), role: "assistant" as const, text: fallback }].slice(-32));
-    } finally { setBusy(false); }
+    } finally { if (requestControllerRef.current === requestController) requestControllerRef.current = null; if (mountedRef.current) setBusy(false); }
   }
   function startInspectionFallback(trade: "plumbing" | "electrical", summary: DiagnosticDraft) {
     const activeLanguage = language ?? "english";
@@ -319,9 +429,9 @@ export function ServiceAssistant() {
   return <div className="mk-assistant">
     {open && <section className="mk-assistant-panel" aria-label={textFor(uiLanguage, "Home service diagnostic guide", "घरायसी सेवा निदान सहायक")}>
       <header><div className="mk-assistant-avatar"><Sparkles size={17} /></div><div><b>{textFor(uiLanguage, "Home service triage", "घरायसी सेवा प्रारम्भिक जाँच")}</b><small>{textFor(uiLanguage, "Safety · evidence · inspection booking", "सुरक्षा · प्रमाण · जाँच बुकिङ")}</small></div><button type="button" onClick={() => { recognitionRef.current?.stop(); setOpen(false); }} aria-label={textFor(uiLanguage, "Close assistant", "सहायक बन्द गर्नुहोस्")}><X size={18} /></button></header>
-      {!language && <div className="mk-language-gate" role="group" aria-label="Select diagnostic language"><strong>Choose a language or start typing / भाषा छान्नुहोस् वा लेख्न सुरु गर्नुहोस्</strong><div><button type="button" onClick={() => selectLanguage("english")}>English</button><button type="button" onClick={() => selectLanguage("nepali_devanagari")}>नेपाली (Devanagari)</button></div><small>Start typing to detect English or Nepali automatically. Language is then kept consistent for this session. / लेख्न सुरु गर्दा भाषा स्वतः पहिचान हुन्छ र सत्रभरि स्थिर रहन्छ।</small></div>}
+      {!language && <div className="mk-language-gate" role="group" aria-label="Select diagnostic language"><strong>Choose a language or start typing / भाषा छान्नुहोस् वा लेख्न सुरु गर्नुहोस्</strong><div><button type="button" onClick={() => selectLanguage("english")}>English</button><button type="button" onClick={() => selectLanguage("nepali_devanagari")}>नेपाली (Devanagari)</button><button type="button" onClick={() => selectLanguage("nepali_romanized")}>Romanized Nepali</button></div><small>Type in English, Nepali script, or Romanized Nepali to detect your language. It stays consistent for this session. / लेख्न सुरु गर्दा भाषा पहिचान हुन्छ र सत्रभरि स्थिर रहन्छ।</small></div>}
       <>
-        <div className="mk-chat-messages" ref={scrollRef} aria-live="polite">{messages.map(message => <div key={message.id} className={`mk-chat-message mk-chat-${message.role}`}><p>{message.text}</p>{message.question && <div className="mk-diagnostic-choices">{message.question.choices.map((choice, index) => <button key={choice} type="button" disabled={busy} onClick={() => void send(undefined, `[[${index}]]${choice}`)}><b>{String.fromCharCode(65 + index)})</b> {choice}</button>)}</div>}{message.quickReplies && <div className="mk-diagnostic-choices">{message.quickReplies.map(reply => <button key={reply.query} type="button" disabled={busy} onClick={() => void send(undefined, reply.query)}>{reply.label}</button>)}</div>}{message.diagnostic && message.diagnosticAction === "review" && <article className="mk-assistant-card mk-diagnostic-card"><span className="mk-kicker">{textFor(uiLanguage, "LIMITED TRIAGE CLASSIFICATION", "सीमित प्रारम्भिक वर्गीकरण")} · {message.diagnostic.diagnostic_code}</span><b>{message.diagnostic.issue_title}</b><small>{message.diagnostic.explanation}</small>{message.diagnostic.photo_assessed && <small>{textFor(uiLanguage, "Visual evidence", "तस्बिरमा देखिएको प्रमाण")}: {[message.diagnostic.visual_material, message.diagnostic.visual_mounting, message.diagnostic.visual_defect, ...(message.diagnostic.visual_evidence ?? [])].filter(Boolean).join(" · ") || textFor(uiLanguage, "No specific defect is clear in the image.", "तस्बिरमा कुनै निश्चित खराबी स्पष्ट देखिँदैन।")}</small>}{message.diagnostic.root_cause_hypothesis && <small>{textFor(uiLanguage, "Unconfirmed possibility", "पुष्टि नभएको सम्भावित कारण")}: {message.diagnostic.root_cause_hypothesis}</small>}<small>{textFor(uiLanguage, "Electrical work requires on-site inspection. This triage does not set a price.", "विद्युतीय कामका लागि स्थलमै जाँच आवश्यक हुन्छ। यो प्रारम्भिक जाँचले मूल्य तोक्दैन।")}</small><button type="button" disabled={busy} onClick={() => void send(undefined, "[[confirm-diagnosis]]")}>{textFor(uiLanguage, "Accept classification and continue", "वर्गीकरण स्वीकार गरी अगाडि बढ्नुहोस्")}</button></article>}{message.diagnostic && message.diagnosticAction === "fallback" && <article className="mk-assistant-card mk-diagnostic-card"><span className="mk-kicker">{textFor(uiLanguage, "ON-SITE INSPECTION FALLBACK", "स्थलमै जाँचको विकल्प")}</span><b>{message.diagnostic.issue_title}</b><small>{message.diagnostic.explanation}</small>{message.diagnostic.photo_assessed && <small>{textFor(uiLanguage, "Transient photo findings", "क्षणिक तस्बिर निष्कर्ष")}: {[message.diagnostic.visual_material, message.diagnostic.visual_defect, ...(message.diagnostic.visual_evidence ?? [])].filter(Boolean).join(" · ") || textFor(uiLanguage, "No specific visual finding", "विशेष दृश्य निष्कर्ष छैन")}</small>}<div className="mk-fallback-actions">{message.fallbackTrade ? <button type="button" onClick={() => startInspectionFallback(message.fallbackTrade!, message.diagnostic!)}>{textFor(uiLanguage, message.fallbackTrade === "plumbing" ? "Request plumbing inspection" : "Request electrical inspection", message.fallbackTrade === "plumbing" ? "प्लम्बिङ जाँच अनुरोध" : "विद्युतीय जाँच अनुरोध")}</button> : <><button type="button" onClick={() => startInspectionFallback("plumbing", message.diagnostic!)}>{textFor(uiLanguage, "Plumbing inspection", "प्लम्बिङ जाँच")}</button><button type="button" onClick={() => startInspectionFallback("electrical", message.diagnostic!)}>{textFor(uiLanguage, "Electrical inspection", "विद्युतीय जाँच")}</button></>}</div></article>}{message.diagnostic && message.diagnosticAction === "dispatch" && message.serviceId && <article className="mk-assistant-card mk-diagnostic-card"><span className="mk-kicker">{textFor(uiLanguage, "INSPECTION REQUEST", "जाँच अनुरोध")} · {message.diagnostic.diagnostic_code}</span><b>{message.diagnostic.issue_title}</b><small>{textFor(uiLanguage, "Area", "क्षेत्र")}: {message.diagnostic.area} · {textFor(uiLanguage, "Requested time", "अनुरोध गरिएको समय")}: {message.diagnostic.preferred_time}</small><small>{textFor(uiLanguage, "Quote pending. No repair or price is approved until the professional has inspected the issue and you accept a written quote.", "मूल्य प्रस्ताव बाँकी छ। प्राविधिकले जाँच गरी तपाईंले लिखित मूल्य प्रस्ताव स्वीकार नगरेसम्म मर्मत वा मूल्य स्वीकृत हुँदैन।")}</small><button type="button" onClick={() => continueToBooking(message.serviceId!, message.diagnostic!)}>{textFor(uiLanguage, "Continue to inspection booking", "जाँच बुकिङ अगाडि बढाउनुहोस्")}</button></article>}</div>)}</div>
+        <div className="mk-chat-messages" ref={scrollRef} aria-live="polite">{messages.map(message => <div key={message.id} className={`mk-chat-message mk-chat-${message.role}`}><p>{message.text}</p>{message.question && <div className="mk-diagnostic-choices">{message.question.choices.map((choice, index) => <button key={choice} type="button" disabled={busy} onClick={() => void send(undefined, `[[${index}]]${choice}`)}><b>{String.fromCharCode(65 + index)})</b> {choice}</button>)}</div>}{message.quickReplies && <div className="mk-diagnostic-choices">{message.quickReplies.map(reply => <button key={reply.query} type="button" disabled={busy} onClick={() => void send(undefined, reply.query)}>{reply.label}</button>)}</div>}{message.diagnostic && message.diagnosticAction === "review" && <article className="mk-assistant-card mk-diagnostic-card"><span className="mk-kicker">{textFor(uiLanguage, "LIMITED TRIAGE CLASSIFICATION", "सीमित प्रारम्भिक वर्गीकरण")}{message.diagnostic.diagnostic_code ? ` · ${message.diagnostic.diagnostic_code}` : message.serviceId ? ` · ${message.serviceId}` : ""}</span><b>{message.diagnostic.issue_title}</b><small>{message.diagnostic.explanation}</small>{message.diagnostic.photo_assessed && <small>{textFor(uiLanguage, "Visual evidence", "तस्बिरमा देखिएको प्रमाण")}: {[message.diagnostic.visual_material, message.diagnostic.visual_mounting, message.diagnostic.visual_defect, ...(message.diagnostic.visual_evidence ?? [])].filter(Boolean).join(" · ") || textFor(uiLanguage, "No specific defect is clear in the image.", "तस्बिरमा कुनै निश्चित खराबी स्पष्ट देखिँदैन।")}</small>}{message.diagnostic.root_cause_hypothesis && <small>{textFor(uiLanguage, "Unconfirmed possibility", "पुष्टि नभएको सम्भावित कारण")}: {message.diagnostic.root_cause_hypothesis}</small>}<small>{message.diagnostic.trade === "electrical" ? textFor(uiLanguage, "Electrical work requires on-site inspection. This triage does not set a price.", "विद्युतीय कामका लागि स्थलमै जाँच आवश्यक हुन्छ। यो प्रारम्भिक जाँचले मूल्य तोक्दैन।") : textFor(uiLanguage, "This is a limited service-routing summary, not a confirmed diagnosis or price quote. Confirm the written scope with the professional before work.", "यो सीमित सेवा-वर्गीकरण हो, पुष्टि भएको निदान वा मूल्य प्रस्ताव होइन। कामअघि प्राविधिकसँग लिखित दायरा पुष्टि गर्नुहोस्।")}</small><button type="button" disabled={busy} onClick={() => void send(undefined, "[[confirm-diagnosis]]")}>{textFor(uiLanguage, "Accept classification and continue", "वर्गीकरण स्वीकार गरी अगाडि बढ्नुहोस्")}</button></article>}{message.diagnostic && message.diagnosticAction === "fallback" && <article className="mk-assistant-card mk-diagnostic-card"><span className="mk-kicker">{textFor(uiLanguage, "ON-SITE INSPECTION FALLBACK", "स्थलमै जाँचको विकल्प")}</span><b>{message.diagnostic.issue_title}</b><small>{message.diagnostic.explanation}</small>{message.diagnostic.photo_assessed && <small>{textFor(uiLanguage, "Transient photo findings", "क्षणिक तस्बिर निष्कर्ष")}: {[message.diagnostic.visual_material, message.diagnostic.visual_defect, ...(message.diagnostic.visual_evidence ?? [])].filter(Boolean).join(" · ") || textFor(uiLanguage, "No specific visual finding", "विशेष दृश्य निष्कर्ष छैन")}</small>}<div className="mk-fallback-actions">{message.fallbackTrade ? <button type="button" onClick={() => startInspectionFallback(message.fallbackTrade!, message.diagnostic!)}>{textFor(uiLanguage, message.fallbackTrade === "plumbing" ? "Request plumbing inspection" : "Request electrical inspection", message.fallbackTrade === "plumbing" ? "प्लम्बिङ जाँच अनुरोध" : "विद्युतीय जाँच अनुरोध")}</button> : <p>{textFor(uiLanguage, "Choose a service category above, or describe the service you need.", "माथि सेवा वर्ग छान्नुहोस् वा आवश्यक सेवा बताउनुहोस्।")}</p>}</div></article>}{message.diagnostic && message.diagnosticAction === "dispatch" && message.serviceId && <article className="mk-assistant-card mk-diagnostic-card"><span className="mk-kicker">{textFor(uiLanguage, "INSPECTION REQUEST", "जाँच अनुरोध")}{message.diagnostic.diagnostic_code ? ` · ${message.diagnostic.diagnostic_code}` : ""}</span><b>{message.diagnostic.issue_title}</b><small>{textFor(uiLanguage, "Area", "क्षेत्र")}: {message.diagnostic.area} · {textFor(uiLanguage, "Requested time", "अनुरोध गरिएको समय")}: {message.diagnostic.preferred_time}</small><small>{textFor(uiLanguage, "Quote pending. No repair or price is approved until the professional has inspected the issue and you accept a written quote.", "मूल्य प्रस्ताव बाँकी छ। प्राविधिकले जाँच गरी तपाईंले लिखित मूल्य प्रस्ताव स्वीकार नगरेसम्म मर्मत वा मूल्य स्वीकृत हुँदैन।")}</small><button type="button" onClick={() => continueToBooking(message.serviceId!, message.diagnostic!)}>{textFor(uiLanguage, "Continue to inspection booking", "जाँच बुकिङ अगाडि बढाउनुहोस्")}</button></article>}</div>)}</div>
         {busy && <p className="mk-voice-error" role="status">{textFor(uiLanguage, "Reviewing the evidence", "प्रमाण जाँच हुँदैछ")}{photo ? textFor(uiLanguage, " and photo…", " र तस्बिर…") : "…"}</p>}{voiceError && <p className="mk-voice-error" role="status">{voiceError}</p>}
         {photo && <div className="mk-photo-attachment"><img src={photoPreview ?? ""} alt={textFor(uiLanguage, "Selected photo preview", "छानिएको तस्बिरको पूर्वावलोकन")} /><span>{photo.name} · {textFor(uiLanguage, "used for this assessment only; not saved", "यो जाँचका लागि मात्र; सुरक्षित राखिँदैन")}</span><button type="button" onClick={() => { if (photoPreview) { URL.revokeObjectURL(photoPreview); previewUrls.current = previewUrls.current.filter(url => url !== photoPreview); } setPhoto(null); setPhotoPreview(null); }} aria-label={textFor(uiLanguage, "Remove attached photo", "जोडिएको तस्बिर हटाउनुहोस्")}><X size={14} /></button></div>}
         <form className="mk-assistant-compose" onSubmit={event => void send(event)}><button type="button" className={listening ? "is-listening" : ""} onClick={toggleVoice} aria-label={listening ? textFor(uiLanguage, "Stop voice dictation", "आवाजबाट लेख्न रोक्नुहोस्") : textFor(uiLanguage, "Start voice dictation", "आवाजबाट लेख्न सुरु गर्नुहोस्")}><Mic size={18} /></button><input value={input} onChange={event => setInput(event.target.value)} placeholder={listening ? textFor(uiLanguage, "Listening…", "सुन्दैछ…") : language ? textFor(uiLanguage, "Describe what you notice", "के देख्नुभएको छ लेख्नुहोस्") : "Describe the issue in English or Nepali / समस्या लेख्नुहोस्"} aria-label={textFor(uiLanguage, "Describe the home-service problem", "घरायसी सेवाको समस्या बताउनुहोस्")} /><input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={onPhoto} hidden /><button type="button" onClick={() => fileRef.current?.click()} aria-label={textFor(uiLanguage, "Attach a JPG, PNG or WebP photo", "JPG, PNG वा WebP तस्बिर जोड्नुहोस्")}><ImagePlus size={18} /></button><button type="submit" disabled={busy || (!input.trim() && !photo)} aria-label={textFor(uiLanguage, "Send message", "सन्देश पठाउनुहोस्")}><Send size={17} /></button></form>

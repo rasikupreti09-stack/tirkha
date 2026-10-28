@@ -8,6 +8,13 @@ const rateWindowMs = 10 * 60_000;
 const rateBuckets = new Map<string, { startedAt: number; count: number }>();
 function takeRateLimit(ip: string) {
   const now = Date.now(), bucket = rateBuckets.get(ip);
+  if (rateBuckets.size >= 5_000 && !bucket) {
+    for (const [key, value] of rateBuckets) if (now - value.startedAt >= rateWindowMs) rateBuckets.delete(key);
+    if (rateBuckets.size >= 5_000) {
+      const oldest = [...rateBuckets].reduce<[string, number]>((current, entry) => entry[1].startedAt < current[1] ? [entry[0], entry[1].startedAt] : current, ["", Number.POSITIVE_INFINITY]);
+      if (oldest[0]) rateBuckets.delete(oldest[0]);
+    }
+  }
   if (!bucket || now - bucket.startedAt >= rateWindowMs) { rateBuckets.set(ip, { startedAt: now, count: 1 }); return true; }
   if (bucket.count >= 5) return false;
   bucket.count += 1;
@@ -33,8 +40,8 @@ export async function POST(request: Request) {
 
   const requestedLanguage = body.language;
   const detectedLanguage = requestedLanguage === "english" || requestedLanguage === "nepali_devanagari" || requestedLanguage === "nepali_romanized" ? requestedLanguage : diagnosticLanguageForText(symptom);
-  const language = detectedLanguage === "english" ? "english" : "nepali_devanagari";
-  const languageName = language === "english" ? "professional English" : "authentic Nepali written entirely in Devanagari script";
+  const language = detectedLanguage;
+  const languageName = language === "english" ? "professional English" : language === "nepali_romanized" ? "natural Romanized Nepali in Latin script, preserving common technical English terms" : "authentic Nepali written in Devanagari script";
   const content: Array<Record<string, string>> = [{ type: "input_text", text: `Customer description: ${symptom || "No written description supplied."}\nReply in ${languageName}.` }];
   if (typeof imageDataUrl === "string") content.push({ type: "input_image", image_url: imageDataUrl, detail: "high" });
   try {
