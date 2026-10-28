@@ -90,7 +90,8 @@ export function ServiceAssistant() {
   const router = useRouter();
   const [open, setOpen] = useState(false), [language, setLanguage] = useState<DiagnosticLanguage | null>(null), [input, setInput] = useState(""), [listening, setListening] = useState(false), [busy, setBusy] = useState(false), [voiceError, setVoiceError] = useState(""), [photo, setPhoto] = useState<File | null>(null), [photoPreview, setPhotoPreview] = useState<string | null>(null), [intake, setIntake] = useState<Intake | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const scrollRef = useRef<HTMLDivElement>(null), recognitionRef = useRef<SpeechRecognitionLike | null>(null), fileRef = useRef<HTMLInputElement>(null), previewUrls = useRef<string[]>([]), requestControllerRef = useRef<AbortController | null>(null), mountedRef = useRef(true), restoredSessionRef = useRef(false);
+  const scrollRef = useRef<HTMLDivElement>(null), recognitionRef = useRef<SpeechRecognitionLike | null>(null), fileRef = useRef<HTMLInputElement>(null), previewUrls = useRef<string[]>([]), requestControllerRef = useRef<AbortController | null>(null), mountedRef = useRef(true);
+  const [sessionReady, setSessionReady] = useState(false);
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, open, busy]);
   useEffect(() => { const reveal = () => setOpen(true); window.addEventListener("tirkha:open-assistant", reveal); return () => window.removeEventListener("tirkha:open-assistant", reveal); }, []);
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; requestControllerRef.current?.abort(); recognitionRef.current?.stop(); previewUrls.current.forEach(url => URL.revokeObjectURL(url)); previewUrls.current = []; }; }, []);
@@ -105,15 +106,15 @@ export function ServiceAssistant() {
         : state.step === "diagnostic" ? questionFor(state.issueId, state.answers.length, state.language, state.answers, state.faultCode)?.prompt : undefined;
       setMessages([{ id: "restored-session", role: "assistant", text: prompt ? textFor(state.language, `Your diagnostic session has been restored. ${prompt}`, `तपाईंको जाँच सत्र पुनः सुरु भयो। ${prompt}`) : textFor(state.language, "Your diagnostic draft has been restored. Continue with the next step or describe what changed.", "तपाईंको जाँच मस्यौदा पुनः सुरु भयो। अर्को चरणमा जानुहोस् वा के परिवर्तन भयो बताउनुहोस्।") }]);
     }
-    restoredSessionRef.current = true;
+    setSessionReady(true);
   }, []);
   useEffect(() => {
-    if (!restoredSessionRef.current) return;
+    if (!sessionReady) return;
     try {
       if (!language && !intake) sessionStorage.removeItem(SESSION_KEY);
       else sessionStorage.setItem(SESSION_KEY, JSON.stringify({ language, intake }));
     } catch { /* Session storage can be disabled; the in-memory diagnostic still works. */ }
-  }, [intake, language]);
+  }, [intake, language, sessionReady]);
   function onPhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null; event.target.value = ""; if (!file) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { setVoiceError(textFor(language ?? "english", "Choose a JPG, PNG or WebP photo.", "JPG, PNG वा WebP तस्बिर छान्नुहोस्।")); return; }

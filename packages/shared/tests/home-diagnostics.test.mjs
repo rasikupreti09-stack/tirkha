@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { HOME_ISSUES, detectHomeSafetyRisk, diagnosticBookingPrefillSchema, diagnosticDraftSchema, matchHomeIssue } from "../src/home-diagnostics.ts";
+import { HOME_ISSUES, detectHomeSafetyRisk, diagnosticBookingPrefillSchema, diagnosticDraftSchema, diagnosticLanguageForText, matchHomeIssue, normalizeHomeDiagnosticText } from "../src/home-diagnostics.ts";
 
  test("home symptom triage recognizes common plumbing and electrical issues without claiming root cause", () => {
   const cases = [
@@ -11,7 +11,9 @@ import { HOME_ISSUES, detectHomeSafetyRisk, diagnosticBookingPrefillSchema, diag
     ["voltage is low and flickering lights", "voltage"], ["inverter battery backup not working", "inverter"],
   ];
   for (const [description, expected] of cases) assert.equal(matchHomeIssue(description)?.id, expected, description);
-  assert.equal(HOME_ISSUES.length, 25);
+  assert.equal(HOME_ISSUES.length, 30);
+  assert.equal(normalizeHomeDiagnosticText("intermittent gas smell plumbingg"), "intermittent gas smell plumbing");
+  assert.equal(diagnosticLanguageForText("saas ferna garo"), "nepali_romanized");
   assert.equal(matchHomeIssue("muddy iron water from supply")?.serviceId, null);
   assert.equal(matchHomeIssue("well pump makes noise and no water")?.serviceId, null);
  });

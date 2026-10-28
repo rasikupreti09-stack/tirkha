@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { detectUniversalLanguage } from "./universal-diagnostics";
-import { diagnosticQuestionCount as faultQuestionCount, detectHomeFaultTrade, faultServiceId, faultTreeQuestion, HOME_FAULT_TREE, matchHomeFault, normalizeHomeDiagnosticText, resolveHomeFaultCode, type HomeFaultCode } from "./home-fault-tree";
+import { detectUniversalLanguage } from "./universal-diagnostics.ts";
+import { diagnosticQuestionCount as faultQuestionCount, detectHomeFaultTrade, faultServiceId, faultTreeQuestion, HOME_FAULT_TREE, matchHomeFault, normalizeHomeDiagnosticText, resolveHomeFaultCode, type HomeFaultCode } from "./home-fault-tree.ts";
 export { HOME_FAULT_TREE, detectHomeFaultTrade, matchHomeFault, normalizeHomeDiagnosticText };
 export type { HomeFaultCode, HomeFaultNode } from "./home-fault-tree";
 

@@ -28,6 +28,6 @@ export * from "./catalog";
 export * from "./pricing";
 
 export * from "./home-diagnostics";
-export * from "./universal-diagnostics";
+export * from "./universal-diagnostics.ts";
 
 export * from "./hero-portal";

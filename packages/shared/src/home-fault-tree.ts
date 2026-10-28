@@ -1,4 +1,4 @@
-import { normalizeDiagnosticText } from "./universal-diagnostics";
+import { normalizeDiagnosticText } from "./universal-diagnostics.ts";
 
 export type FaultTrade = "plumbing" | "electrical";
 export const HOME_FAULT_TREE = [

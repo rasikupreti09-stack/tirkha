@@ -55,12 +55,15 @@ function decodePolyline(encoded: string): [number, number][] {
 }
 function FitPoints({ points }: { points: TrackedPoint[] }) {
   const map = useMap();
-  const fitted = useRef(false);
+  const fittedKey = useRef("");
+  const fitKey = points.map(point => point.kind === "customer"
+    ? `${point.id}:${point.coordinates.latitude}:${point.coordinates.longitude}`
+    : `${point.id}:${point.kind}`).sort().join("|");
   useEffect(() => {
-    if (fitted.current || points.length < 2) return;
+    if (!fitKey || fittedKey.current === fitKey || points.length < 2) return;
     map.fitBounds(points.map(p => [p.coordinates.latitude, p.coordinates.longitude]), { padding: [52, 52], maxZoom: 16, animate: true, duration: 0.7 });
-    fitted.current = true;
-  }, [map, points]);
+    fittedKey.current = fitKey;
+  }, [fitKey, map, points]);
   return null;
 }
 function haversineKm(a: Coordinates, b: Coordinates) {
@@ -78,16 +81,18 @@ export const MapTracker = memo(function MapTracker({ points, origin, destination
   const [eta, setEta] = useState<number | null>(null);
   const [roadDistanceKm, setRoadDistanceKm] = useState<number | null>(null);
   const [routeMessage, setRouteMessage] = useState("Approximate city estimate · traffic-aware routing when available");
-  const lastRouteRequest = useRef<{ origin: Coordinates; requestedAt: number } | null>(null);
+  const lastRouteRequest = useRef<{ origin: Coordinates; destination: Coordinates; requestedAt: number } | null>(null);
   useEffect(() => {
     if (!origin || !destination || !session?.access_token) return;
     const previous = lastRouteRequest.current;
     const now = Date.now();
-    if (previous && now - previous.requestedAt < 60_000 && haversineKm(previous.origin, origin) < 0.25) return;
+    if (previous && now - previous.requestedAt < 60_000
+      && haversineKm(previous.origin, origin) < 0.25
+      && haversineKm(previous.destination, destination) < 0.05) return;
     let active = true;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      lastRouteRequest.current = { origin, requestedAt: Date.now() };
+      lastRouteRequest.current = { origin, destination, requestedAt: Date.now() };
       void fetch("/api/directions/route", {
         method: "POST", signal: controller.signal,
         headers: { "content-type": "application/json", authorization: `Bearer ${session.access_token}` },

@@ -56,12 +56,14 @@ const DOMAIN_PROMPTS: Readonly<Record<string, { object: string; component: strin
 export function normalizeDiagnosticText(text: string): string {
   return text.normalize("NFKC").toLocaleLowerCase("ne-NP").replace(/[\u200B-\u200D\uFEFF]/g, " ")
     .replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim().split(" ").map(token => {
-      const latin = token.replace(/([a-z])\1{1,}/g, "$1");
-      return ALIASES[latin] ?? ALIASES[token] ?? latin;
+      const collapsed = token.replace(/([a-z])\1{1,}/g, "$1");
+      // Keep valid English double letters (e.g. intermittent, smell, address).
+      // Use collapsed forms only when they resolve to a known typo alias.
+      return ALIASES[token] ?? ALIASES[collapsed] ?? token.replace(/([a-z])\1{2,}/g, "$1");
     }).join(" ");
 }
 
-const ROMANIZED_NEPALI = /\b(pani|dhara|bhairacha|bhairako|chha|cha|fohor|dhal|bijuli|batti|aayena|aaena|chuhiyo|chuhirako|gandha|lagyo|jaleyo|garnu|chahiyo|mero|tapai|bigryo|bhayo|garna|safa|ghar|kotha|jyotish)\b/i;
+const ROMANIZED_NEPALI = /\b(pani|dhara|bhairacha|bhairako|chha|cha|fohor|dhal|bijuli|batti|aayena|aaena|chuhiyo|chuhirako|gandha|lagyo|jaleyo|garnu|chahiyo|mero|tapai|bigryo|bhayo|garna|safa|ghar|kotha|jyotish|saas|ferna|garo|khatra|jhatka|aairacha|aairako|bhayeko|naako)\b/i;
 export function detectUniversalLanguage(text: string): UniversalLanguage {
   if (/[\u0900-\u097f]/u.test(text)) return "nepali_devanagari";
   return ROMANIZED_NEPALI.test(normalizeDiagnosticText(text)) ? "nepali_romanized" : "english";

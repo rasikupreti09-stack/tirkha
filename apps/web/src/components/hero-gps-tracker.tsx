@@ -55,17 +55,23 @@ export function HeroGpsTracker({ enabled }: { enabled: boolean }) {
       if (lastSentRef.current > 0 && movedMeters < MIN_MOVEMENT_METERS && now - lastSentRef.current < TRACKING_HEARTBEAT_MS) return;
       sendingRef.current = true;
       lastSentRef.current = now;
-      const { error } = await client.rpc("update_hero_location", {
-        p_latitude: position.latitude,
-        p_longitude: position.longitude,
-        p_heading: position.heading,
-        p_speed_mps: position.speed,
-        p_battery_level: batteryRef.current,
-        p_active_booking_id: activeBookingRef.current,
-      });
-      sendingRef.current = false;
-      if (!error) lastSentPositionRef.current = position;
-      if (active) setStatus(error ? "GPS sharing could not update. Check your connection." : "Sharing your live location with the customer and Tirkha operations.");
+      try {
+        const { error } = await client.rpc("update_hero_location", {
+          p_latitude: position.latitude,
+          p_longitude: position.longitude,
+          p_heading: position.heading,
+          p_speed_mps: position.speed,
+          p_battery_level: batteryRef.current,
+          p_active_booking_id: activeBookingRef.current,
+        });
+        if (error) throw error;
+        lastSentPositionRef.current = position;
+        if (active) setStatus("Sharing your live location with the customer and Tirkha operations.");
+      } catch {
+        if (active) setStatus("GPS sharing could not update. Check your connection; updates will retry.");
+      } finally {
+        sendingRef.current = false;
+      }
     };
 
     const watchId = navigator.geolocation.watchPosition(position => {

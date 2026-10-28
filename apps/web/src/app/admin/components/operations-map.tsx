@@ -42,7 +42,13 @@ const FleetMarker = memo(function FleetMarker({ location, name, stale, onSelect 
   && a.stale === b.stale && a.name === b.name);
 function SelectedHeroFocus({ location }: { location: HeroLocation | null }) {
   const map = useMap();
-  useEffect(() => { if (location) map.panTo([location.latitude, location.longitude], { animate: true, duration: 0.7 }); }, [location, map]);
+  const focusedHero = useRef<string | null>(null);
+  useEffect(() => {
+    if (!location) { focusedHero.current = null; return; }
+    if (focusedHero.current === location.professional_id) return;
+    focusedHero.current = location.professional_id;
+    map.panTo([location.latitude, location.longitude], { animate: true, duration: 0.7 });
+  }, [location, map]);
   return null;
 }
 function relativePing(value: string | null) {
