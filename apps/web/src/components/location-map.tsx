@@ -25,6 +25,8 @@ const Pin = memo(function Pin({ value, onPick, disabled, icon }: Props & { icon:
 });
 export default function LocationMap(props: Props) {
   const mapRef = useRef<LeafletMap | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState("");
   const pinIcon = useMemo(() => divIcon({
     className: "tirkha-map-pin",
     iconSize: [32, 32],
@@ -32,16 +34,30 @@ export default function LocationMap(props: Props) {
     html: '<svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><path d="M16 31C13.7 27.7 3 20.1 3 14A13 13 0 1 1 29 14C29 20.1 18.3 27.7 16 31Z" fill="#047857" stroke="#f8fafc" stroke-width="1.5"/><circle class="tirkha-pin-pulse" cx="16" cy="14" r="6" fill="none" stroke="#d1fae5" stroke-width="2"/><circle cx="16" cy="14" r="2.5" fill="#f8fafc" stroke="#1f2937" stroke-width="1"/></svg>',
   }), []);
   const center = props.value || KATHMANDU_CENTER;
+  const locateMe = () => {
+    if (!navigator.geolocation || locating || props.disabled) {
+      if (!navigator.geolocation) setLocationError("This browser does not provide location access.");
+      return;
+    }
+    setLocating(true); setLocationError("");
+    navigator.geolocation.getCurrentPosition(position => {
+      const point = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+      props.onPick(point);
+      mapRef.current?.flyTo([point.latitude, point.longitude], Math.max(16, mapRef.current.getZoom()), { animate: true, duration: 0.75 });
+      setLocating(false);
+    }, () => { setLocationError("Location permission was unavailable. You can still tap the map or enter coordinates."); setLocating(false); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
+  };
   if (typeof window === "undefined") return <div className="h-[300px] w-full animate-pulse rounded-lg bg-slate-100" role="status">Loading map…</div>;
   return <>
     <div className="tirkha-map-frame">
-      <MapContainer ref={mapRef} center={[center.latitude, center.longitude]} zoom={props.value ? 16 : 12} minZoom={6} maxZoom={19} zoomControl={false} zoomSnap={0.5} zoomDelta={0.75} wheelPxPerZoomLevel={100} touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} style={{ height: props.height ?? 300, width: "100%", zIndex: 0 }} className="tirkha-vector-map" aria-label="Choose your service location">
+      <MapContainer ref={mapRef} center={[center.latitude, center.longitude]} zoom={props.value ? 16 : 12} minZoom={6} maxZoom={19} zoomControl={false} zoomSnap={0.5} zoomDelta={0.5} wheelPxPerZoomLevel={120} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} style={{ height: props.height ?? 300, width: "100%", zIndex: 0 }} className="tirkha-vector-map" aria-label="Choose your service location">
         <TirkhaMapArtwork />
         <TirkhaMapRegionControl />
-        <TirkhaMapZoomControl />
+        <TirkhaMapZoomControl onLocate={locateMe} locating={locating} />
         <Pin key={props.value ? "pin-selected" : "pin-empty"} {...props} icon={pinIcon} />
       </MapContainer>
       <TirkhaMapSignature caption="Kathmandu · Lalitpur · Bhaktapur · Pokhara" />
     </div>
+    {locationError && <p role="status" className="px-2 pt-2 text-xs text-amber-800">{locationError}</p>}
   </>;
 }

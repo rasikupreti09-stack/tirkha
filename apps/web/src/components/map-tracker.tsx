@@ -2,7 +2,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, Marker, Polyline, Tooltip, useMap } from "react-leaflet";
 import { divIcon, type Map as LeafletMap, type Marker as LeafletMarker } from "leaflet";
-import { Clock3, Crosshair, Navigation } from "lucide-react";
+import { Clock3, Navigation } from "lucide-react";
 import type { Coordinates } from "@tirkha/shared";
 import { useAuth } from "./auth-provider";
 import { TirkhaMapArtwork, TirkhaMapSignature, TirkhaMapZoomControl } from "./tirkha-map-artwork";
@@ -63,15 +63,6 @@ function FitPoints({ points }: { points: TrackedPoint[] }) {
   }, [map, points]);
   return null;
 }
-function MapActions({ points }: { points: TrackedPoint[] }) {
-  const map = useMap();
-  return <div className="leaflet-top leaflet-right tirkha-map-actions">
-    <div className="leaflet-control"><button type="button" aria-label="Recenter map on your trip" title="Recenter map" onClick={() => {
-      if (points.length > 1) map.fitBounds(points.map(point => [point.coordinates.latitude, point.coordinates.longitude]), { padding: [52, 52], maxZoom: 16, animate: true, duration: 0.7 });
-      else if (points[0]) map.setView([points[0].coordinates.latitude, points[0].coordinates.longitude], 16, { animate: true });
-    }}><Crosshair size={18} aria-hidden="true" /></button></div>
-  </div>;
-}
 function haversineKm(a: Coordinates, b: Coordinates) {
   const radians = (value: number) => value * Math.PI / 180;
   const lat = radians(b.latitude - a.latitude), lng = radians(b.longitude - a.longitude);
@@ -126,11 +117,10 @@ export const MapTracker = memo(function MapTracker({ points, origin, destination
   if (typeof window === "undefined") return <div className="h-[360px] animate-pulse rounded-xl bg-muted" role="status">Loading live map…</div>;
   return <section className="tirkha-map-surface">
     <div className="tirkha-map-frame tirkha-live-map-canvas">
-      <MapContainer ref={mapRef} center={view} zoom={16} minZoom={6} maxZoom={19} zoomControl={false} zoomSnap={0.5} zoomDelta={0.75} wheelPxPerZoomLevel={100} touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} className="tirkha-vector-map !h-full !w-full" aria-label="Live service map">
+      <MapContainer ref={mapRef} center={view} zoom={16} minZoom={6} maxZoom={19} zoomControl={false} zoomSnap={0.5} zoomDelta={0.5} wheelPxPerZoomLevel={120} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} className="tirkha-vector-map !h-full !w-full" aria-label="Live service map">
       <TirkhaMapArtwork />
-      <TirkhaMapZoomControl />
+      <TirkhaMapZoomControl recenterPoints={points.map(point => [point.coordinates.latitude, point.coordinates.longitude])} />
       <FitPoints points={points} />
-      <MapActions points={points} />
       {points.map(point => <TrackedMapMarker key={point.id} point={point} />)}
       {path.length > 0 && <><Polyline positions={path} pathOptions={{ color: "#ffffff", weight: 10, opacity: 0.9, lineCap: "round", lineJoin: "round" }} /><Polyline positions={path} pathOptions={{ color: "#047857", weight: 5, opacity: 0.96, lineCap: "round", lineJoin: "round" }} /></>}
       </MapContainer>

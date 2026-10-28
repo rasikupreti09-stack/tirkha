@@ -3,6 +3,7 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { canvas, DomEvent } from "leaflet";
 import { CircleMarker, GeoJSON, Polygon, Polyline, Tooltip, useMap } from "react-leaflet";
+import { Crosshair } from "lucide-react";
 import { tirkhaCityViews, tirkhaLandmarks, tirkhaParks, tirkhaRoads, tirkhaWaterways } from "@/lib/tirkha-map-data";
 
 type RoadProperties = { class?: "expressway" | "arterial" | "connector" | "local"; name?: string | null; ref?: string | null };
@@ -218,15 +219,25 @@ export function TirkhaMapRegionControl() {
   </div>;
 }
 
-/** Shared animated zoom controls sized for mouse, stylus, and touch use. */
-export function TirkhaMapZoomControl() {
+/** Shared animated map controls sized for mouse, stylus, and touch use. */
+export function TirkhaMapZoomControl({ recenterPoints, onLocate, locating = false }: {
+  recenterPoints?: [number, number][];
+  onLocate?: () => void;
+  locating?: boolean;
+}) {
   const map = useMap();
   const controlRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (controlRef.current) DomEvent.disableClickPropagation(controlRef.current); }, []);
   return <div ref={controlRef} className="leaflet-top leaflet-left tirkha-zoom-control" aria-label="Map zoom controls">
     <div className="tirkha-zoom-stack">
-      <button type="button" aria-label="Zoom in" title="Zoom in" onClick={(event) => { event.stopPropagation(); map.zoomIn(0.75, { animate: true }); }}>+</button>
-      <button type="button" aria-label="Zoom out" title="Zoom out" onClick={(event) => { event.stopPropagation(); map.zoomOut(0.75, { animate: true }); }}>−</button>
+      <button type="button" aria-label="Zoom in" title="Zoom in" onClick={(event) => { event.stopPropagation(); map.zoomIn(0.5, { animate: true }); }}>+</button>
+      <button type="button" aria-label="Zoom out" title="Zoom out" onClick={(event) => { event.stopPropagation(); map.zoomOut(0.5, { animate: true }); }}>−</button>
+      {recenterPoints && <button type="button" aria-label="Re-center map" title="Re-center map" onClick={(event) => {
+        event.stopPropagation();
+        if (recenterPoints.length > 1) map.fitBounds(recenterPoints, { padding: [52, 52], maxZoom: 16, animate: true, duration: 0.65 });
+        else if (recenterPoints[0]) map.flyTo(recenterPoints[0], Math.max(16, map.getZoom()), { animate: true, duration: 0.65 });
+      }}><Crosshair size={18} aria-hidden="true" /></button>}
+      {onLocate && <button type="button" aria-label="My Location" title={locating ? "Finding your location…" : "My Location"} disabled={locating} onClick={(event) => { event.stopPropagation(); onLocate(); }}><Crosshair size={18} aria-hidden="true" /></button>}
     </div>
   </div>;
 }
