@@ -63,7 +63,7 @@ export default function HeroDashboardPage() {
     const [profileResult, locationResult, activeResult, categoryResult] = await Promise.all([
       client.from("professional_profiles").select("verification_status,suspended_at,operational_zone,trade_code,trade_category").eq("profile_id", heroId).maybeSingle(),
       client.from("hero_locations").select("updated_at").eq("professional_id", heroId).maybeSingle(),
-      client.from("bookings").select("*").eq("professional_id", heroId).in("status", ["accepted", "on_the_way", "in_progress"]).order("scheduled_at", { ascending: true }),
+      client.from("bookings").select("*").eq("professional_id", heroId).in("status", ["requested", "accepted", "on_the_way", "in_progress"]).order("scheduled_at", { ascending: true }),
       client.from("service_categories").select("id,name"),
     ]);
     if (profileResult.error) { setError("Could not load Hero verification. Ensure migration 21 is applied."); setLoadingData(false); return; }
@@ -163,7 +163,7 @@ function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; va
 function HeroBookingCommunication({ job, userId }: { job: WorkBooking; userId: string }) {
   const parsed = workflowBookingSchema.safeParse(job);
   if (!parsed.success) return null;
-  return <><BookingCall booking={parsed.data}/><BookingChatDrawer bookingId={job.id} userId={userId} professional disabled={!userId || !["accepted", "on_the_way", "in_progress"].includes(job.status)} /></>;
+  return <><BookingCall booking={parsed.data}/><BookingChatDrawer bookingId={job.id} userId={userId} professional disabled={!userId || !["requested", "accepted", "on_the_way", "in_progress"].includes(job.status)} /></>;
 }
 
 function QuoteForm({ bookingId }: { bookingId: string }) {

@@ -10,7 +10,7 @@ export function BookingCall({ booking }: { booking: WorkflowBooking }) {
   const [contact, setContact] = useState<{ key: string; data: BookingContact } | null>(null);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
-  const eligible = !!booking.professional_id && ["accepted", "on_the_way", "in_progress", "completed"].includes(booking.status);
+  const eligible = !!booking.professional_id && ["requested", "accepted", "on_the_way", "in_progress"].includes(booking.status);
   const key = booking.id + ":" + session?.user.id + ":" + booking.professional_id;
   useEffect(() => {
     let active = true;
@@ -25,10 +25,10 @@ export function BookingCall({ booking }: { booking: WorkflowBooking }) {
     })();
     return () => { active = false; };
   }, [client, key, eligible, retry, booking.id, session]);
-  if (!eligible) return null;
+  if (!eligible) return booking.status === "requested" ? <p className="mt-3 text-sm text-muted-foreground">Voice call becomes available as soon as a Hero is assigned to this request.</p> : null;
   const data = contact?.key === key ? contact.data : null;
   return <div className="mt-3">
-    {data && <><a className="inline-flex min-h-11 items-center rounded-md border px-3 font-medium underline" href={"tel:" + data.phone}>Call {data.full_name || "booking contact"} · {data.phone}</a><InAppCallModal bookingId={booking.id} active={["accepted", "on_the_way", "in_progress"].includes(booking.status)} phoneNumber={data.phone}/></>}
+    {data && <><a className="inline-flex min-h-11 items-center rounded-md border px-3 font-medium underline" href={"tel:" + data.phone}>Call {data.full_name || "booking contact"} · {data.phone}</a><InAppCallModal bookingId={booking.id} active={["requested", "accepted", "on_the_way", "in_progress"].includes(booking.status)} phoneNumber={data.phone}/></>}
     {error && <button type="button" className="min-h-11 underline" onClick={() => setRetry(n => n + 1)}>{error}</button>}
   </div>;
 }

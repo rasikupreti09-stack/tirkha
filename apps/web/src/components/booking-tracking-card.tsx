@@ -25,7 +25,7 @@ export function BookingTrackingCard({ booking, live, localMock, stale, userId }:
     <p className="mt-3 text-xs text-muted-foreground">{stale ? "Refresh failed — showing last loaded status." : localMock ? "Local demo · polling updates" : live ? "Live updates connected" : "Live connection unavailable · polling updates"}</p>
     <p className="mt-1 text-xs text-muted-foreground">Status saved: {formatBookingDate(booking.updated_at)}</p>
     <BookingCall booking={booking} />
-    <BookingChatDrawer bookingId={booking.id} userId={userId} professional={false} disabled={!booking.professional_id || !["requested", "accepted", "on_the_way", "in_progress"].includes(booking.status)} />
+    <BookingChatDrawer bookingId={booking.id} userId={userId} professional={false} disabled={!(["requested", "accepted", "on_the_way", "in_progress"].includes(booking.status))} />
     <CustomerRouteTracker booking={booking}/>
   </section>;
 }
