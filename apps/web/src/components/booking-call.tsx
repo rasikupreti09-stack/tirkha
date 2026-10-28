@@ -11,6 +11,7 @@ export function BookingCall({ booking }: { booking: WorkflowBooking }) {
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   const eligible = !!booking.professional_id && ["requested", "accepted", "on_the_way", "in_progress"].includes(booking.status);
+  const requestActive = ["requested", "accepted", "on_the_way", "in_progress"].includes(booking.status);
   const key = booking.id + ":" + session?.user.id + ":" + booking.professional_id;
   useEffect(() => {
     let active = true;
@@ -25,10 +26,14 @@ export function BookingCall({ booking }: { booking: WorkflowBooking }) {
     })();
     return () => { active = false; };
   }, [client, key, eligible, retry, booking.id, session]);
-  if (!eligible) return booking.status === "requested" ? <p className="mt-3 text-sm text-muted-foreground">Voice call becomes available as soon as a Hero is assigned to this request.</p> : null;
+  if (!requestActive) return null;
   const data = contact?.key === key ? contact.data : null;
   return <div className="mt-3">
-    {data && <><a className="inline-flex min-h-11 items-center rounded-md border px-3 font-medium underline" href={"tel:" + data.phone}>Call {data.full_name || "booking contact"} · {data.phone}</a><InAppCallModal bookingId={booking.id} active={["requested", "accepted", "on_the_way", "in_progress"].includes(booking.status)} phoneNumber={data.phone}/></>}
+    {eligible ? <>
+      <InAppCallModal bookingId={booking.id} active phoneNumber={data?.phone}/>
+      {data ? <a className="mt-2 inline-flex min-h-11 items-center rounded-md border px-3 font-medium underline" href={"tel:" + data.phone}>Call {data.full_name || "booking contact"} · {data.phone}</a>
+        : <span className="mt-2 inline-flex min-h-11 items-center rounded-md border px-3 text-sm text-muted-foreground" role="status">{error || "Loading secure phone contact…"}</span>}
+    </> : <button type="button" disabled aria-disabled="true" className="inline-flex min-h-11 items-center rounded-md border px-3 text-sm text-muted-foreground">Call · available when a Hero is assigned</button>}
     {error && <button type="button" className="min-h-11 underline" onClick={() => setRetry(n => n + 1)}>{error}</button>}
   </div>;
 }
