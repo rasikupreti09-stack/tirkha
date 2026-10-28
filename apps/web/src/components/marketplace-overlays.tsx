@@ -86,8 +86,8 @@ export function MarketplaceOverlays(){
    <div className="mk-orders">{state.orders.map(order=><OrderReceipt key={order.id} order={order} onCancel={()=>cancel(order.id)}/>)}</div>}</section>;
  const authContent=<section className="mk-overlay-content mk-auth-content"><div className="mk-overlay-heading"><div><span className="mk-kicker">WELCOME TO TIRKHA</span><h2>Choose your portal</h2><p>Select the account that fits you. Phone verification appears after you continue.</p></div></div>
    <div className="mk-portal-grid">
-    <article className="mk-portal-card"><span className="mk-portal-label">For customers</span><h3>Customer Account</h3><p>Book help, follow requests and manage your service details.</p><div><Link href="/login">Sign In</Link><Link href="/signup">Create Account</Link></div></article>
-    <article className="mk-portal-card"><span className="mk-portal-label">For service professionals</span><h3>Service Hero Portal</h3><p>Join the local service network or return to your Hero workspace.</p><div><Link href="/signup?role=professional&next=%2Fhero%2Fregister">Register as a Hero</Link><Link href="/login?role=professional&next=%2Fhero%2Fdashboard">Hero Sign In</Link></div></article>
+    <article className="mk-portal-card"><span className="mk-portal-label">For customers</span><h3>Customer Account</h3><p>Book help, follow requests and manage your service details.</p><div><Link href="/login" onClick={()=>setModal(null)}>Sign In</Link><Link href="/signup" onClick={()=>setModal(null)}>Create Account</Link></div></article>
+    <article className="mk-portal-card"><span className="mk-portal-label">For service professionals</span><h3>Service Hero Portal</h3><p>Join the local service network or return to your Hero workspace.</p><div><Link href="/signup?role=professional&next=%2Fhero%2Fregister" onClick={()=>setModal(null)}>Register as a Hero</Link><Link href="/login?role=professional&next=%2Fhero%2Fdashboard" onClick={()=>setModal(null)}>Hero Sign In</Link></div></article>
    </div>
  </section>;
  return <>
