@@ -53,7 +53,7 @@ export function useBookingChat(bookingId: string, userId: string) {
     if (!sendMessageSchema.shape.booking_id.safeParse(bookingId).success) return;
     const client = getSupabase();
     let subscribed = true;
-    const channel = client.channel("chat:" + bookingId + ":" + userId)
+    const channel = client.channel(`booking_chat:${bookingId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "booking_messages", filter: "booking_id=eq." + bookingId }, refresh)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "bookings", filter: "id=eq." + bookingId }, refresh)
       ;

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { bookingContactSchema, type BookingContact, type WorkflowBooking } from "@tirkha/shared";
 import { useAuth } from "./auth-provider";
+import { InAppCallModal } from "./booking-voice-call";
 
 export function BookingCall({ booking }: { booking: WorkflowBooking }) {
   const { client, session } = useAuth();
@@ -27,7 +28,7 @@ export function BookingCall({ booking }: { booking: WorkflowBooking }) {
   if (!eligible) return null;
   const data = contact?.key === key ? contact.data : null;
   return <div className="mt-3">
-    {data && <a className="inline-flex min-h-11 items-center rounded-md border px-3 font-medium underline" href={"tel:" + data.phone}>Call {data.full_name || "booking contact"} · {data.phone}</a>}
+    {data && <><a className="inline-flex min-h-11 items-center rounded-md border px-3 font-medium underline" href={"tel:" + data.phone}>Call {data.full_name || "booking contact"} · {data.phone}</a><InAppCallModal bookingId={booking.id} active={["accepted", "on_the_way", "in_progress"].includes(booking.status)} phoneNumber={data.phone}/></>}
     {error && <button type="button" className="min-h-11 underline" onClick={() => setRetry(n => n + 1)}>{error}</button>}
   </div>;
 }

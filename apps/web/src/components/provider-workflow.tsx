@@ -5,6 +5,7 @@ import { Button } from "./ui/button";
 import { useEffect, useState } from "react";
 import { MapTracker, type TrackedPoint } from "./map-tracker-loader";
 import { useAuth } from "./auth-provider";
+import { BookingChatDrawer } from "./booking-chat-drawer";
 
 export function ProviderWorkflow({ booking, userId, verified, busy, updating, onAction }: {
   booking: WorkflowBooking; userId: string; verified: boolean; busy: boolean; updating: boolean;
@@ -33,6 +34,7 @@ export function ProviderWorkflow({ booking, userId, verified, busy, updating, on
     <p className="text-sm text-muted-foreground">Accepted → On the Way → In Progress → Completed</p>
     <div className="flex flex-wrap gap-3">{actions.map((action) => <Button key={action} disabled={busy} onClick={() => onAction(action)}>{updating ? "Updating…" : BOOKING_ACTION_LABELS[action]}</Button>)}</div>
     <BookingCall booking={booking} />
+    <BookingChatDrawer bookingId={booking.id} userId={userId} professional disabled={!verified || !["accepted", "on_the_way", "in_progress"].includes(booking.status)} />
     {verified && destination && ["accepted", "on_the_way", "in_progress"].includes(booking.status) && <div className="mt-4"><h3 className="mb-2 font-medium">Route to the customer</h3><MapTracker points={routePoints} origin={coordinates ?? undefined} destination={destination} navigation/></div>}
   </section>;
 }

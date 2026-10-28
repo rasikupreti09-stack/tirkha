@@ -7,13 +7,14 @@ import { Button } from "./ui/button";
 import { useBookingChat } from "@/hooks/use-booking-chat";
 import { BookingVoiceCall } from "./booking-voice-call";
 
-export function HeroCommHub({ bookingId, userId, professional }: { bookingId: string; userId: string; professional: boolean }) {
-  const [tab, setTab] = useState<"ai" | "hero">("ai");
+export function HeroCommHub({ bookingId, userId, professional, embedded = false, initialTab = "ai" }: { bookingId: string; userId: string; professional: boolean; embedded?: boolean; initialTab?: "ai" | "hero" }) {
+  const [tab, setTab] = useState<"ai" | "hero">(initialTab);
   const chat = useBookingChat(bookingId, userId);
   const canCall = !!chat.booking?.professional_id && ["accepted", "on_the_way", "in_progress"].includes(chat.booking.status);
-  return <main className="mx-auto min-h-screen max-w-3xl px-4 py-8">
-    <Link href={professional ? "/jobs" : "/bookings"} className="underline">← Bookings</Link>
-    <h1 className="mt-6 text-3xl font-semibold">Tirkha | तिर्खा communication hub</h1>
+  const Container = embedded ? "section" : "main";
+  return <Container className={embedded ? "w-full" : "mx-auto min-h-screen max-w-3xl px-4 py-8"}>
+    {!embedded && <Link href={professional ? "/jobs" : "/bookings"} className="underline">← Bookings</Link>}
+    <h1 className={`${embedded ? "text-xl" : "mt-6 text-3xl"} font-semibold`}>Tirkha | तिर्खा communication hub</h1>
     {chat.booking && <p className="mt-2">Booking status: {BOOKING_STATUS_LABELS[chat.booking.status]}</p>}
     <div className="mt-6 flex gap-2 border-b" role="tablist" aria-label="Communication options">
       <button role="tab" aria-selected={tab === "ai"} className="min-h-11 border-b-2 px-3" onClick={() => setTab("ai")}><Bot className="mr-2 inline" size={16}/>AI Support Concierge</button>
@@ -28,5 +29,5 @@ export function HeroCommHub({ bookingId, userId, professional }: { bookingId: st
       {chat.writable && <form className="space-y-3" onSubmit={event => { event.preventDefault(); void chat.send(); }}><label htmlFor="hub-chat-message" className="font-medium">Message your Hero</label><textarea id="hub-chat-message" maxLength={2000} rows={3} value={chat.draft} disabled={chat.sending} onChange={event => chat.setDraft(event.target.value)} className="w-full rounded-md border bg-background p-3"/><div className="flex flex-wrap gap-3"><Button type="submit" disabled={chat.sending || !chat.draft.trim()}><Send size={16} className="mr-2"/>{chat.sending ? "Sending…" : "Send message"}</Button><label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm font-medium"><ImagePlus size={16}/>Attach a site photo<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/heic" disabled={chat.sending} onChange={event => { const file = event.currentTarget.files?.[0]; if (file) void chat.sendAttachment(file); event.currentTarget.value = ""; }}/></label></div>{chat.sendError && <p role="alert">{chat.sendError}</p>}</form>}
       {canCall && <BookingVoiceCall bookingId={bookingId} active={canCall}/>}
     </section>}
-  </main>;
+  </Container>;
 }
