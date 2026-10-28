@@ -26,6 +26,14 @@ test("initial migration enforces grants, RLS and constraints in PostgreSQL", asy
     insert into auth.users(id) values ('${c1}');
   `);
   await db.exec(await readFile(new URL("../supabase/migrations/01_initial_schema.sql", import.meta.url), "utf8"));
+  // The test intentionally applies migration 01 only, then adds nullable columns
+  // introduced by later Hero onboarding migrations so current row schemas can be checked.
+  await db.exec(`alter table public.professional_profiles
+    add column trade_code text,
+    add column trade_category text,
+    add column operational_zone text,
+    add column citizenship_document_path text,
+    add column suspended_at timestamptz`);
   await db.query("insert into auth.users(id, raw_user_meta_data) values ($1, $4), ($2, $4), ($3, $4)", [c2, p1, p2, { role: "admin" }]);
   assert.deepEqual((await db.query("select distinct role from public.profiles")).rows, [{ role: "customer" }]);
   await db.exec(`

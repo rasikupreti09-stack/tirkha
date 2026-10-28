@@ -80,7 +80,7 @@ begin
  insert into public.completed_transactions(booking_id,"timestamp",hero_id,hero_name,hero_trade,gross_amount,commission_rate,company_income,hero_payout,payment_type)
  values(new.id,coalesce(new.updated_at,now()),new.professional_id,hn,tr,gross,12.5,fee,gross-fee,pt) on conflict(booking_id) do nothing;
  delete from public.booking_messages where booking_id=new.id; delete from public.hero_dispatch_notifications where booking_id=new.id; delete from public.hero_locations where active_booking_id=new.id;
- update public.bookings set diagnostic_summary=null,diagnostic_severity=null,diagnostic_urgency=null,suggested_parts=null where id=new.id and (diagnostic_summary is not null or diagnostic_severity is not null or diagnostic_urgency is not null or suggested_parts is not null);
+ update public.bookings set diagnostic_summary=null,diagnostic_severity=null,diagnostic_urgency=null,suggested_parts='{}'::text[] where id=new.id and (diagnostic_summary is not null or diagnostic_severity is not null or diagnostic_urgency is not null or cardinality(suggested_parts)>0);
  return new;
 end; $$;
 revoke all on function public.sync_completed_transaction() from public,anon,authenticated;

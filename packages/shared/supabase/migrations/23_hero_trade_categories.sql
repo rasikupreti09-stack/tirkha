@@ -116,8 +116,8 @@ begin
  delete from public.booking_messages where booking_id=new.id;
  delete from public.hero_dispatch_notifications where booking_id=new.id;
  delete from public.hero_locations where active_booking_id=new.id;
- update public.bookings set diagnostic_summary=null,diagnostic_severity=null,diagnostic_urgency=null,suggested_parts=null
-   where id=new.id and (diagnostic_summary is not null or diagnostic_severity is not null or diagnostic_urgency is not null or suggested_parts is not null);
+ update public.bookings set diagnostic_summary=null,diagnostic_severity=null,diagnostic_urgency=null,suggested_parts='{}'::text[]
+   where id=new.id and (diagnostic_summary is not null or diagnostic_severity is not null or diagnostic_urgency is not null or cardinality(suggested_parts)>0);
  return new;
 end; $$;
 revoke all on function public.sync_completed_transaction() from public,anon,authenticated;

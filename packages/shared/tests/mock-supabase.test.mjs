@@ -17,7 +17,7 @@ test("local service works with the actual Supabase SDK: signup, sessions, profil
   for(const [sdk,email] of [[customer,"customer@tirkha.test"],[professional,"professional@tirkha.test"]]) assert.equal((await sdk.auth.signInWithPassword({email,password:"TirkhaLocal123!"})).error,null);
   assert.equal((await customer.auth.getUser()).data.user.id,mock.customer.id);
   assert.equal((await customer.auth.refreshSession()).error,null);
-  const categories=await customer.from("service_categories").select("*").order("name");assert.equal(categories.data.length,15);
+  const categories=await customer.from("service_categories").select("*").order("name");assert.equal(categories.data.length,17);
   const category=categories.data.find(row=>row.slug==="plumbing");
   const directory=await customer.rpc("list_verified_professionals",{p_category_slug:"plumbing",p_limit:12,p_offset:0});assert.equal(directory.error,null);assert.equal(directory.data[0].profile_id,mock.professional.id);
   const booking=await customer.rpc("create_booking_request",{p_request_id:randomUUID(),p_category_id:category.id,p_professional_id:mock.professional.id,p_service_address:"Lalitpur, near Patan Dhoka",p_job_details:"Please repair the leaking tap",p_scheduled_at:new Date(Date.now()+86400000).toISOString(),p_duration_minutes:60,p_latitude:27.6785,p_longitude:85.3184,p_resolved_address:"Patan, Lalitpur"}).single();
@@ -54,7 +54,7 @@ test("phone OTP SDK flow verifies a six-digit code, persists a session, and prot
   const booking=await customer.rpc("create_booking_request",{p_request_id:randomUUID(),p_category_id:category,p_professional_id:mock.professional.id,p_service_address:"Kathmandu, Baneshwor",p_job_details:"Fix the leaking tap",p_scheduled_at:new Date(Date.now()+86400000).toISOString(),p_duration_minutes:60}).single();
   assert.equal(booking.error,null);
   const contact=sdk=>sdk.rpc("get_booking_contact",{p_booking_id:booking.data.id});
-  assert.deepEqual((await contact(customer)).data,[]);
+  assert.equal((await contact(customer)).data[0].phone,mock.professional.phone);
   assert.equal((await professional.rpc("transition_booking",{p_booking_id:booking.data.id,p_action:"accepted"})).error,null);
   assert.equal((await contact(customer)).data[0].phone,mock.professional.phone);
   assert.equal((await contact(professional)).data[0].phone,mock.customer.phone);

@@ -22,12 +22,14 @@ test("shared transition helpers order actions and call only the authenticated bo
 });
 
 test("hero location retention purges only GPS rows older than five minutes", async t => {
-  const { db, admin } = await createPilotFixture(); t.after(() => db.close());
+  const { db, admin, prepareVerifiedHero } = await createPilotFixture(); t.after(() => db.close());
   const staleId = randomUUID(), freshId = randomUUID();
   await db.query("insert into auth.users(id,raw_user_meta_data) values($1,$2),($3,$4)", [
     staleId, { full_name: "Stale Hero", requested_role: "professional" },
     freshId, { full_name: "Active Hero", requested_role: "professional" },
   ]);
+  await prepareVerifiedHero(staleId);
+  await prepareVerifiedHero(freshId);
   await admin();
   await db.query(`insert into public.hero_locations(professional_id,latitude,longitude,status,updated_at)
     values($1,27.7,85.3,'online_idle',now()-interval '6 minutes'),
@@ -41,10 +43,10 @@ test("hero location retention purges only GPS rows older than five minutes", asy
 });
 
 test("provider tracking enforces ordered transitions, ownership, retry safety, chat and push", async (t) => {
-  const {db,ids,as,admin}=await createPilotFixture();t.after(()=>db.close());
+  const {db,ids,as,admin,prepareVerifiedHero}=await createPilotFixture();t.after(()=>db.close());
   for(const [name,id] of Object.entries(ids)) await db.query("insert into auth.users(id,raw_user_meta_data) values($1,$2)",[id,{full_name:name,requested_role:name==="customer"||name==="outsider"?"customer":"professional"}]);
   const category=(await db.query("select id from public.service_categories where slug='plumbing'")).rows[0].id;
-  await db.query("update public.professional_profiles set verification_status='verified' where profile_id=$1",[ids.professional]);
+  await prepareVerifiedHero(ids.professional);
   await db.query("insert into public.professional_service_categories values($1,$2)",[ids.professional,category]);
   await as(ids.customer);
   await db.query("select public.register_push_device($1,$2)",["ExponentPushToken[tracking_customer]",randomUUID()]);

@@ -14,7 +14,18 @@ const booking = { ...request, id: category, professional_id: null, status: "requ
 
 test("row schemas accept nullable onboarding fields and Nepal timezone offsets", () => {
   profileSchema.parse({ id: customer, full_name: null, phone_number: null, phone: "+9779800000001", avatar_url: null, role: "customer", created_at: time });
-  professionalProfileSchema.parse({ profile_id: professional, bio: null, verification_status: "pending", rating: 0, hourly_rate_paisa: null });
+  professionalProfileSchema.parse({
+    profile_id: professional,
+    bio: null,
+    verification_status: "pending",
+    rating: 0,
+    hourly_rate_paisa: null,
+    trade_code: null,
+    trade_category: null,
+    operational_zone: null,
+    citizenship_document_path: null,
+    suspended_at: null,
+  });
   serviceCategorySchema.parse({ id: category, name: "Plumbing", slug: "home-plumbing", description: null, icon_name: null });
   bookingSchema.parse(booking);
 });

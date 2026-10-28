@@ -6,13 +6,14 @@ import { createPilotFixture } from "./pilot-fixture.mjs";
 test("diagnostic booking dispatches a private live alert only to nearby verified on-duty category Heroes", async (t) => {
   const fixture = await createPilotFixture();
   t.after(() => fixture.db.close());
-  const { db, ids, admin, as } = fixture;
+  const { db, ids, admin, as, prepareVerifiedHero } = fixture;
   const nearby = ids.professional;
   const far = randomUUID();
   const customer = ids.customer;
   await admin();
   await db.query("insert into auth.users(id,raw_user_meta_data) values($1,$2),($3,$4),($5,$6)", [far, { requested_role: "professional", full_name: "Far Hero" }, customer, { requested_role: "customer", full_name: "Test Customer" }, nearby, { requested_role: "professional", full_name: "Nearby Hero" }]);
-  await db.query("update public.professional_profiles set verification_status='verified' where profile_id=any($1::uuid[])", [[nearby, far]]);
+  await prepareVerifiedHero(nearby);
+  await prepareVerifiedHero(far);
   const category = (await db.query("select id from public.service_categories where slug='plumbing'")).rows[0].id;
   await db.query("insert into public.professional_service_categories values($1,$2),($3,$2)", [nearby, category, far]);
   const installLocation = async (id, latitude, longitude) => {

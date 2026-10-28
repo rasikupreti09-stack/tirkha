@@ -28,7 +28,7 @@ test("configuration diagnostics identify variables without exposing secret value
 
 test("pilot journey across every migration: signup → browse → landmark → book → accept → chat → pay → complete", async (t) => {
   const fixture = await createPilotFixture();
-  const { db, ids, as, admin } = fixture;
+  const { db, ids, as, admin, prepareVerifiedHero } = fixture;
   t.after(() => db.close());
   let category, booking, payment, message;
   const requestId = randomUUID(), attemptId = randomUUID(), nonce = randomUUID();
@@ -45,12 +45,13 @@ test("pilot journey across every migration: signup → browse → landmark → b
     await db.query("update public.profiles set role='admin' where id=$1", [ids.admin]);
     assert.equal((await db.query("select verification_status from public.professional_profiles where profile_id=$1",[ids.professional])).rows[0].verification_status,"pending");
     category=(await db.query("select id from public.service_categories where slug='plumbing'")).rows[0].id;
-    await db.query("update public.professional_profiles set verification_status='verified',hourly_rate_paisa=12551 where profile_id=$1",[ids.professional]);
+    await prepareVerifiedHero(ids.professional, "Lalitpur");
+    await db.query("update public.professional_profiles set hourly_rate_paisa=12551 where profile_id=$1",[ids.professional]);
     await db.query("insert into public.professional_service_categories values($1,$2)",[ids.professional,category]);
   });
   await t.test("browse exposes only verified professionals; landmark selection round-trips",async()=>{
     await as(null,"anon");
-    assert.equal((await db.query("select * from public.service_categories")).rows.length,15);
+    assert.equal((await db.query("select * from public.service_categories")).rows.length,17);
     const people=(await db.query("select row_to_json(p) data from public.list_verified_professionals('plumbing') p")).rows;
     assert.equal(people.length,1);publicProfessionalSchema.parse(people[0].data);
     const landmark=locationPreferenceSchema.parse(JSON.parse(JSON.stringify({municipality:"Lalitpur",ward:"4",landmark:"Patan Dhoka"})));
@@ -117,11 +118,11 @@ test("pilot journey across every migration: signup → browse → landmark → b
     await as(ids.outsider);assert.equal((await db.query("select * from public.booking_payments")).rows.length,0);
     await as(ids.customer);assert.equal((await db.query("select status from public.booking_payments")).rows[0].status,"paid");
   });
-  await t.test("completion closes chat and preserves messages and paid state",async()=>{
+  await t.test("completion closes chat, purges transient messages and preserves paid state",async()=>{
     await as(ids.professional);booking=await transition("on_the_way");booking=await transition("in_progress");booking=await transition("completed");
     assert.equal(booking.status,"completed");
     await assert.rejects(db.query("select public.send_booking_message($1,$2,'Another message')",[booking.id,randomUUID()]),/CHAT_CLOSED/);
-    assert.equal((await db.query("select * from public.booking_messages")).rows.length,1);
+    assert.equal((await db.query("select * from public.booking_messages")).rows.length,0);
     await as(ids.customer);await assert.rejects(transition("cancelled"),/REQUEST_NO_LONGER_PENDING/);
     assert.equal((await db.query("select status from public.booking_payments")).rows[0].status,"paid");
   });
@@ -133,19 +134,20 @@ test("pilot journey across every migration: signup → browse → landmark → b
     await as(ids.professional);
     const move=async(action)=>(await db.query("select row_to_json(b) data from public.transition_booking($1,$2) b",[codBooking.id,action])).rows[0].data;
     await move("accepted");await move("on_the_way");await move("in_progress");await move("completed");
-    const entries=(await db.query("select * from public.professional_settlement_ledger where booking_id=$1",[codBooking.id])).rows;
-    assert.equal(entries.length,1);assert.equal(entries[0].gross_amount_paisa,12551);
-    assert.equal(entries[0].commission_rate_basis_points,1250);assert.equal(entries[0].commission_paisa,1569);
-    assert.equal(entries[0].entry_amount_paisa,-1569);
-    await move("completed");assert.equal((await db.query("select count(*)::int count from public.professional_settlement_ledger where booking_id=$1",[codBooking.id])).rows[0].count,1);
-    await as(ids.customer);assert.equal((await db.query("select * from public.professional_settlement_ledger where booking_id=$1",[codBooking.id])).rows.length,0);
-    await assert.rejects(db.query("insert into public.professional_settlement_ledger(booking_id,professional_id,gross_amount_paisa,commission_rate_basis_points,commission_paisa,entry_amount_paisa) values($1,$2,10000,1250,1250,-1250)",[codBooking.id,ids.professional]),e=>e.code==="42501");
+    const entries=(await db.query("select * from public.completed_transactions where booking_id=$1",[codBooking.id])).rows;
+    assert.equal(entries.length,1);assert.equal(entries[0].gross_amount,"125.51");
+    assert.equal(entries[0].commission_rate,"12.50");assert.equal(entries[0].company_income,"15.69");
+    assert.equal(entries[0].hero_payout,"109.82");assert.equal(entries[0].payment_type,"CASH");
+    await move("completed");assert.equal((await db.query("select count(*)::int count from public.completed_transactions where booking_id=$1",[codBooking.id])).rows[0].count,1);
+    await as(ids.customer);assert.equal((await db.query("select * from public.completed_transactions where booking_id=$1",[codBooking.id])).rows.length,0);
+    await assert.rejects(db.query("insert into public.completed_transactions(booking_id,\"timestamp\",hero_id,hero_name,hero_trade,gross_amount,commission_rate,company_income,hero_payout,payment_type) values($1,now(),$2,'Hero','PLUMBING',100,12.5,12.5,87.5,'CASH')",[codBooking.id,ids.professional]),e=>e.code==="42501");
   });
   await t.test("outbox leases prevent duplicate claims and device revocation is private",async()=>{
     await as(ids.outsider);await assert.rejects(db.query("select * from public.push_devices"),e=>e.code==="42501");
     await assert.rejects(db.query("select * from public.push_outbox"),e=>e.code==="42501");
-    await as(null,"service_role");const claimed=(await db.query("select * from public.claim_push_jobs($1)",[randomUUID()])).rows;
-    assert.equal(claimed.length,11);assert.equal((await db.query("select * from public.claim_push_jobs($1)",[randomUUID()])).rows.length,0);
+    await as(null,"service_role");const expectedClaimCount=Number((await db.query("select count(*)::int as count from public.push_outbox where state in ('queued','processing','receipt') and available_at<=now() and attempts<8")).rows[0].count);
+    const claimed=(await db.query("select * from public.claim_push_jobs($1)",[randomUUID()])).rows;
+    assert.equal(claimed.length,expectedClaimCount);assert.ok(claimed.length>0);assert.equal((await db.query("select * from public.claim_push_jobs($1)",[randomUUID()])).rows.length,0);
     await as(ids.customer);await db.query("select public.unregister_push_device($1)",[customerDevice]);
     await admin();assert.equal((await db.query("select * from public.push_devices where user_id=$1",[ids.customer])).rows.length,0);
   });

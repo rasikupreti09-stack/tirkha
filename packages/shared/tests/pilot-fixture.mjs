@@ -15,6 +15,12 @@ export async function createPilotFixture() {
       create schema storage;
       create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
       create table storage.objects(id uuid default gen_random_uuid(),bucket_id text,name text,owner_id text);
+      create function storage.foldername(object_name text) returns text[] language sql immutable as $$
+        select case
+          when position('/' in object_name) = 0 then array[]::text[]
+          else string_to_array(regexp_replace(object_name, '/[^/]*$', ''), '/')
+        end;
+      $$;
       alter table storage.objects enable row level security;
       create sequence auth.test_phone_seq start 9800000001;
       create table auth.users(id uuid primary key,raw_user_meta_data jsonb,
@@ -39,7 +45,14 @@ export async function createPilotFixture() {
       await db.query("select set_config('request.jwt.claim.sub',$1,false)", [user || ""]);
       await db.exec("set role " + ({ authenticated: "authenticated", service_role: "service_role", anon: "anon" }[role]));
     }
-    return { db, ids, as, async admin() { await db.exec("reset role"); } };
+    async function prepareVerifiedHero(profileId, zone = "Kathmandu") {
+      await db.query(`update public.professional_profiles
+        set verification_status='verified', trade_code='PLUMBING', trade_category='PLUMBING',
+            operational_zone=$2, citizenship_document_path=profile_id::text || '/test-id.pdf',
+            hourly_rate_paisa=12550
+        where profile_id=$1`, [profileId, zone]);
+    }
+    return { db, ids, as, prepareVerifiedHero, async admin() { await db.exec("reset role"); } };
   } catch (error) { await db.close(); throw error; }
 }
 
