@@ -2,7 +2,7 @@ import type { CatalogService } from "./catalog";
 import type { Profile, ProfessionalProfile, ServiceCategory, WorkflowBooking, PublicProfessional, UserRole, VerificationStatus, BookingStatus } from "./schemas";
 import type { BookingPayment } from "./payments";
 import type { ChatMessage, PushJob } from "./chat";
-import type { CompletedTransaction, FinanceSummary, ProfessionalJobQuote } from "./hero-portal";
+import type { CompletedTransaction, FinanceSummary, HeroTrade, ProfessionalJobQuote } from "./hero-portal";
 
 // Hand-maintained database contract for the checked-in migrations. Regenerate
 // from Supabase after deployment as the schema grows; SQL remains authoritative.
@@ -29,7 +29,7 @@ export type Database = {
 
       professional_presence: Table<{ professional_id: string; latitude: number; longitude: number; heading: number | null; updated_at: string }, never, never>;
       hero_locations: Table<{ professional_id: string; latitude: number; longitude: number; heading: number | null; speed_mps: number | null; battery_level: number | null; active_booking_id: string | null; status: "online_idle" | "en_route" | "on_service"; updated_at: string }, never, never>;
-      hero_dispatch_notifications: Table<{ id: string; booking_id: string; professional_id: string; status: "new" | "seen" | "accepted" | "expired"; service_name: string; diagnostic_summary: string | null; diagnostic_severity: string | null; diagnostic_urgency: "routine" | "soon" | "urgent" | null; suggested_parts: string[]; service_address: string; latitude: number | null; longitude: number | null; distance_meters: number | null; scheduled_at: string; created_at: string }, never, never>;
+      hero_dispatch_notifications: Table<{ id: string; booking_id: string; professional_id: string; trade_category: HeroTrade | null; status: "new" | "seen" | "accepted" | "expired"; service_name: string; diagnostic_summary: string | null; diagnostic_severity: string | null; diagnostic_urgency: "routine" | "soon" | "urgent" | null; suggested_parts: string[]; service_address: string; latitude: number | null; longitude: number | null; distance_meters: number | null; scheduled_at: string; created_at: string }, never, never>;
     };
     Views: { [_ in never]: never };
     Functions: {

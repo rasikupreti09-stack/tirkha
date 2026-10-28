@@ -53,7 +53,7 @@ export default function HeroDashboardPage() {
       setOnline(localStorage.getItem(demoAvailabilityKey) === "true");
       setJobs(readDemoArray<WorkBooking>(demoJobsKey));
       setDemoEarnings(readDemoArray<CompletedTransaction>(demoEarningsKey));
-      const categoryName = trade === "ELECTRICAL" ? "Electrical" : trade === "APPLIANCE_TECHNICIAN" ? "Appliance Repair" : "Plumbing";
+      const categoryName = trade === "ELECTRICAL" ? "Electrical" : trade === "APPLIANCE_TECHNICIAN" ? "Appliance Repair" : trade === "BEAUTICIAN" ? "Home Salon & Spa" : trade === "PAINTER" ? "Painting" : trade === "CLEANER" ? "Home Cleaning" : trade === "HANDYMAN" ? "General Handyman" : "Plumbing";
       setCategories(new Map([[`demo-${trade?.toLowerCase() ?? "plumbing"}`, categoryName]]));
       setLoadingData(false); return;
     }
