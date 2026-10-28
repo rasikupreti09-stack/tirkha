@@ -25,6 +25,7 @@ export * from "./phone-auth";
 
 
 export * from "./catalog";
+export * from "./pricing";
 
 export * from "./home-diagnostics";
 

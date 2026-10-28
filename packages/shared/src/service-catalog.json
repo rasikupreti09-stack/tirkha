@@ -1,13 +1,13 @@
 [
   {
     "id": "sink-leak",
-    "title": "Under-sink leak repair",
+    "title": "Tap & faucet leakage repair",
     "category_slug": "plumbing",
     "category_name": "Plumbing",
     "icon": "wrench",
     "vertical": "Home repairs",
-    "base_paisa": 45000,
-    "visit_paisa": 15000,
+    "base_paisa": 35000,
+    "visit_paisa": 0,
     "duration_minutes": 45,
     "description": "Stop the drip. Get your kitchen back.",
     "included": [
@@ -28,7 +28,7 @@
       "pipe",
       "drip"
     ],
-    "image": "/images/plumbing.jpg",
+    "image": "/images/tirkha-plumber.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -36,7 +36,10 @@
       "Pokhara"
     ],
     "active": true,
-    "sort_order": 0
+    "sort_order": 0,
+    "pricing_mode": "fixed",
+    "pricing_unit": "per unit",
+    "pricing_note": "Accessible tap or faucet leak; replacement parts are separate."
   },
   {
     "id": "pipe-fitting",
@@ -65,7 +68,7 @@
       "drain",
       "water"
     ],
-    "image": "/images/plumbing.jpg",
+    "image": "/images/tirkha-plumber.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -102,7 +105,7 @@
       "plumbing",
       "bathroom"
     ],
-    "image": "/images/plumbing.jpg",
+    "image": "/images/tirkha-plumber.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -141,7 +144,7 @@
       "socket",
       "fault"
     ],
-    "image": "/images/electrical.jpg",
+    "image": "/images/tirkha-electrician.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -153,13 +156,13 @@
   },
   {
     "id": "switchboard",
-    "title": "Switchboard repair",
+    "title": "Switch, socket & bulb replacement",
     "category_slug": "electrical",
     "category_name": "Electrical",
     "icon": "zap",
     "vertical": "Home repairs",
-    "base_paisa": 50000,
-    "visit_paisa": 15000,
+    "base_paisa": 35000,
+    "visit_paisa": 0,
     "duration_minutes": 60,
     "description": "Small switches. A big difference.",
     "included": [
@@ -177,7 +180,7 @@
       "socket",
       "electrical"
     ],
-    "image": "/images/electrical.jpg",
+    "image": "/images/tirkha-electrician.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -185,7 +188,11 @@
       "Pokhara"
     ],
     "active": true,
-    "sort_order": 4
+    "sort_order": 4,
+    "pricing_mode": "range",
+    "pricing_unit": "per unit",
+    "price_max_paisa": 50000,
+    "pricing_note": "Rs. 350–500 per unit depending on fitting; parts are separate."
   },
   {
     "id": "inverter",
@@ -213,7 +220,7 @@
       "backup",
       "electricity"
     ],
-    "image": "/images/electrical.jpg",
+    "image": "/images/tirkha-electrician.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -251,7 +258,7 @@
       "hinge",
       "cabinet"
     ],
-    "image": "/images/carpentry.jpg",
+    "image": "/images/tirkha-carpenter.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -290,7 +297,7 @@
       "dust",
       "mop"
     ],
-    "image": "/images/cleaning.jpg",
+    "image": "/images/tirkha-home-care.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -328,7 +335,7 @@
       "reservoir",
       "sanitation"
     ],
-    "image": "/images/tank.jpg",
+    "image": "/images/tirkha-tank-care.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -365,7 +372,7 @@
       "stain",
       "upholstery"
     ],
-    "image": "/images/cleaning.jpg",
+    "image": "/images/tirkha-home-care.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -403,7 +410,7 @@
       "fever",
       "illness"
     ],
-    "image": "/images/doctor.jpg",
+    "image": "/images/tirkha-home-doctor.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -441,7 +448,7 @@
       "care",
       "caregiver"
     ],
-    "image": "/images/nurse.jpg",
+    "image": "/images/tirkha-home-doctor.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -479,7 +486,7 @@
       "back",
       "joint"
     ],
-    "image": "/images/physio.jpg",
+    "image": "/images/tirkha-home-doctor.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -518,7 +525,7 @@
       "beauty",
       "massage"
     ],
-    "image": "/images/salon.jpg",
+    "image": "/images/tirkha-beautician.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -556,7 +563,7 @@
       "birth chart",
       "jyotish"
     ],
-    "image": "/images/astrology.jpg",
+    "image": "/images/tirkha-astrologer.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -595,7 +602,7 @@
       "english",
       "tuition"
     ],
-    "image": "/images/tutor.jpg",
+    "image": "/images/tirkha-tutor.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -633,7 +640,7 @@
       "styling",
       "room"
     ],
-    "image": "/images/decor.jpg",
+    "image": "/images/tirkha-decorator.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -642,5 +649,230 @@
     ],
     "active": true,
     "sort_order": 16
+  },
+  {
+    "id": "plumbing-inspection",
+    "title": "Plumbing initial inspection & leak diagnosis",
+    "category_slug": "plumbing",
+    "category_name": "Plumbing",
+    "icon": "wrench",
+    "vertical": "Home repairs",
+    "base_paisa": 65000,
+    "visit_paisa": 0,
+    "duration_minutes": 45,
+    "description": "A focused first inspection to identify an accessible plumbing leak or fault.",
+    "included": [
+      "Visual inspection of one accessible fault",
+      "Basic leak or flow checks",
+      "Written findings and next-step scope"
+    ],
+    "excluded": [
+      "Repair labour and replacement parts",
+      "Concealed-line opening or civil work"
+    ],
+    "keywords": [
+      "inspection",
+      "diagnosis",
+      "leak",
+      "plumbing",
+      "pipe",
+      "tap"
+    ],
+    "image": "/images/tirkha-plumber.webp",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 17,
+    "pricing_mode": "fixed"
+  },
+  {
+    "id": "drain-clearing",
+    "title": "Waste pipe & drainage clearing",
+    "category_slug": "plumbing",
+    "category_name": "Plumbing",
+    "icon": "droplets",
+    "vertical": "Home repairs",
+    "base_paisa": 50000,
+    "visit_paisa": 0,
+    "duration_minutes": 60,
+    "description": "Starting rate for clearing one accessible household waste pipe or drain.",
+    "included": [
+      "Clear one accessible household blockage",
+      "Basic flow test",
+      "Work-area cleanup"
+    ],
+    "excluded": [
+      "Major sewer line work",
+      "Chemical treatment, replacement parts or concealed access"
+    ],
+    "keywords": [
+      "drain",
+      "drainage",
+      "waste pipe",
+      "sink jam",
+      "dhal"
+    ],
+    "image": "/images/tirkha-plumber.webp",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 18,
+    "pricing_mode": "starting_at",
+    "pricing_note": "From Rs. 500; final scope confirmed on inspection."
+  },
+  {
+    "id": "sump-pump-fitting",
+    "title": "Water motor & sump pump fitting",
+    "category_slug": "plumbing",
+    "category_name": "Plumbing",
+    "icon": "wrench",
+    "vertical": "Home repairs",
+    "base_paisa": 200000,
+    "visit_paisa": 0,
+    "duration_minutes": 120,
+    "description": "Labour for fitting one compatible water motor or sump pump at an accessible household installation.",
+    "included": [
+      "Fit one customer-supplied compatible pump",
+      "Accessible connection check",
+      "Basic operational test"
+    ],
+    "excluded": [
+      "Pump, wiring, pipework, electrical changes or civil work"
+    ],
+    "keywords": [
+      "motor",
+      "pump",
+      "sump pump",
+      "water motor",
+      "paani motor"
+    ],
+    "image": "/images/tirkha-plumber.webp",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 19,
+    "pricing_mode": "fixed"
+  },
+  {
+    "id": "electrical-inspection",
+    "title": "Electrical safety inspection & MCB diagnosis",
+    "category_slug": "electrical",
+    "category_name": "Electrical",
+    "icon": "zap",
+    "vertical": "Home repairs",
+    "base_paisa": 65000,
+    "visit_paisa": 0,
+    "duration_minutes": 45,
+    "description": "A first safety inspection and diagnosis for one accessible household circuit or breaker issue.",
+    "included": [
+      "Visual check of one accessible circuit or distribution board",
+      "Basic trip-pattern diagnosis",
+      "Written findings and next-step scope"
+    ],
+    "excluded": [
+      "Live repair, replacement parts, full rewiring or concealed wiring access"
+    ],
+    "keywords": [
+      "inspection",
+      "mcb",
+      "breaker",
+      "electrical diagnosis",
+      "safety"
+    ],
+    "image": "/images/tirkha-electrician.webp",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 20,
+    "pricing_mode": "fixed"
+  },
+  {
+    "id": "mcb-fuse-swap",
+    "title": "Single-phase MCB & fuse swap",
+    "category_slug": "electrical",
+    "category_name": "Electrical",
+    "icon": "zap",
+    "vertical": "Home repairs",
+    "base_paisa": 75000,
+    "visit_paisa": 0,
+    "duration_minutes": 45,
+    "description": "Labour to replace one compatible single-phase MCB or fuse after confirming the fault and rating.",
+    "included": [
+      "Verify one compatible breaker rating",
+      "Replace one customer-approved unit",
+      "Basic functional check"
+    ],
+    "excluded": [
+      "MCB/fuse and repairs for underlying overload, short circuit or wiring fault"
+    ],
+    "keywords": [
+      "mcb",
+      "fuse",
+      "breaker swap",
+      "single phase",
+      "trip"
+    ],
+    "image": "/images/tirkha-electrician.webp",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 21,
+    "pricing_mode": "fixed"
+  },
+  {
+    "id": "technical-audit",
+    "title": "General on-site technical audit",
+    "category_slug": "general-home-services",
+    "category_name": "General Home Services",
+    "icon": "clipboard-check",
+    "vertical": "Home repairs",
+    "base_paisa": 100000,
+    "visit_paisa": 0,
+    "duration_minutes": 60,
+    "description": "A general on-site technical audit for a household repair issue that needs a professional assessment.",
+    "included": [
+      "One on-site assessment",
+      "Documented scope and written estimate",
+      "Safety observations"
+    ],
+    "excluded": [
+      "Repair work, parts, testing requiring specialist equipment"
+    ],
+    "keywords": [
+      "technical audit",
+      "site inspection",
+      "on-site inspection",
+      "home audit"
+    ],
+    "image": "/images/tirkha-hero-team.webp",
+    "regions": [
+      "Kathmandu",
+      "Lalitpur",
+      "Bhaktapur",
+      "Pokhara"
+    ],
+    "active": true,
+    "sort_order": 22,
+    "pricing_mode": "fixed"
   }
 ]

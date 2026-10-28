@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import seed from "@tirkha/shared/service-catalog";
-import { catalogServiceSchema, diagnosticDraftSchema, marketplaceStateSchema, serviceTotal, type CatalogService, type DemoOrder, type DiagnosticDraft, type MarketplaceState } from "@tirkha/shared";
+import { applyCatalogPriceOverride, catalogServiceSchema, diagnosticDraftSchema, marketplaceStateSchema, serviceTotal, type CatalogService, type DemoOrder, type DiagnosticDraft, type MarketplaceState } from "@tirkha/shared";
 import { useAuth } from "./auth-provider";
 import { MarketplaceOverlays } from "./marketplace-overlays";
 import { ServiceAssistant } from "./service-assistant";
@@ -24,7 +24,7 @@ export function useMarketplace(){const value=useContext(Context);if(!value)throw
 export function MarketplaceProvider({children}:{children:ReactNode}){
  const {client}=useAuth();
  const [state,setState]=useState(initial);
- const [services,setServices]=useState(()=>catalogServiceSchema.array().parse(seed));
+ const [services,setServices]=useState(()=>catalogServiceSchema.array().parse(seed).map(applyCatalogPriceOverride));
  const [ready,setReady]=useState(false),[notice,setNotice]=useState(""),[modal,setModal]=useState<Modal>(null),[detail,setDetail]=useState<string|null>(null),[legalModal,setLegalModal]=useState<LegalTopic|null>(null);
  const checkoutAfterLogin=useRef(false);
  useEffect(()=>{
@@ -43,7 +43,7 @@ export function MarketplaceProvider({children}:{children:ReactNode}){
  useEffect(()=>{if(!client)return;const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),8000);
    void (async()=>{try{const {data,error}=await client.from("service_offerings").select("*").eq("active",true).order("sort_order").abortSignal(controller.signal);
      if(error)throw error;
-     const parsed=catalogServiceSchema.array().parse(data);
+     const parsed=catalogServiceSchema.array().parse(data).map(applyCatalogPriceOverride);
      if(!controller.signal.aborted&&parsed.length>0)setServices(parsed);
    }catch{ /* Bundled catalog is the validated offline fallback. */ }finally{clearTimeout(timer);}})();
    return()=>{controller.abort();clearTimeout(timer);};

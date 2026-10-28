@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { MapPin, ArrowUpRight, ArrowRight, Search, ShoppingBag, Wrench, Sparkles, HeartPulse, BookOpen, ShieldCheck, Clock3, Check, Menu, X } from "lucide-react";
-import { REGIONS, catalogMoney, inRegion, serviceTotal, type CatalogService } from "@tirkha/shared";
+import { REGIONS, catalogMoney, catalogPriceLabel, inRegion, serviceTotal, type CatalogService } from "@tirkha/shared";
 import { useMarketplace } from "./marketplace-provider";
 const categories=[["All services",Sparkles],["Home repairs",Wrench],["Cleaning",Sparkles],["Care & wellness",HeartPulse],["Everyday support",BookOpen]] as const;
 export function ServiceCard({service,compact=false}:{service:CatalogService;compact?:boolean}){
@@ -11,7 +11,7 @@ export function ServiceCard({service,compact=false}:{service:CatalogService;comp
    <div className="mk-card-body"><div className="mk-card-meta"><span><Clock3 size={13}/>{service.duration_minutes} min</span><span>At your doorstep</span></div>
      <button className="mk-title-button" onClick={()=>setDetail(service.id)}><h3>{service.title}</h3></button>
      {!compact&&<p>{service.description}</p>}
-     <div className="mk-card-bottom"><div><small>Starting estimate</small><strong>{catalogMoney(serviceTotal(service))}</strong></div><button className="mk-add" disabled={!ready} onClick={()=>add(service.id)} aria-label={"Add "+service.title+" to cart"}>Add <span>+</span></button></div>
+     <div className="mk-card-bottom"><div className="mk-card-price"><small>Listed rate · सेवा दर</small><strong>{catalogPriceLabel(service)}</strong>{service.pricing_note&&<small className="mk-card-price-note">{service.pricing_note}</small>}</div><button className="mk-add" disabled={!ready} onClick={()=>add(service.id)} aria-label={"Add "+service.title+" to cart"}>Add <span>+</span></button></div>
    </div>
  </article>;
 }
@@ -31,7 +31,7 @@ export function Marketplace(){
   </header>
   <main>
    <section className="mk-hero">
-    <img className="mk-hero-image" src="/images/kathmandu.jpg" alt="Kathmandu Valley skyline beneath the Himalayan mountains" width={1170} height={530} fetchPriority="high"/>
+    <img className="mk-hero-image" src="/images/tirkha-hero-team.webp" alt="Nepali Tirkha home-service professionals in navy uniforms in a Kathmandu home" width={1600} height={900} fetchPriority="high"/>
     <div className="mk-hero-shade"/><div className="mk-hero-content"><div className="mk-eyebrow"><span/> TIRKHA | तिर्खा · YOUR CITY. YOUR HOME.</div>
       <h1>A little help,<br/>for the place<br/>you call <em>home.</em></h1>
       <p>Nepal’s Premier Home Services Marketplace</p><p className="mk-hero-sub">From a leaking tap to a fresh start.<br/>Everyday services, right at your doorstep.</p>
@@ -41,7 +41,7 @@ export function Marketplace(){
       <div className="mk-hero-promises"><span><Check size={14}/>Clear pricing</span><span><Check size={14}/>Local service catalog</span><span><Check size={14}/>Carefully defined scopes</span></div>
     </div>
     <div className="mk-hero-location"><MapPin size={15}/><div>Kathmandu Valley<small>Our home. Just like yours.</small></div></div>
-    <span className="mk-hero-credit">Kathmandu photograph · Unsplash / UN News</span>
+    <span className="mk-hero-credit">Local Tirkha Hero team · Kathmandu Valley</span>
    </section>
    <section className="mk-discovery" id="catalog"><div className="mk-section-top"><div><span className="mk-kicker">GOOD HELP STARTS HERE</span><h2>What can we help you with?</h2><p>Small fixes, fresh spaces, and a little more peace of mind.</p></div>
      <label className="mk-search"><Search size={18}/><input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Try “plumbing” or “cleaning”" aria-label="Search services"/></label></div>
@@ -49,7 +49,7 @@ export function Marketplace(){
      <div className="mk-results-label"><span>{filtered.length} services to make life easier</span><span><MapPin size={13}/>{state.region}</span></div>
      <div className="mk-grid">{filtered.map(service=><ServiceCard key={service.id} service={service}/>)}</div>
      {!filtered.length&&<div className="mk-empty"><Search/><h3>No matching services</h3><p>Try another search or explore all categories.</p><button className="mk-primary" onClick={()=>{setQuery("");setVertical("All services");}}>Show all services</button></div>}
-     <p className="mk-price-note">Starting estimates include labour and a visit fee. Materials and additional work require a separate quote. Photos illustrate service activities.</p>
+     <p className="mk-price-note">Listed Kathmandu starting rates are shown in NPR. Any parts, materials or work beyond the listed scope need a written quote and your approval. मूल्य स्पष्ट, काम सुरु हुनुअघि पुष्टि.</p>
    </section>
    <section className="mk-care-strip"><div className="mk-care-icon"><HeartPulse size={32}/></div><div><span className="mk-kicker">CARE THAT COMES TO YOU</span><h2>For the people who make it home.</h2><p>Explore scheduled home care, wellness and everyday support.</p></div><a className="mk-outline" href="#catalog" onClick={()=>{setVertical("Care & wellness");setQuery("");}}>Explore home care <ArrowRight size={17}/></a></section>
    <section className="mk-how" id="how-it-works"><div><span className="mk-kicker">LESS COORDINATING. MORE LIVING.</span><h2>Your to-do list,<br/>a little lighter.</h2><p>Try the complete demo journey.<br/>No SMS, payment, or provider dispatch.</p></div>

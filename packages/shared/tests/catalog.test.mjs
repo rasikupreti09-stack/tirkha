@@ -7,8 +7,8 @@ import { buildDemoPaymentQrUrl } from "../src/payments.ts";
 
 test("seeded marketplace catalog has complete scopes, usable images and integer NPR estimates", () => {
   const parsed=catalogServiceSchema.array().parse(seed);
-  assert.equal(parsed.length,17);
-  assert.equal(new Set(parsed.map(service=>service.id)).size,17);
+  assert.equal(parsed.length,23);
+  assert.equal(new Set(parsed.map(service=>service.id)).size,23);
   for(const service of parsed){
     assert.ok(service.included.length>0&&service.excluded.length>0);
     assert.ok(Number.isSafeInteger(serviceTotal(service)));

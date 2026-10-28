@@ -74,6 +74,14 @@
 .mk-card-bottom small,.mk-card-bottom strong{display:block}
 .mk-card-bottom small{color:#7a867f;font-size:9px;margin-bottom:4px}
 .mk-card-bottom strong{font-size:18px;letter-spacing:-.03em}
+.mk-card-bottom{min-height:58px;align-items:center;gap:9px}
+.mk-card-price{min-width:0;max-width:calc(100% - 66px)}
+.mk-card-price strong{overflow-wrap:anywhere;font-size:clamp(14px,1.3vw,18px);line-height:1.2}
+.mk-card-bottom .mk-card-price small:first-child{font-weight:700;color:#475569}
+.mk-card-price .mk-card-price-note{max-width:250px;margin-top:5px;line-height:1.35;color:#64748b;font-size:9px}
+.mk-cart-price-note{display:block;max-width:340px;margin-top:4px!important;color:#64748b!important;font-size:9px!important;line-height:1.4}
+.mk-pricing-note{margin:2px 0 10px!important;padding:9px 10px;border-left:3px solid #059669;background:#f8fafc;color:#475569!important;font-size:10px!important;line-height:1.5}
+.mk-price-breakdown>small{display:block;border-top:1px solid #e2e8f0;padding-top:9px;color:#64748b;font-size:10px;line-height:1.5}
 .mk-add{display:flex;align-items:center;gap:8px;background:#f0f4f0;border:1px solid #dce5dc;color:#1f2937;padding:8px 10px;border-radius:4px;font-size:10px;font-weight:700}
 .mk-add span{font-size:17px;line-height:10px}
 .mk-add:disabled{opacity:.5;cursor:wait}
