@@ -11,7 +11,7 @@
 @keyframes tirkha-pin-pulse { 0% { opacity: .9; transform: scale(.7); } 75%, 100% { opacity: 0; transform: scale(1.8); } }
 @media (prefers-reduced-motion: reduce) { .tirkha-pin-pulse { animation: none; } }
 .tirkha-map-frame { position: relative; overflow: hidden; border-radius: inherit; }
-.tirkha-vector-map.leaflet-container { background: #f3f5ef; color: #20372f; font-family: inherit; }
+.tirkha-vector-map.leaflet-container { background: #f3f5ef; color: #20372f; font-family: inherit; touch-action: pan-x pan-y; overscroll-behavior: contain; }
 .tirkha-vector-map .leaflet-pane { z-index: 200; }
 .tirkha-vector-map .leaflet-overlay-pane svg { overflow: visible; }
 .leaflet-tooltip.tirkha-place-label,

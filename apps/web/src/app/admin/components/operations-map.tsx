@@ -1,8 +1,7 @@
 "use client";
-import { useMemo, useState } from "react";
-import { divIcon } from "leaflet";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { divIcon, type Map as LeafletMap, type Marker as LeafletMarker } from "leaflet";
 import { MapContainer, Marker, Tooltip, useMap } from "react-leaflet";
-import { useEffect } from "react";
 import type { BookingStatus } from "@tirkha/shared";
 import { TirkhaMapArtwork, TirkhaMapSignature, TirkhaMapZoomControl } from "@/components/tirkha-map-artwork";
 
@@ -22,6 +21,25 @@ function motorcycleIcon(heading: number | null, stale = false) {
     iconSize: [32, 32], iconAnchor: [16, 16],
   });
 }
+const FleetMarker = memo(function FleetMarker({ location, name, stale, onSelect }: {
+  location: HeroLocation; name: string; stale: boolean; onSelect: (professionalId: string) => void;
+}) {
+  const markerRef = useRef<LeafletMarker | null>(null);
+  const [initialPosition] = useState<[number, number]>(() => [location.latitude, location.longitude]);
+  const [initialIcon] = useState(() => motorcycleIcon(location.heading, stale));
+  useEffect(() => {
+    markerRef.current?.setLatLng([location.latitude, location.longitude]);
+  }, [location.latitude, location.longitude]);
+  useEffect(() => {
+    markerRef.current?.setIcon(motorcycleIcon(location.heading, stale));
+  }, [location.heading, stale]);
+  return <Marker ref={markerRef} position={initialPosition} icon={initialIcon} eventHandlers={{ click: () => onSelect(location.professional_id) }}>
+    <Tooltip>{name}</Tooltip>
+  </Marker>;
+}, (a, b) => a.location.professional_id === b.location.professional_id
+  && a.location.latitude === b.location.latitude && a.location.longitude === b.location.longitude
+  && a.location.heading === b.location.heading && a.location.updated_at === b.location.updated_at
+  && a.stale === b.stale && a.name === b.name);
 function SelectedHeroFocus({ location }: { location: HeroLocation | null }) {
   const map = useMap();
   useEffect(() => { if (location) map.panTo([location.latitude, location.longitude], { animate: true, duration: 0.7 }); }, [location, map]);
@@ -34,7 +52,9 @@ function relativePing(value: string | null) {
 }
 
 export function OperationsMap({ heroes, locations, jobs }: { heroes: Hero[]; locations: HeroLocation[]; jobs: OperationsJob[] }) {
+  const mapRef = useRef<LeafletMap | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectHero = useCallback((id: string) => setSelectedId(id), []);
   const locationById = useMemo(() => new Map(locations.map(row => [row.professional_id, row])), [locations]);
   const jobByHero = useMemo(() => new Map(jobs.filter(job => job.professional_id).map(job => [job.professional_id!, job])), [jobs]);
   const selectedLocation = selectedId ? locationById.get(selectedId) ?? null : null;
@@ -43,13 +63,11 @@ export function OperationsMap({ heroes, locations, jobs }: { heroes: Hero[]; loc
   if (typeof window === "undefined") return <div className="grid min-h-[480px] place-items-center rounded-xl border bg-muted text-sm text-muted-foreground" role="status">Loading Valley fleet map…</div>;
   return <div className="grid min-h-[480px] overflow-hidden rounded-xl border bg-card lg:grid-cols-[minmax(0,1fr)_320px]">
     <div className="tirkha-map-frame relative min-h-[420px]">
-      <MapContainer center={VALLEY_CENTER} zoom={12} minZoom={6} maxZoom={19} zoomControl={false} zoomSnap={0.5} zoomDelta={0.75} wheelPxPerZoomLevel={100} touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} className="tirkha-vector-map !h-full !min-h-[420px] !w-full" aria-label="Live Kathmandu Valley Hero fleet map">
+      <MapContainer ref={mapRef} center={VALLEY_CENTER} zoom={12} minZoom={6} maxZoom={19} zoomControl={false} zoomSnap={0.5} zoomDelta={0.75} wheelPxPerZoomLevel={100} touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} className="tirkha-vector-map !h-full !min-h-[420px] !w-full" aria-label="Live Kathmandu Valley Hero fleet map">
         <TirkhaMapArtwork />
         <TirkhaMapZoomControl />
         <SelectedHeroFocus location={selectedLocation} />
-        {liveLocations.map(location => <Marker key={location.professional_id} position={[location.latitude, location.longitude]} icon={motorcycleIcon(location.heading)} eventHandlers={{ click: () => setSelectedId(location.professional_id) }}>
-          <Tooltip>{heroes.find(hero => hero.id === location.professional_id)?.name || "Hero"}</Tooltip>
-        </Marker>)}
+        {liveLocations.map(location => <FleetMarker key={location.professional_id} location={location} stale={Date.now() - Date.parse(location.updated_at) > 90_000} name={heroes.find(hero => hero.id === location.professional_id)?.name || "Hero"} onSelect={selectHero} />)}
       </MapContainer>
       <TirkhaMapSignature caption="Kathmandu Valley fleet" />
     </div>

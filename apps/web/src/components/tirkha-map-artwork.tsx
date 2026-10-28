@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { canvas, DomEvent } from "leaflet";
 import { CircleMarker, GeoJSON, Polygon, Polyline, Tooltip, useMap } from "react-leaflet";
 import { tirkhaCityViews, tirkhaLandmarks, tirkhaParks, tirkhaRoads, tirkhaWaterways } from "@/lib/tirkha-map-data";
@@ -10,6 +10,23 @@ type RoadFeature = { type: "Feature"; id?: string; properties?: RoadProperties; 
 type RoadCollection = { type: "FeatureCollection"; features: RoadFeature[] };
 type BuildingFeature = { type: "Feature"; id?: string; properties?: { kind?: string; center?: [number, number] }; geometry: { type: "Polygon"; coordinates: number[][][] } };
 type BuildingCollection = { type: "FeatureCollection"; features: BuildingFeature[] };
+
+function subscribeAfterGesture(map: ReturnType<typeof useMap>, events: string, callback: () => void) {
+  let timeout: number | undefined;
+  let frame: number | undefined;
+  const schedule = () => {
+    if (timeout !== undefined) window.clearTimeout(timeout);
+    timeout = window.setTimeout(() => {
+      frame = window.requestAnimationFrame(callback);
+    }, 150);
+  };
+  map.on(events, schedule);
+  return () => {
+    map.off(events, schedule);
+    if (timeout !== undefined) window.clearTimeout(timeout);
+    if (frame !== undefined) window.cancelAnimationFrame(frame);
+  };
+}
 
 async function loadBuildingTile(region: string, tile: string, signal: AbortSignal): Promise<BuildingFeature[]> {
   const response = await fetch(`/data/buildings/${region}/${tile}.geojson.gz`, { cache: "force-cache", signal });
@@ -33,7 +50,7 @@ function mapBuildingTiles(map: ReturnType<typeof useMap>) {
 }
 
 /** Original Tirkha cartography rendered from geographic vector geometry, with no raster tile layer. */
-export function TirkhaMapArtwork() {
+export const TirkhaMapArtwork = memo(function TirkhaMapArtwork() {
   const [roadData, setRoadData] = useState<RoadCollection | null>(null);
   useEffect(() => {
     let active = true;
@@ -56,15 +73,14 @@ export function TirkhaMapArtwork() {
     <DetailedBuildingFootprints />
     <CuratedLandmarkLabels />
   </>;
-}
+});
 
 function CuratedRoadNetwork() {
   const map = useMap();
   const [zoom, setZoom] = useState(map.getZoom());
   useEffect(() => {
     const update = () => setZoom(map.getZoom());
-    map.on("zoomend", update);
-    return () => { map.off("zoomend", update); };
+    return subscribeAfterGesture(map, "zoomend", update);
   }, [map]);
   return <>
     {tirkhaRoads.map((road, index) => {
@@ -95,8 +111,7 @@ function DetailedBuildingFootprints() {
 
   useEffect(() => {
     const update = () => setView(readView());
-    map.on("zoomend moveend", update);
-    return () => { map.off("zoomend moveend", update); };
+    return subscribeAfterGesture(map, "zoomend moveend", update);
   }, [map]);
 
   useEffect(() => {
@@ -142,8 +157,7 @@ function CuratedLandmarkLabels() {
   const [zoom, setZoom] = useState(map.getZoom());
   useEffect(() => {
     const update = () => setZoom(map.getZoom());
-    map.on("zoomend moveend", update);
-    return () => { map.off("zoomend moveend", update); };
+    return subscribeAfterGesture(map, "zoomend moveend", update);
   }, [map]);
   const visible = useMemo(() => {
     const bounds = map.getBounds().pad(0.08);
@@ -168,16 +182,9 @@ function CuratedLandmarkLabels() {
 
 function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
   const map = useMap();
-  const [zoom, setZoom] = useState(map.getZoom());
   const renderer = useMemo(() => canvas({ padding: 0.5 }), []);
-  useEffect(() => {
-    map.invalidateSize({ pan: false });
-    const updateZoom = () => setZoom(map.getZoom());
-    map.on("zoomend", updateZoom);
-    return () => { map.off("zoomend", updateZoom); };
-  }, [map]);
+  useEffect(() => { map.invalidateSize({ pan: false }); }, [map]);
   return <GeoJSON
-    key={Math.floor(zoom)}
     data={data as never}
     style={(feature) => {
       const properties = feature?.properties as RoadProperties | undefined;
@@ -195,8 +202,7 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
     onEachFeature={(feature, layer) => {
       const props = feature.properties as RoadProperties | undefined;
       const label = props?.name || props?.ref;
-      const minimumLabelZoom = props?.class === "expressway" ? 11 : props?.class === "arterial" ? 13 : props?.class === "connector" ? 15 : 17;
-      if (label) layer.bindTooltip(label, { permanent: zoom >= minimumLabelZoom, sticky: zoom < minimumLabelZoom, direction: "top", className: "tirkha-road-label" });
+      if (label) layer.bindTooltip(label, { sticky: true, direction: "top", className: "tirkha-road-label" });
     }}
   />;
 }

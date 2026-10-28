@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, Marker, Polyline, Tooltip, useMap } from "react-leaflet";
-import { divIcon } from "leaflet";
+import { divIcon, type Map as LeafletMap, type Marker as LeafletMarker } from "leaflet";
 import { Clock3, Crosshair, Navigation } from "lucide-react";
 import type { Coordinates } from "@tirkha/shared";
 import { useAuth } from "./auth-provider";
@@ -19,6 +19,27 @@ function pointIcon(kind: TrackedPoint["kind"], heading = 0) {
     iconAnchor: kind === "hero" ? [16, 16] : [16, 32],
   });
 }
+
+const TrackedMapMarker = memo(function TrackedMapMarker({ point }: { point: TrackedPoint }) {
+  const markerRef = useRef<LeafletMarker | null>(null);
+  const [initialPosition] = useState<[number, number]>(() => [point.coordinates.latitude, point.coordinates.longitude]);
+  const [initialIcon] = useState(() => pointIcon(point.kind, point.heading ?? 0));
+  useEffect(() => {
+    markerRef.current?.setLatLng([point.coordinates.latitude, point.coordinates.longitude]);
+  }, [point.coordinates.latitude, point.coordinates.longitude]);
+  useEffect(() => {
+    if (point.kind === "hero") markerRef.current?.setIcon(pointIcon(point.kind, point.heading ?? 0));
+  }, [point.heading, point.kind]);
+  return <Marker ref={markerRef} position={initialPosition} icon={initialIcon}>
+    <Tooltip>{point.label}{point.updatedAt ? ` · ${new Date(point.updatedAt).toLocaleTimeString()}` : ""}</Tooltip>
+  </Marker>;
+}, (previous, next) => previous.point.id === next.point.id
+  && previous.point.label === next.point.label
+  && previous.point.kind === next.point.kind
+  && previous.point.coordinates.latitude === next.point.coordinates.latitude
+  && previous.point.coordinates.longitude === next.point.coordinates.longitude
+  && previous.point.heading === next.point.heading
+  && previous.point.updatedAt === next.point.updatedAt);
 function decodePolyline(encoded: string): [number, number][] {
   const points: [number, number][] = []; let index = 0; let lat = 0; let lng = 0;
   while (index < encoded.length) {
@@ -57,10 +78,11 @@ function haversineKm(a: Coordinates, b: Coordinates) {
   const arc = Math.sin(lat / 2) ** 2 + Math.cos(radians(a.latitude)) * Math.cos(radians(b.latitude)) * Math.sin(lng / 2) ** 2;
   return 6371 * 2 * Math.atan2(Math.sqrt(arc), Math.sqrt(1 - arc));
 }
-export function MapTracker({ points, origin, destination, navigation = false, navigationTarget, live = false }: {
+export const MapTracker = memo(function MapTracker({ points, origin, destination, navigation = false, navigationTarget, live = false }: {
   points: TrackedPoint[]; origin?: Coordinates; destination?: Coordinates; navigation?: boolean; navigationTarget?: Coordinates; live?: boolean;
 }) {
   const { session } = useAuth();
+  const mapRef = useRef<LeafletMap | null>(null);
   const [path, setPath] = useState<[number, number][]>([]);
   const [eta, setEta] = useState<number | null>(null);
   const [roadDistanceKm, setRoadDistanceKm] = useState<number | null>(null);
@@ -104,14 +126,12 @@ export function MapTracker({ points, origin, destination, navigation = false, na
   if (typeof window === "undefined") return <div className="h-[360px] animate-pulse rounded-xl bg-muted" role="status">Loading live map…</div>;
   return <section className="tirkha-map-surface">
     <div className="tirkha-map-frame tirkha-live-map-canvas">
-      <MapContainer center={view} zoom={16} minZoom={6} maxZoom={19} zoomControl={false} zoomSnap={0.5} zoomDelta={0.75} wheelPxPerZoomLevel={100} touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} className="tirkha-vector-map !h-full !w-full" aria-label="Live service map">
+      <MapContainer ref={mapRef} center={view} zoom={16} minZoom={6} maxZoom={19} zoomControl={false} zoomSnap={0.5} zoomDelta={0.75} wheelPxPerZoomLevel={100} touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} className="tirkha-vector-map !h-full !w-full" aria-label="Live service map">
       <TirkhaMapArtwork />
       <TirkhaMapZoomControl />
       <FitPoints points={points} />
       <MapActions points={points} />
-      {points.map(point => point.kind === "hero"
-        ? <Marker key={point.id} position={[point.coordinates.latitude, point.coordinates.longitude]} icon={pointIcon("hero", point.heading ?? 0)}><Tooltip>{point.label}{point.updatedAt ? ` · ${new Date(point.updatedAt).toLocaleTimeString()}` : ""}</Tooltip></Marker>
-        : <Marker key={point.id} position={[point.coordinates.latitude, point.coordinates.longitude]} icon={pointIcon("customer")}><Tooltip>{point.label}{point.updatedAt ? ` · ${new Date(point.updatedAt).toLocaleTimeString()}` : ""}</Tooltip></Marker>)}
+      {points.map(point => <TrackedMapMarker key={point.id} point={point} />)}
       {path.length > 0 && <><Polyline positions={path} pathOptions={{ color: "#ffffff", weight: 10, opacity: 0.9, lineCap: "round", lineJoin: "round" }} /><Polyline positions={path} pathOptions={{ color: "#047857", weight: 5, opacity: 0.96, lineCap: "round", lineJoin: "round" }} /></>}
       </MapContainer>
       <div className="tirkha-map-live-chip"><span className={`tirkha-live-indicator ${live ? "is-live" : ""}`} /><span><strong>{live ? "HERO IS LIVE" : heroPoint ? "LAST GPS LOCATION" : "WAITING FOR HERO"}</strong><small>{heroPoint?.updatedAt ? `Updated ${new Date(heroPoint.updatedAt).toLocaleTimeString()}` : "Live updates appear here"}</small></span></div>
@@ -123,4 +143,4 @@ export function MapTracker({ points, origin, destination, navigation = false, na
       {navigation && (navUrl ? <a className="tirkha-navigation-button" href={navUrl} target="_blank" rel="noreferrer"><Navigation size={17} aria-hidden="true" />Directions</a> : <span className="tirkha-navigation-button is-disabled"><Navigation size={17} aria-hidden="true" />Waiting for location</span>)}
     </div>
   </section>;
-}
+});
