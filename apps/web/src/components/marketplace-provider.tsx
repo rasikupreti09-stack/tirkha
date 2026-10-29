@@ -22,7 +22,7 @@ type Store={
 const Context=createContext<Store|null>(null);
 export function useMarketplace(){const value=useContext(Context);if(!value)throw new Error("Marketplace provider missing");return value;}
 export function MarketplaceProvider({children}:{children:ReactNode}){
- const {client}=useAuth();
+ const {client,signOut:clearAuthSession}=useAuth();
  const [state,setState]=useState(initial);
  const [services,setServices]=useState(()=>catalogServiceSchema.array().parse(seed).map(applyCatalogPriceOverride));
  const [ready,setReady]=useState(false),[notice,setNotice]=useState(""),[modal,setModal]=useState<Modal>(null),[detail,setDetail]=useState<string|null>(null),[legalModal,setLegalModal]=useState<LegalTopic|null>(null);
@@ -72,7 +72,7 @@ export function MarketplaceProvider({children}:{children:ReactNode}){
  function addDiagnostic(id:string,diagnostic:DiagnosticDraft){setState(s=>({...s,diagnostic_draft:diagnosticDraftSchema.parse(diagnostic)}));add(id,true);}
  const value:Store={state,services,ready,notice,modal,detail,setRegion:region=>setState(s=>({...s,region})),add,addDiagnostic,
    quantity:(id,n)=>setState(s=>({...s,cart:n<=0?s.cart.filter(l=>l.id!==id):s.cart.map(l=>l.id===id?{...l,quantity:Math.min(10,n)}:l)})),
-   setModal:open,setDetail,setLegalModal,login,logout:()=>{setState(s=>({...s,session:null}));setNotice("Demo session signed out.");},requireCheckoutAuth,
+   setModal:open,setDetail,setLegalModal,login,logout:()=>{setState(s=>({...s,session:null}));void clearAuthSession().then(()=>setNotice("Signed out of Tirkha." )).catch(()=>setNotice("The Tirkha account could not be signed out. Please retry."));},requireCheckoutAuth,
    place,cancel:id=>setState(s=>({...s,orders:s.orders.map(o=>o.id===id?{...o,status:"cancelled"}:o)})),inform:setNotice};
  return <Context.Provider value={value}>{children}<SiteFooter/><MarketplaceOverlays/><LegalModals topic={legalModal} onClose={()=>setLegalModal(null)}/><ServiceAssistant/>{notice&&<div className="mk-toast" role="status">{notice}</div>}</Context.Provider>;
 }

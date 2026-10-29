@@ -10,7 +10,8 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
-const demoAuthEnabled = process.env.NEXT_PUBLIC_TIRKHA_DEMO_AUTH === "1" || (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_TIRKHA_LOCAL_MOCK === "1");
+// Pre-launch sign-in is local demo auth until real Supabase SMS is explicitly enabled.
+const demoAuthEnabled = process.env.NEXT_PUBLIC_TIRKHA_REAL_SMS_ENABLED !== "1";
 const demoPhoneAllowlist = [...new Set([...DEMO_PHONE_AUTH_NUMBERS, ...(process.env.NEXT_PUBLIC_TIRKHA_DEMO_PHONES || "").split(",").map(value => normalizeNepalPhoneNumber(value)).filter(Boolean)])];
 const tradeOptions: Record<HeroTrade, { icon: string; label: string }> = {
   PLUMBING: { icon: "🚰", label: "Plumber (प्लम्बर)" },
@@ -26,7 +27,7 @@ type AccountRole = "customer" | "professional";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const signup = mode === "signup";
-  const { client, error: sessionError, demoSignIn, session, loading } = useAuth();
+  const { client, error: sessionError, demoSignIn, signOut, session, loading } = useAuth();
   const router = useRouter();
   const [phone, setPhone] = useState("");
   const [token, setToken] = useState("");
@@ -40,6 +41,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [cooldown, setCooldown] = useState(0);
   const [explicitReturnTo, setExplicitReturnTo] = useState<string | null>(null);
   const [returnToReady, setReturnToReady] = useState(false);
+  const [authenticatedThisVisit, setAuthenticatedThisVisit] = useState(false);
   const lock = useRef(false);
   const normalizedPhone = normalizeNepalPhoneNumber(`+977${phone}`);
   const isDemoPhone = isDemoAuthPhone(normalizedPhone, demoAuthEnabled, demoPhoneAllowlist);
@@ -59,8 +61,25 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     setReturnToReady(true);
   }, []);
   useEffect(() => {
-    if (session && !loading && returnToReady) router.replace(destination);
-  }, [session, loading, router, destination, returnToReady]);
+    if (session && !loading && returnToReady && authenticatedThisVisit) router.replace(destination);
+  }, [session, loading, router, destination, returnToReady, authenticatedThisVisit]);
+
+  async function switchAccount() {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await signOut();
+      setSent(false);
+      setDemoCodeSent(false);
+      setToken("");
+      setAuthenticatedThisVisit(false);
+    } catch {
+      setError("Sign out could not finish. Please retry, then choose the account you want to use.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function changeRole(nextRole: AccountRole) {
     setRole(nextRole);
@@ -149,6 +168,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         setDemoCodeSent(false);
         setToken("");
         setCooldown(60);
+      } else {
+        setAuthenticatedThisVisit(true);
       }
     } catch (failure) {
       if (!verify && smsRequestStarted && demoAuthEnabled && isDemoAuthPhone(normalizedPhone, true, demoPhoneAllowlist)) {
@@ -166,7 +187,12 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       setBusy(false);
     }
   }
-  if (loading || session) return <main role="status" className="p-8">Loading your account…</main>;
+  if (loading) return <main role="status" className="p-8">Loading your account…</main>;
+  if (session && !authenticatedThisVisit) {
+    const currentRole: AccountRole = session.user.user_metadata.requested_role === "professional" ? "professional" : "customer";
+    const continueTo = explicitReturnTo ?? authDashboardPath(currentRole);
+    return <main className="flex min-h-screen items-center justify-center bg-background p-6"><Card className="w-full max-w-md"><CardHeader><CardTitle>Tirkha | तिर्खा</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm text-slate-700">You’re already signed in as a {currentRole === "professional" ? "Hero" : "Customer"}. Continue to your account or switch accounts to enter another phone number and demo code.</p>{error&&<p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{error}</p>}<Button className="w-full" onClick={()=>router.replace(continueTo)}>Continue to {currentRole === "professional" ? "Hero dashboard" : "Tirkha"}</Button><Button className="w-full" variant="outline" disabled={busy} onClick={()=>void switchAccount()}>{busy?"Signing out…":"Switch account"}</Button></CardContent></Card></main>;
+  }
   return <main className="flex min-h-screen items-center justify-center bg-background p-6">
     <Card className="w-full max-w-md">
       <CardHeader><CardTitle>Tirkha | तिर्खा · {signup ? "Create account" : "Sign in"}</CardTitle></CardHeader>
@@ -177,7 +203,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         </div>
         <p className="mb-4 text-sm text-muted-foreground">Use your Nepal mobile number. Email is optional and is not needed to sign in.</p>
         {(error || (!client && !canUseDemo && sessionError)) && <p role="alert" className="mb-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{error || sessionError}</p>}
-        {canUseDemo && <p className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">Demo sign-in works for configured test numbers{demoAuthEnabled ? " or valid 97/98 Nepal numbers while explicit demo mode is enabled" : ""}. Demo OTP: <b>{DEMO_PHONE_AUTH_CODE}</b>. Demo sessions are local and cannot access live dispatch.</p>}
+        {canUseDemo && <p className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">Demo sign-in is enabled for Nepal 97/98 numbers. Enter the phone number, then use demo OTP <b>{DEMO_PHONE_AUTH_CODE}</b>. Demo sessions stay in this browser and cannot access live Supabase data or dispatch.</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={busy} className="space-y-4">
             {signup && <><Label htmlFor="full-name">Full name</Label><Input id="full-name" value={name} onChange={event => setName(event.target.value)} maxLength={100} autoComplete="name" required /></>}

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function Dashboard() {
-  const { client, session, loading, error: authError } = useAuth();
+  const { client, session, loading, error: authError, signOut: clearSession } = useAuth();
   const router = useRouter();
   const [account, setAccount] = useState<{ owner: string; profile: Profile; professional: ProfessionalProfile | null } | null>(null);
   const [error, setError] = useState("");
@@ -38,11 +38,10 @@ export default function Dashboard() {
   }, [client, session?.user.id, attempt]);
 
   async function signOut() {
-    if (!client || busy) return;
+    if (busy) return;
     setBusy(true); setError("");
     try {
-      const { error } = await client.auth.signOut({ scope: "local" });
-      if (error) throw error;
+      await clearSession();
     } catch { setError("Sign out failed. Please try again."); }
     finally { setBusy(false); }
   }

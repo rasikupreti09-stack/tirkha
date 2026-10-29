@@ -4,9 +4,10 @@ import { DEMO_PHONE_AUTH_NUMBERS, normalizeNepalPhoneNumber, phoneSchema } from 
 export function isDemoAuthPhone(phone: string, demoModeEnabled: boolean, configuredTestPhones: readonly string[] = DEMO_PHONE_AUTH_NUMBERS): boolean {
   const normalized = normalizeNepalPhoneNumber(phone);
   if (!phoneSchema.safeParse(normalized).success) return false;
+  if (!demoModeEnabled) return false;
   if (configuredTestPhones.some(testPhone => normalizeNepalPhoneNumber(testPhone) === normalized)) return true;
   const localDigits = normalized.replace(/\D/g, "").replace(/^977/, "");
-  return demoModeEnabled && (localDigits.startsWith("97") || localDigits.startsWith("98"));
+  return localDigits.startsWith("97") || localDigits.startsWith("98");
 }
 
 export function isValidDemoOtp(phone: string, otp: string, demoModeEnabled: boolean, configuredTestPhones?: readonly string[]): boolean {

@@ -7,10 +7,10 @@ import { isDemoAuthPhone } from "@/lib/auth";
 
 type DemoRole = "customer" | "professional";
 type DemoIdentity = { id?: string; phone: string; role: DemoRole; fullName: string; trade?: string; tradeCategory?: HeroTrade; createdAt: string };
-type AuthState = AuthSnapshot<Session> & { client: SupabaseClient<Database> | null; demoSignIn: (phone: string, role: DemoRole, fullName?: string, tradeCategory?: HeroTrade) => void };
+type AuthState = AuthSnapshot<Session> & { client: SupabaseClient<Database> | null; demoSignIn: (phone: string, role: DemoRole, fullName?: string, tradeCategory?: HeroTrade) => void; signOut: () => Promise<void> };
 const demoStorageKey = "tirkha.demo-auth.v1";
 const activeRoleStorageKey = "tirkha.demo-auth.active-role";
-const demoAuthEnabled = process.env.NEXT_PUBLIC_TIRKHA_DEMO_AUTH === "1" || (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_TIRKHA_LOCAL_MOCK === "1");
+const demoAuthEnabled = process.env.NEXT_PUBLIC_TIRKHA_REAL_SMS_ENABLED !== "1";
 const demoPhoneAllowlist = [...new Set([...DEMO_PHONE_AUTH_NUMBERS, ...(process.env.NEXT_PUBLIC_TIRKHA_DEMO_PHONES || "").split(",").map(value => normalizeNepalPhoneNumber(value)).filter(Boolean)])];
 function roleStorageKey(role: DemoRole) { return `${demoStorageKey}:${role}`; }
 function expectedDemoRole(): DemoRole {
@@ -63,7 +63,7 @@ function readDemoSession(): Session | null {
   } catch { return null; }
 }
 const initialState: AuthSnapshot<Session> = { session: null, loading: true, error: null };
-const AuthContext = createContext<AuthState>({ client: null, ...initialState, demoSignIn: () => undefined });
+const AuthContext = createContext<AuthState>({ client: null, ...initialState, demoSignIn: () => undefined, signOut: async () => undefined });
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [client, setClient] = useState<SupabaseClient<Database> | null>(null);
   const [state, setState] = useState<AuthSnapshot<Session>>(initialState);
@@ -94,6 +94,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!session) throw new Error("Could not start the local demo session.");
     setState({ session, loading: false, error: null });
   }
-  return <AuthContext.Provider value={{ ...state, client, demoSignIn }}>{children}</AuthContext.Provider>;
+  async function signOut() {
+    const currentRole = state.session?.user.user_metadata.requested_role === "professional" ? "professional" : "customer";
+    if (client) {
+      const { error } = await client.auth.signOut({ scope: "local" });
+      if (error) throw error;
+    }
+    try {
+      window.localStorage.removeItem(roleStorageKey(currentRole));
+      for (const legacyKey of ["tirkha_demo_user", demoStorageKey]) {
+        const raw = window.localStorage.getItem(legacyKey);
+        if (!raw) continue;
+        const identity = JSON.parse(raw) as DemoIdentity;
+        if (identity.role === currentRole) window.localStorage.removeItem(legacyKey);
+      }
+      window.sessionStorage.removeItem(activeRoleStorageKey);
+      document.cookie = "tirkha_demo_role=; Path=/; SameSite=Lax; Max-Age=0";
+    } catch { /* The in-memory session is still cleared if browser storage is unavailable. */ }
+    setState({ session: null, loading: false, error: null });
+  }
+  return <AuthContext.Provider value={{ ...state, client, demoSignIn, signOut }}>{children}</AuthContext.Provider>;
 }
 export const useAuth = () => useContext(AuthContext);

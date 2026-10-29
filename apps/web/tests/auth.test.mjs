@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { authDashboardPath, isDemoAuthPhone, isValidDemoOtp, safeAuthReturnTarget } from "../src/lib/auth.ts";
 
-test("production demo interception only accepts configured test phones", () => {
-  assert.equal(isDemoAuthPhone("+9779800000000", false), true);
-  assert.equal(isValidDemoOtp("9800000000", "123456", false), true);
+test("demo OTP is available for Nepal 97/98 numbers only while demo mode is enabled", () => {
+  assert.equal(isDemoAuthPhone("+9779800000000", true), true);
+  assert.equal(isValidDemoOtp("9800000000", "123456", true), true);
   assert.equal(isDemoAuthPhone("9855029577", false), false);
   assert.equal(isValidDemoOtp("9855029577", "123456", false), false);
   assert.equal(isDemoAuthPhone("+9779812345679", false), false);

@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { MapPin, ArrowUpRight, ArrowRight, Search, ShoppingBag, Wrench, Sparkles, HeartPulse, BookOpen, ShieldCheck, Clock3, Check, Menu, X } from "lucide-react";
 import { REGIONS, catalogMoney, catalogPriceLabel, inRegion, serviceTotal, type CatalogService } from "@tirkha/shared";
 import { useMarketplace } from "./marketplace-provider";
+import { useAuth } from "./auth-provider";
 const categories=[["All services",Sparkles],["Home repairs",Wrench],["Cleaning",Sparkles],["Care & wellness",HeartPulse],["Everyday support",BookOpen]] as const;
 export function ServiceCard({service,compact=false}:{service:CatalogService;compact?:boolean}){
  const {add,setDetail,ready}=useMarketplace();
@@ -17,17 +18,19 @@ export function ServiceCard({service,compact=false}:{service:CatalogService;comp
 }
 export function Marketplace(){
  const {state,services,setRegion,setModal,logout,ready}=useMarketplace();
+ const {session}=useAuth();
  const [query,setQuery]=useState(""),[vertical,setVertical]=useState("All services"),[nav,setNav]=useState(false);
  const filtered=useMemo(()=>services.filter(s=>s.active&&inRegion(s,state.region)&&(vertical==="All services"||s.vertical===vertical)&&
    (s.title+" "+s.category_name+" "+s.description+" "+s.keywords.join(" ")).toLowerCase().includes(query.trim().toLowerCase())),[services,state.region,vertical,query]);
  const count=state.cart.reduce((sum,l)=>sum+l.quantity,0);
+ const signedIn=Boolean(session||state.session);
  return <div className="mk">
   <div className="mk-announcement">A little help. A better everyday. <span>Made for life in Nepal <ArrowUpRight size={12}/></span></div>
   <header className="mk-header"><a href="/" className="mk-brand" aria-label="Tirkha | तिर्खा home"><span className="mk-brand-mark">T<span>•</span></span><span className="mk-brand-name">Tirkha <span className="mk-brand-nepali">| तिर्खा</span></span></a>
    <label className="mk-region"><MapPin size={17}/><span className="sr-only">Service region</span><select value={state.region} onChange={e=>setRegion(e.target.value as typeof state.region)}>{REGIONS.map(r=><option key={r}>{r}</option>)}</select></label>
    <nav className={nav?"mk-nav mk-nav-open":"mk-nav"} aria-label="Main navigation"><a href="#catalog" onClick={()=>setNav(false)}>Explore services</a><a href="/map" onClick={()=>setNav(false)}>Our map</a><a href="#how-it-works" onClick={()=>setNav(false)}>How it works</a><button onClick={()=>{setModal("orders");setNav(false);}}>My demo bookings</button></nav>
    <div className="mk-header-actions"><button className="mk-bag" onClick={()=>setModal("cart")} aria-label={"Open cart, "+count+" items"}><ShoppingBag size={20}/>{count>0&&<span>{count}</span>}</button>
-   <button className="mk-login" disabled={!ready} onClick={()=>state.session?logout():setModal("auth")}>{state.session?"Sign out demo":"Sign in"}</button><button className="mk-mobile-nav" aria-label={nav?"Close navigation":"Open navigation"} onClick={()=>setNav(!nav)}>{nav?<X/>:<Menu/>}</button></div>
+   <button className="mk-login" disabled={!ready} onClick={()=>signedIn?logout():setModal("auth")}>{signedIn?"Sign out":"Sign in"}</button><button className="mk-mobile-nav" aria-label={nav?"Close navigation":"Open navigation"} onClick={()=>setNav(!nav)}>{nav?<X/>:<Menu/>}</button></div>
   </header>
   <main>
    <section className="mk-hero">
