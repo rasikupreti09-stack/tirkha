@@ -74,7 +74,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       setError("Choose a trade category to continue as a Hero.");
       return;
     }
-    demoSignIn(canonicalPhone, role, name || "Tirkha Demo User", role === "professional" ? tradeCategory || undefined : undefined);
+    const demoTrade = role === "professional" ? tradeCategory || "PLUMBING" : undefined;
+    demoSignIn(canonicalPhone, role, name || "Tirkha Demo User", demoTrade);
     const selectedRole = role === "professional" ? "hero" : "customer";
     document.cookie = "tirkha_demo_role=" + selectedRole + "; Path=/; SameSite=Lax; Max-Age=604800";
     const targetRoute = explicitReturnTo ?? authDashboardPath(role);
@@ -124,6 +125,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     lock.current = true;
     setBusy(true);
     setError("");
+    let smsRequestStarted = false;
     try {
       const canonicalPhone = phoneSchema.parse(normalizedPhone);
       if (!verify && signup) {
@@ -133,6 +135,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
       if (!client) throw new Error("Supabase phone authentication is not configured. Enable demo mode or configure Supabase.");
       const auth = createPhoneAuth(client);
+      smsRequestStarted = !verify;
       const result = verify
         ? await auth.verifyPhoneOtp(canonicalPhone, token)
         : await auth.signInWithPhone(canonicalPhone, signup ? {
@@ -148,8 +151,16 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         setCooldown(60);
       }
     } catch (failure) {
-      setError(failure instanceof Error && failure.message.startsWith("Choose a trade category")
-        ? failure.message : phoneAuthError(failure));
+      if (!verify && smsRequestStarted && demoAuthEnabled && isDemoAuthPhone(normalizedPhone, true, demoPhoneAllowlist)) {
+        setError("");
+        setSent(true);
+        setDemoCodeSent(true);
+        setToken("");
+        setCooldown(0);
+      } else {
+        setError(failure instanceof Error && failure.message.startsWith("Choose a trade category")
+          ? failure.message : phoneAuthError(failure));
+      }
     } finally {
       lock.current = false;
       setBusy(false);
@@ -166,11 +177,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         </div>
         <p className="mb-4 text-sm text-muted-foreground">Use your Nepal mobile number. Email is optional and is not needed to sign in.</p>
         {(error || (!client && !canUseDemo && sessionError)) && <p role="alert" className="mb-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{error || sessionError}</p>}
-        {canUseDemo && <p className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">Demo sign-in works for configured test numbers{demoAuthEnabled ? " or any valid Nepal number while explicit demo mode is enabled" : ""}. Demo OTP: <b>{DEMO_PHONE_AUTH_CODE}</b>. Demo sessions are local and cannot access live dispatch.</p>}
+        {canUseDemo && <p className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">Demo sign-in works for configured test numbers{demoAuthEnabled ? " or valid 97/98 Nepal numbers while explicit demo mode is enabled" : ""}. Demo OTP: <b>{DEMO_PHONE_AUTH_CODE}</b>. Demo sessions are local and cannot access live dispatch.</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={busy} className="space-y-4">
             {signup && <><Label htmlFor="full-name">Full name</Label><Input id="full-name" value={name} onChange={event => setName(event.target.value)} maxLength={100} autoComplete="name" required /></>}
-            {role === "professional" && <><Label htmlFor="trade-category">Trade category</Label><select id="trade-category" className="w-full rounded-md border bg-background p-3" value={tradeCategory} onChange={event => setTradeCategory(event.target.value as HeroTrade | "")} required><option value="">Choose your specialty</option>{HERO_TRADES.map(trade => <option key={trade} value={trade}>{tradeOptions[trade].icon} {tradeOptions[trade].label}</option>)}</select><small className="block text-xs text-muted-foreground">Your requests and Hero dashboard will use this trade category.</small></>}
+            {role === "professional" && signup && <><Label htmlFor="trade-category">Trade category</Label><select id="trade-category" className="w-full rounded-md border bg-background p-3" value={tradeCategory} onChange={event => setTradeCategory(event.target.value as HeroTrade | "")} required><option value="">Choose your specialty</option>{HERO_TRADES.map(trade => <option key={trade} value={trade}>{tradeOptions[trade].icon} {tradeOptions[trade].label}</option>)}</select><small className="block text-xs text-muted-foreground">Your requests and Hero dashboard will use this trade category.</small></>}
             <Label htmlFor="phone">Mobile number</Label>
             <div className="flex overflow-hidden rounded-md border bg-background focus-within:ring-2 focus-within:ring-ring"><span className="flex items-center border-r bg-muted px-3 text-sm font-medium text-foreground" aria-hidden="true">+977</span><Input id="phone" className="rounded-none border-0 shadow-none focus-visible:ring-0" type="tel" inputMode="numeric" autoComplete="tel-national" placeholder="98XXXXXXXX" value={phone} readOnly={sent} onChange={event => { const digits = event.target.value.replace(/\D/g, ""); setPhone((digits.startsWith("977") ? digits.slice(3) : digits).slice(-10)); }} maxLength={10} pattern="9[0-9]{9}" aria-describedby="phone-help" required /></div>
             <small id="phone-help" className="text-xs text-muted-foreground">Enter your 10-digit Nepal mobile number. The +977 code is added automatically.</small>
