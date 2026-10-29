@@ -11,6 +11,7 @@ import { HeroCustomerContact } from "@/components/hero-customer-contact";
 import { HeroJobLocationMap } from "@/components/hero-job-location-map";
 import { BookingChatDrawer } from "@/components/booking-chat-drawer";
 import { BookingCall } from "@/components/booking-call";
+import { HeroRouteGuard } from "@/components/hero-route-guard";
 import { Button } from "@/components/ui/button";
 
 const tradeLabels: Record<HeroTrade, string> = { PLUMBING: "🚰 Plumber (प्लम्बर)", ELECTRICAL: "⚡ Electrician (इलेक्ट्रीशियन)", APPLIANCE_TECHNICIAN: "🔌 Appliance Repair (उपकरण मर्मत)", BEAUTICIAN: "✨ Beautician (सौन्दर्य सेवा)", PAINTER: "🎨 Painter (पेन्टर)", CLEANER: "🧹 Cleaner / Maid (सरसफाई)", HANDYMAN: "🛠️ General Handyman / Repair (सामान्य मर्मत)" };
@@ -30,6 +31,10 @@ function getCurrentCoordinates() {
 }
 
 export default function HeroDashboardPage() {
+  return <HeroRouteGuard><HeroDashboardContent /></HeroRouteGuard>;
+}
+
+function HeroDashboardContent() {
   const { client, session, loading } = useAuth();
   const router = useRouter();
   const [access, setAccess] = useState<HeroAccess | null>(null);

@@ -5,6 +5,7 @@
   "version": "0.0.0",
   "exports": {
     "./payments-server": "./src/esewa-server.ts",
+    "./phone-auth": "./src/phone-auth.ts",
     ".": "./src/index.ts",
     "./tokens": "./src/tokens.json",
     "./theme.css": "./src/theme.css",

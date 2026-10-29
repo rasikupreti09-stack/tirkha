@@ -99,8 +99,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     const rawDigits = phone.replace(/\D/g, "");
-    const isDemo = rawDigits.startsWith("98")
-      || (demoAuthEnabled && phoneSchema.safeParse(normalizeNepalPhoneNumber(rawDigits)).success);
+    const isDemo = isDemoAuthPhone(normalizedPhone, demoAuthEnabled, demoPhoneAllowlist);
     event.preventDefault();
     event.stopPropagation();
 
@@ -167,7 +166,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         </div>
         <p className="mb-4 text-sm text-muted-foreground">Use your Nepal mobile number. Email is optional and is not needed to sign in.</p>
         {(error || (!client && !canUseDemo && sessionError)) && <p role="alert" className="mb-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{error || sessionError}</p>}
-        {canUseDemo && <p className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">Demo sign-in works for Nepal numbers beginning with 98{demoAuthEnabled ? " and any valid Nepal number while demo mode is enabled" : ""}. Demo OTP: <b>{DEMO_PHONE_AUTH_CODE}</b>. Demo sessions are local and cannot access live dispatch.</p>}
+        {canUseDemo && <p className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">Demo sign-in works for configured test numbers{demoAuthEnabled ? " or any valid Nepal number while explicit demo mode is enabled" : ""}. Demo OTP: <b>{DEMO_PHONE_AUTH_CODE}</b>. Demo sessions are local and cannot access live dispatch.</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={busy} className="space-y-4">
             {signup && <><Label htmlFor="full-name">Full name</Label><Input id="full-name" value={name} onChange={event => setName(event.target.value)} maxLength={100} autoComplete="name" required /></>}

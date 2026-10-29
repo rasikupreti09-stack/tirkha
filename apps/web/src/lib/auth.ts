@@ -1,11 +1,9 @@
-import { DEMO_PHONE_AUTH_NUMBERS, normalizeNepalPhoneNumber, phoneSchema } from "@tirkha/shared";
+import { DEMO_PHONE_AUTH_NUMBERS, normalizeNepalPhoneNumber, phoneSchema } from "@tirkha/shared/phone-auth";
 
-/** Demo mode is opt-in; the fixed sample numbers are always safe to intercept locally. */
+/** Demo OTP is limited to configured test numbers unless explicit demo mode is enabled. */
 export function isDemoAuthPhone(phone: string, demoModeEnabled: boolean, configuredTestPhones: readonly string[] = DEMO_PHONE_AUTH_NUMBERS): boolean {
   const normalized = normalizeNepalPhoneNumber(phone);
   if (!phoneSchema.safeParse(normalized).success) return false;
-  const localDigits = normalized.replace(/\D/g, "").replace(/^977/, "");
-  if (localDigits.startsWith("98")) return true;
   if (demoModeEnabled) return true;
   return configuredTestPhones.some(testPhone => normalizeNepalPhoneNumber(testPhone) === normalized);
 }

@@ -5,12 +5,17 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Banknote, CircleDollarSign, ReceiptText } from "lucide-react";
 import { catalogMoney, type CompletedTransaction } from "@tirkha/shared";
 import { useAuth } from "@/components/auth-provider";
+import { HeroRouteGuard } from "@/components/hero-route-guard";
 
 type WalletSummary = { gross_paisa: number; commission_paisa: number; net_paisa: number; cod_commission_receivable_paisa: number };
 const blankWallet: WalletSummary = { gross_paisa: 0, commission_paisa: 0, net_paisa: 0, cod_commission_receivable_paisa: 0 };
 const PAGE_SIZE = 25;
 
 export default function HeroHistoryPage() {
+  return <HeroRouteGuard><HeroHistoryContent /></HeroRouteGuard>;
+}
+
+function HeroHistoryContent() {
   const { client, session, loading } = useAuth();
   const router = useRouter();
   const [summary, setSummary] = useState(blankWallet);
