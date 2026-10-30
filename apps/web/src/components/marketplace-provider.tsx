@@ -9,6 +9,7 @@ import { SiteFooter } from "./footer";
 import { LegalModals } from "./legal-modals";
 
 const storageKey="tirkha.marketplace.v1";
+const checkoutAfterLoginKey="tirkha.marketplace.checkout-after-login";
 const initial:MarketplaceState={version:1,region:"Kathmandu Valley",cart:[],session:null,orders:[],diagnostic_draft:null};
 type Modal="auth"|"cart"|"orders"|null;
 export type LegalTopic="about"|"terms"|"privacy"|"cancellation"|"grievance";
@@ -22,7 +23,7 @@ type Store={
 const Context=createContext<Store|null>(null);
 export function useMarketplace(){const value=useContext(Context);if(!value)throw new Error("Marketplace provider missing");return value;}
 export function MarketplaceProvider({children}:{children:ReactNode}){
- const {client,signOut:clearAuthSession}=useAuth();
+ const {client,session:authSession,loading:authLoading,signOut:clearAuthSession}=useAuth();
  const [state,setState]=useState(initial);
  const [services,setServices]=useState(()=>catalogServiceSchema.array().parse(seed).map(applyCatalogPriceOverride));
  const [ready,setReady]=useState(false),[notice,setNotice]=useState(""),[modal,setModal]=useState<Modal>(null),[detail,setDetail]=useState<string|null>(null),[legalModal,setLegalModal]=useState<LegalTopic|null>(null);
@@ -39,6 +40,21 @@ export function MarketplaceProvider({children}:{children:ReactNode}){
    const update=(event:StorageEvent)=>{if(event.key===storageKey){try{setState(restore(event.newValue));}catch{setNotice("Could not read the other tab's changes.");}}};
    window.addEventListener("storage",update);return()=>window.removeEventListener("storage",update);
  },[]);
+ useEffect(()=>{
+   if(!ready||authLoading||!authSession)return;
+   const requestedRole=authSession.user.user_metadata.requested_role;
+   if(requestedRole==="professional")return;
+   const phone=authSession.user.phone;
+   if(!phone)return;
+   const expires=authSession.expires_at?authSession.expires_at*1000:Date.now()+7*86400000;
+   setState(current=>current.session?.phone===phone&&current.session.expires> Date.now()?current:{...current,session:{phone,expires}});
+   let resumeCheckout=checkoutAfterLogin.current;
+   try{
+     resumeCheckout=resumeCheckout||sessionStorage.getItem(checkoutAfterLoginKey)==="1";
+     if(resumeCheckout)sessionStorage.removeItem(checkoutAfterLoginKey);
+   }catch{/* Session storage is optional; a return to the cart still works in this tab. */}
+   if(resumeCheckout){checkoutAfterLogin.current=false;setModal("cart");setNotice("You’re signed in. Continue to the address step to place your map pin.");}
+ },[ready,authLoading,authSession]);
  useEffect(()=>{if(ready)try{const data=JSON.stringify(state);if(localStorage.getItem(storageKey)!==data)localStorage.setItem(storageKey,data);}catch{setNotice("Browser storage is unavailable. Keep this tab open to retain your demo cart.");}},[state,ready]);
  useEffect(()=>{if(!client)return;const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),8000);
    void (async()=>{try{const {data,error}=await client.from("service_offerings").select("*").eq("active",true).order("sort_order").abortSignal(controller.signal);
@@ -55,11 +71,11 @@ export function MarketplaceProvider({children}:{children:ReactNode}){
    const service=services.find(s=>s.id===id&&s.active);if(!service)return;
    setState(s=>{const line=s.cart.find(l=>l.id===id);return {...s,cart:line?s.cart.map(l=>l.id===id?{...l,quantity:Math.min(10,l.quantity+1)}:l):[...s.cart,{id,quantity:1}]};});
    setNotice(service.title+" added to your cart");
-   if(checkout){setDetail(null);checkoutAfterLogin.current=true;setModal(state.session?"cart":"auth");}
+   if(checkout){setDetail(null);checkoutAfterLogin.current=true;if(!state.session)try{sessionStorage.setItem(checkoutAfterLoginKey,"1");}catch{/* The return marker is best-effort; the cart itself remains persisted. */}setModal(state.session?"cart":"auth");}
  }
  function open(next:Modal){checkoutAfterLogin.current=false;setModal(next);}
- function requireCheckoutAuth(){checkoutAfterLogin.current=true;setModal("auth");}
- function login(phone:string){setState(s=>({...s,session:{phone:phone.trim().slice(0,64)||"Demo guest",expires:Date.now()+7*86400000}}));setModal(checkoutAfterLogin.current?"cart":null);checkoutAfterLogin.current=false;setNotice("Demo session ready. No SMS sent.");}
+ function requireCheckoutAuth(){checkoutAfterLogin.current=true;try{sessionStorage.setItem(checkoutAfterLoginKey,"1");}catch{/* The return marker is best-effort; the cart itself remains persisted. */}setModal("auth");}
+ function login(phone:string){setState(s=>({...s,session:{phone:phone.trim().slice(0,64)||"Demo guest",expires:Date.now()+7*86400000}}));setModal(checkoutAfterLogin.current?"cart":null);checkoutAfterLogin.current=false;try{sessionStorage.removeItem(checkoutAfterLoginKey);}catch{/* Optional resume marker. */}setNotice("Demo session ready. No SMS sent.");}
  function place(input:Pick<DemoOrder,"address"|"pin"|"scheduled"|"payment_method"|"payment_status"|"payment_reference">){
    if(!state.session)throw new Error("Start a demo session first.");
    if(!state.cart.length)throw new Error("Add a service to your cart.");

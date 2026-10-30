@@ -1,8 +1,12 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { DURATION_OPTIONS, NEPAL_AREA_SUGGESTIONS, formatNpr, hourlyRateLabel, formatBookingDate } from "@tirkha/shared";
+import { DIAGNOSTIC_PREFILL_STORAGE_KEY, diagnosticBookingPrefillSchema, DURATION_OPTIONS, NEPAL_AREA_SUGGESTIONS, formatNpr, hourlyRateLabel, formatBookingDate } from "@tirkha/shared";
 import { useBookingDraft } from "@/hooks/use-booking-draft";
+import { useAuth } from "./auth-provider";
+import { useMarketplace } from "./marketplace-provider";
 import { AccountGate } from "./account-gate";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -12,9 +16,46 @@ import { LocationPicker } from "./location-picker";
 
 export function BookingForm() {
   const params = useSearchParams();
+  const { session, loading } = useAuth();
   const slug = params.get("category") || "";
   const inspectionOnly = params.get("inspection") === "1";
+  if (loading) return <main className="p-8" role="status">Checking your account…</main>;
+  if (session?.user.app_metadata.demo_auth === true) return <DemoBookingHandoff slug={slug} />;
   return <AccountGate roles={["customer"]}>{() => <BookingFields key={`${slug}:${inspectionOnly}`} slug={slug} inspectionOnly={inspectionOnly} />}</AccountGate>;
+}
+
+/** Demo OTP creates a browser-only identity, so route demo checkout through the
+ * already-local marketplace flow instead of attempting a Supabase booking write. */
+function DemoBookingHandoff({ slug }: { slug: string }) {
+  const router = useRouter();
+  const { ready, state, services, add, addDiagnostic } = useMarketplace();
+  const initiated = useRef(false);
+  const [message, setMessage] = useState("Preparing your demo checkout…");
+  useEffect(() => {
+    if (!ready || !state.session || initiated.current) return;
+    let prefill: ReturnType<typeof diagnosticBookingPrefillSchema.parse> | null = null;
+    try {
+      const raw = sessionStorage.getItem(DIAGNOSTIC_PREFILL_STORAGE_KEY);
+      if (raw) {
+        const parsed = diagnosticBookingPrefillSchema.safeParse(JSON.parse(raw));
+        if (parsed.success) prefill = parsed.data;
+      }
+    } catch { /* Continue using the selected catalog service without a draft. */ }
+    const serviceSlug = prefill?.category_slug || slug;
+    const service = services.find(item => item.active && item.category_slug === serviceSlug);
+    if (!service) {
+      initiated.current = true;
+      setMessage("This demo request could not be matched to a catalog service. Browse the catalog and choose a service to continue.");
+      return;
+    }
+    initiated.current = true;
+    if (prefill) {
+      addDiagnostic(service.id, prefill.diagnostic);
+      try { sessionStorage.removeItem(DIAGNOSTIC_PREFILL_STORAGE_KEY); } catch { /* The saved cart remains usable. */ }
+    } else add(service.id, true);
+    router.replace("/");
+  }, [ready, state.session, services, slug, add, addDiagnostic, router]);
+  return <main className="mx-auto grid min-h-[60vh] max-w-xl place-items-center px-6 py-12"><section className="w-full rounded-2xl border bg-white p-7"><p className="text-xs font-semibold uppercase tracking-widest text-emerald-800">Tirkha demo checkout</p><h1 className="mt-3 text-2xl font-semibold">Continue your service request</h1><p className="mt-3 text-sm text-slate-600" role="status">{message}</p>{initiated.current && <Link className="mt-5 inline-flex min-h-11 items-center rounded-md bg-slate-900 px-4 font-medium text-white" href="/">Browse services</Link>}<p className="mt-4 text-xs text-slate-500">Demo requests stay in this browser and do not create a live dispatch. The address step includes the interactive pin map.</p></section></main>;
 }
 function BookingFields({ slug, inspectionOnly }: { slug: string; inspectionOnly: boolean }) {
   const form = useBookingDraft(slug, inspectionOnly);
