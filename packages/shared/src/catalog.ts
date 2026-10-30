@@ -26,35 +26,87 @@ export function codCommissionPaisa(grossPaisa:number,basisPoints=COD_COMMISSION_
  if(!Number.isInteger(basisPoints)||basisPoints<1000||basisPoints>1500)throw new RangeError("COD commission must be between 10% and 15%.");
  return Math.floor((grossPaisa*basisPoints+5000)/10000);
 }
+const romanizedAliases: [RegExp,string][] = [
+ [/\b(?:kharab(?:e+|i)?|kharbi+|kharabi+)\b/gu,"fault broken repair problem"],
+ [/\b(?:paani+|pani+)\b/gu,"water"],
+ [/\b(?:daktar|doctor)\b/gu,"doctor healthcare"],
+ [/\b(?:nars|nurse|nursing)\b/gu,"nurse healthcare"],
+ [/\b(?:bihe|bihay|bibaha|wedding)\b/gu,"wedding event decoration"],
+ [/\b(?:decorations?|decorate|sajawat)\b/gu,"decoration event"],
+];
+const serviceIntentRules: { pattern:RegExp; ids:string[] }[] = [
+ {pattern:/\b(nurse|nursing|caregiver|elderly)\b/u,ids:["home-nurse"]},
+ {pattern:/\b(doctor|daktar)\b/u,ids:["doctor-home"]},
+ {pattern:/\b(physio|physiotherapy)\b/u,ids:["physiotherapy"]},
+ {pattern:/\b(health|healthcare|medical|swasthya)\b/u,ids:["doctor-home","home-nurse","physiotherapy"]},
+ {pattern:/\b(bihe|bihay|bibaha|wedding|decor|decoration|party|event|sajawat)\b/u,ids:["home-decorator"]},
+];
+const SEARCH_STOP_WORDS=new Set(["a","an","the","for","to","of","in","on","at","my","ko","ma","mero","ra","wa","please","help","need","chahiyo","service","services","nearby","near","find"]);
+export function normalizeServiceSearchQuery(query:string){
+ let normalized=query.normalize("NFKC").toLocaleLowerCase().replace(/([a-z])\1{2,}/gu,"$1$1").replace(/[^\p{L}\p{N}\s-]/gu," ").replace(/\s+/gu," ").trim();
+ for(const [pattern,replacement] of romanizedAliases)normalized=normalized.replace(pattern,replacement);
+ return normalized.replace(/\s+/gu," ").trim();
+}
+export function getServiceQuickRecommendations(query:string,services:CatalogService[]){
+ const normalized=normalizeServiceSearchQuery(query);
+ for(const rule of serviceIntentRules){
+  if(!rule.pattern.test(normalized))continue;
+  const matches=rule.ids.map(id=>services.find(service=>service.id===id)).filter((service):service is CatalogService=>Boolean(service));
+  if(matches.length)return matches;
+ }
+ return [];
+}
+function editDistanceAtMostOne(left:string,right:string){
+ if(Math.abs(left.length-right.length)>1)return false;
+ let i=0,j=0,edits=0;
+ while(i<left.length&&j<right.length){
+  if(left[i]===right[j]){i++;j++;continue;}
+  if(++edits>1)return false;
+  if(left.length>right.length)i++;else if(right.length>left.length)j++;else{i++;j++;}
+ }
+ return edits+(i<left.length||j<right.length?1:0)<=1;
+}
+function searchTokens(value:string){return normalizeServiceSearchQuery(value).split(/\s+/u).filter(token=>token.length>1&&!SEARCH_STOP_WORDS.has(token));}
+function serviceSearchScore(query:string,service:CatalogService){
+ const queryTokens=searchTokens(query);
+ const indexTokens=searchTokens(`${service.title} ${service.category_name} ${service.category_slug} ${service.vertical} ${service.description} ${service.keywords.join(" ")}`);
+ return queryTokens.reduce((score,queryToken)=>score+(indexTokens.some(indexToken=>indexToken===queryToken||indexToken.startsWith(queryToken)||(queryToken.length>=5&&indexToken.length>=5&&queryToken[0]===indexToken[0]&&editDistanceAtMostOne(queryToken,indexToken)))?1:0),0);
+}
+export function catalogServiceMatchesQuery(service:CatalogService,query:string){
+ if(!query.trim())return true;
+ const recommendations=getServiceQuickRecommendations(query,[service]);
+ if(recommendations.length)return true;
+ return serviceSearchScore(query,service)>0;
+}
 const romanNepaliIntents:[RegExp,string][]=[
- [/\b(dhara|tap)\b.*\b(leak|leek|leaking|chuh|chuhi|bhairako|bhairacha|bhayeko)\b|\b(leak|leek)\b.*\b(dhara|tap)\b/,"sink-leak"],
- [/\b(fohor|dirty|gandha)\b.*\b(tank|inar|reservoir|cleaning)\b|\b(tank|inar)\b.*\b(clean|cleaning|safa)\b/,"tank-clean"],
- [/\b(jyotish|jyotisi|jotish|kundali)\b/,"astrology-session"],
- [/\b(doctor|daktar)\b.*\b(home|ghar|visit|consultation)\b|\b(home|ghar)\b.*\b(doctor|daktar)\b/,"doctor-home"],
- [/\b(batti|bijuli|light)\b.*\b(na|chaina|chhaina|gako|aako|aaena|balyena)\b|\b(na-aako|naako)\b/,"electrical-wiring"],
- [/\b(fohor|dirty)\b.*\b(ghar|home|clean|cleaning)\b/,"deep-clean"],
+ [/\b(dhara|tap)\b.*\b(leak|leek|leaking|chuh|chuhi|bhairako|bhairacha|bhayeko)\b|\b(leak|leek)\b.*\b(dhara|tap)\b/u,"sink-leak"],
+ [/\b(fohor|dirty|gandha)\b.*\b(tank|inar|reservoir|cleaning)\b|\b(tank|inar)\b.*\b(clean|cleaning|safa)\b/u,"tank-clean"],
+ [/\b(jyotish|jyotisi|jotish|kundali)\b/u,"astrology-session"],
+ [/\b(doctor|daktar)\b.*\b(home|ghar|visit|consultation)\b|\b(home|ghar)\b.*\b(doctor|daktar)\b/u,"doctor-home"],
+ [/\b(batti|bijuli|light)\b.*\b(na|chaina|chhaina|gako|aako|aaena|balyena)\b|\b(na-aako|naako)\b/u,"electrical-wiring"],
+ [/\b(fohor|dirty)\b.*\b(ghar|home|clean|cleaning)\b/u,"deep-clean"],
 ];
 function romanizedNepaliIntent(query:string,services:CatalogService[]){
- const normalized=query.toLowerCase().replace(/[^a-z0-9\s-]/g," ").replace(/\s+/g," ").trim();
+ const normalized=normalizeServiceSearchQuery(query);
  for(const [pattern,id] of romanNepaliIntents){if(pattern.test(normalized)){const service=services.find(item=>item.id===id);if(service)return [service];}}
  return [];
 }
 export function matchServices(query:string, services:CatalogService[]):CatalogService[]{
+ const quickRecommendations=getServiceQuickRecommendations(query,services);if(quickRecommendations.length)return quickRecommendations;
  const nepali=romanizedNepaliIntent(query,services);if(nepali.length)return nepali;
- const words=query.toLowerCase().replace(/[^a-z0-9\s]/g," ").split(/\s+/).filter(w=>w.length>2);
- const ranked=services.map(service=>({service,score:words.reduce((n,w)=>n+service.keywords.filter(k=>w===k || (k.length>3 && w.startsWith(k))).length,0)}))
+ const ranked=services.map(service=>({service,score:serviceSearchScore(query,service)}))
  .filter(r=>r.score>0).sort((a,b)=>b.score-a.score || a.service.sort_order-b.service.sort_order);
  if(ranked.length>1&&ranked[0].score>=ranked[1].score+2)return [ranked[0].service];
  return ranked.slice(0,3).map(r=>r.service);
 }
 export function isRomanizedNepali(query:string){
- const q=query.toLowerCase();
- return /\b(dhara|bhairako|bhairacha|chha|cha|fohor|safa|ghar|jyotish|jyotisi|jotish|batti|bijuli|na-aako|aaena|aako|garna|garnu|chahiyo|milcha|huncha|kripaya|tapai|mero|ma|ko|lai)\b/.test(q);
+ const pattern=/\b(dhara|bhairako|bhairacha|chha|cha|fohor|safa|ghar|jyotish|jyotisi|jotish|batti|bijuli|na-aako|aaena|aako|garna|garnu|chahiyo|milcha|huncha|kripaya|tapai|mero|ma|ko|lai|paani|bihe|bihay|bibaha|sajawat|kharab(?:e+|i)?|kharbi+|kharabi+)\b/u;
+ return pattern.test(query.normalize("NFKC").toLocaleLowerCase())||pattern.test(normalizeServiceSearchQuery(query));
 }
 export function assistantReply(query:string,services:CatalogService[]){
  const q=query.toLowerCase(),roman=isRomanizedNepali(query);
  if(/cancel|refund|radd|firta/.test(q))return {text:roman?"Ma cancellation process bujhauna sakchhu. Demo booking lai ‘My demo bookings’ bata cancel garna milcha. Live booking ko cancellation option ra kunai lagu hune charge confirm garnu agadi screen ma dekhaincha; payment bhayeko cha bhane refund gateway processing pachi matra settle huncha. Tapai ko booking demo ho ki live?":"I can help clarify the next step. Demo bookings can be cancelled from “My demo bookings.” For a live booking, review the cancellation option and any applicable charge shown before confirming. If payment has already been made, the refund is settled after the payment gateway processes it. Is this a demo booking or a live one?",services:[]};
- if(/\b(area|location|where|pokhara|valley|operate|coverage|kata|kun thau|neighborhood|neighbourhood|landmark)\b/.test(q))return {text:roman?"Tirkha ko catalog Kathmandu, Lalitpur, Bhaktapur ra Pokhara ko lagi dekhaiyeko chha. Tapai le map ma area ra najikko landmark chhanna saknuhuncha. Yo coverage le turuntai Hero available cha bhanne guarantee gardaina; booking availability confirmation aayepachi matra pakka huncha. Kun tole wa landmark bata khojnu bhayeko?":"The catalog currently lists Kathmandu, Lalitpur, Bhaktapur and Pokhara. You can choose a neighborhood or nearby landmark on the map. That does not guarantee immediate provider availability; the appointment is confirmed only after availability is checked. Which area or landmark should I use?",services:[]};
+ if(/\b(area|location|where|nearby|pokhara|valley|operate|coverage|kata|kun thau|neighborhood|neighbourhood|landmark)\b/.test(q))return {text:roman?"Tirkha ko catalog Kathmandu, Lalitpur, Bhaktapur ra Pokhara ko lagi dekhaiyeko chha. Tapai le map ma area ra najikko landmark chhanna saknuhuncha. Yo coverage le turuntai Hero available cha bhanne guarantee gardaina; booking availability confirmation aayepachi matra pakka huncha. Kun tole wa landmark bata khojnu bhayeko?":"The catalog currently lists Kathmandu, Lalitpur, Bhaktapur and Pokhara. You can choose a neighborhood or nearby landmark on the map. That does not guarantee immediate provider availability; the appointment is confirmed only after availability is checked. Which neighborhood or landmark should I use?",services:[]};
  if(/safe|verified|verification|trust|surakshit|bharosa|otp|background/.test(q))return {text:roman?"Live job request verified professionals lai matra dekhaincha. Tapai ko account OTP kasailai share nagarnuhola. Ghar aayepachi app ma dekhaeko provider details sanga pahichan milayera matra kaam suru garnuhola. Doctor/nurse service ko lagi yogya licensed practitioner confirm garnu hola. Yo demo le kasaiko dispatch gardaina.":"For live requests, Tirkha limits access to verified professionals. Keep your OTP private, and check that the person who arrives matches the provider details shown in your booking before work begins. For medical care, confirm the practitioner’s relevant licence and qualifications. A demo booking does not dispatch anyone.",services:[]};
  if(/price|cost|fee|transparent|payment|mulya|kati|pais[a]?/.test(q))return {text:roman?"Service card ma listed labour rate, samaya, included ra excluded kaam chhuttai herna milcha. Parts, material, jatil scope wa range bhanda bahira ko kaam ko price Hero le agadi quote garnu parcha; tapai ko sahmati bina extra kaam hudaina. Yo demo checkout le paisa lidaina. Kun service ko mulya herna chahanu huncha?":"Each service card shows its listed labour rate, estimated time, inclusions and exclusions. Parts, materials, complex scope, or work outside a stated range require a written quote before proceeding; no extra work should be done without your approval. Demo checkout does not collect money. Which service would you like me to price?",services:[]};
  if(/\b(emergency|chest pain|cannot breathe|can't breathe|unconscious|gas leak|smell gas|electric shock|sparking|fire|saas|chhati dukh|gas gandha|current lagyo)\b/.test(q))return {text:roman?"Yo urgent safety risk huna sakcha. Kripaya pahila sabai jana lai jokhim bata tada, surakshit khulla thau ma lanu; gas ko gandha cha bhane flame ra electrical switch nachalaunu. Turuntai local emergency service wa sambandhit utility samparka garnuhola. Tirkha emergency service wa emergency response hoina ra diagnosis gardaina.":"This may be an immediate safety risk. Please move people away from danger first. If you smell gas, avoid flames and electrical switches, leave the area, and contact local emergency services or the relevant utility. Tirkha is not an emergency service or response provider, and I cannot diagnose the cause.",services:[]};

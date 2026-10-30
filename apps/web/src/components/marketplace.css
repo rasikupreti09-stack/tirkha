@@ -271,3 +271,14 @@
 @media(max-width:700px){.mk-portal-grid{grid-template-columns:1fr}.mk-portal-card p{min-height:0}.mk-portal-card{padding:14px}.mk-auth-content{max-height:85dvh;overflow-y:auto}}
 
 .mk-fallback-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.mk-fallback-actions button{min-height:38px;border:1px solid #167451;border-radius:8px;background:#167451;color:white;font-size:11px;font-weight:700}@media(max-width:480px){.mk-fallback-actions{grid-template-columns:1fr}}
+.mk-assistant-service-list{display:grid;gap:8px;margin-top:9px}
+.mk-assistant-service{display:grid;grid-template-columns:76px minmax(0,1fr);gap:9px;overflow:hidden;border:1px solid #dce8df;border-radius:9px;background:#fff;padding:7px}
+.mk-assistant-service>img{width:76px;height:76px;object-fit:cover;border-radius:6px;background:#f1f5f2}
+.mk-assistant-service>div{display:grid;align-content:start;gap:3px;min-width:0}
+.mk-assistant-service>div>span{color:#167451;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.mk-assistant-service>div>b{color:#26372e;font-size:10px;line-height:1.35}
+.mk-assistant-service>div>strong{color:#1f2937;font-size:10px}
+.mk-assistant-service>div>div{display:flex;gap:6px;margin-top:3px}
+.mk-assistant-service button{min-height:28px;padding:4px 7px;border:1px solid #dce5df;border-radius:6px;background:#fff;color:#334155;font-size:8px;font-weight:700;cursor:pointer}
+.mk-assistant-service button:last-child{border-color:#08734f;background:#08734f;color:#fff}
+.mk-assistant-service button:disabled{opacity:.5;cursor:not-allowed}

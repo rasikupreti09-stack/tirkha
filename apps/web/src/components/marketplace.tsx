@@ -1,14 +1,14 @@
 "use client";
 import { useMemo, useState } from "react";
 import { MapPin, ArrowUpRight, ArrowRight, Search, ShoppingBag, Wrench, Sparkles, HeartPulse, BookOpen, ShieldCheck, Clock3, Check, Menu, X } from "lucide-react";
-import { REGIONS, catalogMoney, catalogPriceLabel, inRegion, serviceTotal, type CatalogService } from "@tirkha/shared";
+import { REGIONS, catalogMoney, catalogPriceLabel, catalogServiceMatchesQuery, inRegion, serviceTotal, type CatalogService } from "@tirkha/shared";
 import { useMarketplace } from "./marketplace-provider";
 import { useAuth } from "./auth-provider";
 const categories=[["All services",Sparkles],["Home repairs",Wrench],["Cleaning",Sparkles],["Care & wellness",HeartPulse],["Everyday support",BookOpen]] as const;
 export function ServiceCard({service,compact=false}:{service:CatalogService;compact?:boolean}){
  const {add,setDetail,ready}=useMarketplace();
  return <article className={compact?"mk-card mk-card-compact":"mk-card"}>
-   <button className="mk-image-button" onClick={()=>setDetail(service.id)} aria-label={"View "+service.title}><img src={service.image} alt={service.category_name+" service activity"} loading="lazy" width={900} height={600}/><span className="mk-image-tag">{service.category_name}</span></button>
+   <button className="mk-image-button" onClick={()=>setDetail(service.id)} aria-label={"View "+service.title}><img src={service.image} alt={`Local professional providing ${service.title.toLowerCase()} in a Kathmandu Valley home`} loading="lazy" width={900} height={600}/><span className="mk-image-tag">{service.category_name}</span></button>
    <div className="mk-card-body"><div className="mk-card-meta"><span><Clock3 size={13}/>{service.duration_minutes} min</span><span>At your doorstep</span></div>
      <button className="mk-title-button" onClick={()=>setDetail(service.id)}><h3>{service.title}</h3></button>
      {!compact&&<p>{service.description}</p>}
@@ -20,8 +20,7 @@ export function Marketplace(){
  const {state,services,setRegion,setModal,logout,ready}=useMarketplace();
  const {session}=useAuth();
  const [query,setQuery]=useState(""),[vertical,setVertical]=useState("All services"),[nav,setNav]=useState(false);
- const filtered=useMemo(()=>services.filter(s=>s.active&&inRegion(s,state.region)&&(vertical==="All services"||s.vertical===vertical)&&
-   (s.title+" "+s.category_name+" "+s.description+" "+s.keywords.join(" ")).toLowerCase().includes(query.trim().toLowerCase())),[services,state.region,vertical,query]);
+ const filtered=useMemo(()=>services.filter(s=>s.active&&inRegion(s,state.region)&&(vertical==="All services"||s.vertical===vertical)&&catalogServiceMatchesQuery(s,query)),[services,state.region,vertical,query]);
  const count=state.cart.reduce((sum,l)=>sum+l.quantity,0);
  const signedIn=Boolean(session||state.session);
  return <div className="mk">

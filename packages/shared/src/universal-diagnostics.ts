@@ -63,7 +63,7 @@ export function normalizeDiagnosticText(text: string): string {
     }).join(" ");
 }
 
-const ROMANIZED_NEPALI = /\b(pani|dhara|bhairacha|bhairako|chha|cha|fohor|dhal|bijuli|batti|aayena|aaena|chuhiyo|chuhirako|gandha|lagyo|jaleyo|garnu|chahiyo|mero|tapai|bigryo|bhayo|garna|safa|ghar|kotha|jyotish|saas|ferna|garo|khatra|jhatka|aairacha|aairako|bhayeko|naako)\b/i;
+const ROMANIZED_NEPALI = /\b(pani|dhara|bhairacha|bhairako|chha|cha|fohor|dhal|bijuli|batti|aayena|aaena|chuhiyo|chuhirako|gandha|lagyo|jaleyo|garnu|chahiyo|mero|tapai|bigryo|bhayo|garna|safa|ghar|kotha|jyotish|saas|ferna|garo|khatra|jhatka|aairacha|aairako|bhayeko|naako|bihe|bihay|bibaha|sajawat|kharab(?:e+|i)?|kharbi+|kharabi+)\b/i;
 export function detectUniversalLanguage(text: string): UniversalLanguage {
   if (/[\u0900-\u097f]/u.test(text)) return "nepali_devanagari";
   return ROMANIZED_NEPALI.test(normalizeDiagnosticText(text)) ? "nepali_romanized" : "english";

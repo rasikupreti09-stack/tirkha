@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import seed from "../src/service-catalog.json" with { type: "json" };
-import { assistantReply, catalogServiceSchema, codCommissionPaisa, matchServices, serviceTotal } from "../src/catalog.ts";
+import { assistantReply, catalogServiceMatchesQuery, catalogServiceSchema, codCommissionPaisa, getServiceQuickRecommendations, matchServices, normalizeServiceSearchQuery, serviceTotal } from "../src/catalog.ts";
 import { buildDemoPaymentQrUrl } from "../src/payments.ts";
 
 test("seeded marketplace catalog has complete scopes, usable images and integer NPR estimates", () => {
@@ -45,6 +45,22 @@ test("Romanized Nepali service phrases map to catalog entries and mirror the rep
     else assert.match(answer.text, /tapai|tapai le/i, query);
   }
   assert.match(assistantReply("My kitchen tap is leaking", seed).text, /These services match/);
+});
+
+test("messy Romanized Nepali faults normalize and stay searchable", () => {
+  for (const spelling of ["kharabeee", "kharbi", "kharabi"]) {
+    const matches = matchServices(`tap ko ${spelling}`, seed).map(service => service.id);
+    assert.ok(matches.includes("sink-leak"), `${spelling} should find tap repair`);
+    assert.ok(catalogServiceMatchesQuery(seed.find(service => service.id === "sink-leak"), `tap ko ${spelling}`));
+  }
+  assert.match(normalizeServiceSearchQuery("paani leakage"), /water/);
+});
+
+test("healthcare and event keywords produce relevant quick service recommendations", () => {
+  assert.deepEqual(getServiceQuickRecommendations("doctor home visit", seed).map(service => service.id), ["doctor-home"]);
+  assert.deepEqual(getServiceQuickRecommendations("nurse for elderly care", seed).map(service => service.id), ["home-nurse"]);
+  assert.deepEqual(getServiceQuickRecommendations("health service", seed).map(service => service.id), ["doctor-home", "home-nurse", "physiotherapy"]);
+  assert.deepEqual(getServiceQuickRecommendations("bihe party decorations", seed).map(service => service.id), ["home-decorator"]);
 });
 
 test("assistant gives measured follow-up guidance and escalates household hazards", () => {
