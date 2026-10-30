@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { HOME_ISSUES, detectHomeSafetyRisk, diagnosticBookingPrefillSchema, diagnosticDraftSchema, diagnosticLanguageForText, matchHomeIssue, normalizeHomeDiagnosticText } from "../src/home-diagnostics.ts";
+import { romanizeNepaliText } from "../src/universal-diagnostics.ts";
 
  test("home symptom triage recognizes common plumbing and electrical issues without claiming root cause", () => {
   const cases = [
@@ -17,6 +18,12 @@ import { HOME_ISSUES, detectHomeSafetyRisk, diagnosticBookingPrefillSchema, diag
   assert.equal(matchHomeIssue("muddy iron water from supply")?.serviceId, null);
   assert.equal(matchHomeIssue("well pump makes noise and no water")?.serviceId, null);
  });
+
+test("Romanized Nepali UI uses short, readable everyday spellings", () => {
+  assert.equal(romanizeNepaliText("घरायसी सेवा प्रारम्भिक जाँच"), "gharayasi sewa prarambha jaach");
+  assert.equal(romanizeNepaliText("सुरक्षा · प्रमाण · जाँच बुकिङ"), "suraksha · pramaan · jaach booking");
+  assert.equal(romanizeNepaliText("तपाईंको जाँच फेरि सुरु भयो। तपाईंले देख्नुभएको बिजुलीको लक्षण कुनसँग बढी मिल्छ?"), "tapaiko jaach pheri suru bhayo। tapai le dekhnu bhayeko bijuli ko lakshan kun sanga badhi milchha?");
+});
 
 test("hazard cues escalate instead of suggesting DIY repair", () => {
   assert.equal(detectHomeSafetyRisk("sparking and burning smell near outlet"), "electric");

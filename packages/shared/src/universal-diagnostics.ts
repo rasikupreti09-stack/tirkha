@@ -98,7 +98,29 @@ export function romanizeNepaliText(text: string): string {
     else if (char === "्" || char === "़") continue;
     else output += char;
   }
-  return output.replace(/\s+/g, " ").trim();
+  let readable = output.replace(/\s+/g, " ").trim();
+  const commonRomanizedSpellings: readonly [RegExp, string][] = [
+    [/\bgharaayasee\b/giu, "gharayasi"],
+    [/\bsewaa\b/giu, "sewa"],
+    [/\bpraarambhika\b/giu, "prarambha"],
+    [/\bjaancha\b/giu, "jaach"],
+    [/\bsurakshaa\b/giu, "suraksha"],
+    [/\bpramaana\b/giu, "pramaan"],
+    [/\bbukinga\b/giu, "booking"],
+    [/\btapaaeenko\b/giu, "tapaiko"],
+    [/\btapaaeenle\b/giu, "tapai le"],
+    [/\bdekhnubhaeko\b/giu, "dekhnu bhayeko"],
+    [/\bwidyuteeya\b/giu, "bijuli"],
+    [/\bbijuleeko\b/giu, "bijuli ko"],
+    [/\blakshana\b/giu, "lakshan"],
+    [/\bkunasanga\b/giu, "kun sanga"],
+    [/\bbadhee\b/giu, "badhi"],
+    [/\bbhaeko\b/giu, "bhayeko"],
+    [/\bkaamaaghi\b/giu, "kaam agadi"],
+    [/\bgarnuparchha\b/giu, "garnu parchha"],
+  ];
+  for (const [pattern, replacement] of commonRomanizedSpellings) readable = readable.replace(pattern, replacement);
+  return readable;
 }
 
 export type DiagnosticSeverity = "routine" | "soon" | "urgent";

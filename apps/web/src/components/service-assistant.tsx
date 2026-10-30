@@ -104,7 +104,7 @@ export function ServiceAssistant() {
       const prompt = state.universal
         ? universalDiagnosticQuestion({ categorySlug: state.universal.categorySlug, categoryName: state.universal.categoryName, symptom: state.symptom, step: state.universal.answers.length, answers: state.universal.answers, language: state.language })?.prompt
         : state.step === "diagnostic" ? questionFor(state.issueId, state.answers.length, state.language, state.answers, state.faultCode)?.prompt : undefined;
-      setMessages([{ id: "restored-session", role: "assistant", text: prompt ? textFor(state.language, `Your diagnostic session has been restored. ${prompt}`, `तपाईंको जाँच सत्र पुनः सुरु भयो। ${prompt}`) : textFor(state.language, "Your diagnostic draft has been restored. Continue with the next step or describe what changed.", "तपाईंको जाँच मस्यौदा पुनः सुरु भयो। अर्को चरणमा जानुहोस् वा के परिवर्तन भयो बताउनुहोस्।") }]);
+      setMessages([{ id: "restored-session", role: "assistant", text: prompt ? textFor(state.language, `Your diagnostic session has been restored. ${prompt}`, `तपाईंको जाँच फेरि सुरु भयो। ${prompt}`) : textFor(state.language, "Your diagnostic draft has been restored. Continue with the next step or describe what changed.", "तपाईंको जाँचको मस्यौदा फेरि खुलेको छ। अब अर्को प्रश्नको जवाफ दिनुहोस् वा के परिवर्तन भयो बताउनुहोस्।") }]);
     }
     setSessionReady(true);
   }, []);
