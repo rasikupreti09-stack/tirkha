@@ -28,7 +28,7 @@
       "pipe",
       "drip"
     ],
-    "image": "/images/tirkha-plumber.webp",
+    "image": "/images/tirkha-service-tap-leak.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -68,7 +68,7 @@
       "drain",
       "water"
     ],
-    "image": "/images/tirkha-plumber.webp",
+    "image": "/images/tirkha-service-pipe-fitting.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -105,7 +105,7 @@
       "plumbing",
       "bathroom"
     ],
-    "image": "/images/tirkha-plumber.webp",
+    "image": "/images/tirkha-service-tap-installation.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -144,7 +144,7 @@
       "socket",
       "fault"
     ],
-    "image": "/images/tirkha-electrician.webp",
+    "image": "/images/tirkha-service-wiring-hall.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -180,7 +180,7 @@
       "socket",
       "electrical"
     ],
-    "image": "/images/tirkha-electrician.webp",
+    "image": "/images/tirkha-service-electrical-inspection.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -220,7 +220,7 @@
       "backup",
       "electricity"
     ],
-    "image": "/images/tirkha-electrician.webp",
+    "image": "/images/tirkha-service-inverter-utility-room.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -372,7 +372,7 @@
       "stain",
       "upholstery"
     ],
-    "image": "/images/tirkha-home-care.webp",
+    "image": "/images/tirkha-service-sofa-cleaning.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -448,7 +448,7 @@
       "care",
       "caregiver"
     ],
-    "image": "/images/tirkha-home-doctor.webp",
+    "image": "/images/tirkha-service-home-nurse.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -486,7 +486,7 @@
       "back",
       "joint"
     ],
-    "image": "/images/tirkha-home-doctor.webp",
+    "image": "/images/tirkha-service-physiotherapy.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -716,7 +716,7 @@
       "sink jam",
       "dhal"
     ],
-    "image": "/images/tirkha-plumber.webp",
+    "image": "/images/tirkha-service-drain-clearing.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -754,7 +754,7 @@
       "water motor",
       "paani motor"
     ],
-    "image": "/images/tirkha-plumber.webp",
+    "image": "/images/tirkha-service-sump-pump.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
@@ -828,7 +828,7 @@
       "single phase",
       "trip"
     ],
-    "image": "/images/tirkha-electrician.webp",
+    "image": "/images/tirkha-service-mcb-alcove.webp",
     "regions": [
       "Kathmandu",
       "Lalitpur",
