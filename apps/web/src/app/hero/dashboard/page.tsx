@@ -15,7 +15,7 @@ import { HeroRouteGuard } from "@/components/hero-route-guard";
 import { Button } from "@/components/ui/button";
 
 const tradeLabels: Record<HeroTrade, string> = { PLUMBING: "🚰 Plumber (प्लम्बर)", ELECTRICAL: "⚡ Electrician (इलेक्ट्रीशियन)", APPLIANCE_TECHNICIAN: "🔌 Appliance Repair (उपकरण मर्मत)", BEAUTICIAN: "✨ Beautician (सौन्दर्य सेवा)", PAINTER: "🎨 Painter (पेन्टर)", CLEANER: "🧹 Cleaner / Maid (सरसफाई)", HANDYMAN: "🛠️ General Handyman / Repair (सामान्य मर्मत)" };
-const zoneLabels: Record<HeroOperationalZone, string> = { Kathmandu: "Kathmandu", Lalitpur: "Lalitpur", Bhaktapur: "Bhaktapur", Baneshwor: "Baneshwor / New Baneshwor", Thamel: "Thamel", Kirtipur: "Kirtipur" };
+const zoneLabels: Record<HeroOperationalZone, string> = { "Kathmandu Valley": "Kathmandu Valley", Pokhara: "Pokhara" };
 type HeroAccess = { verification_status: "pending" | "verified" | "rejected"; suspended_at: string | null; operational_zone: HeroOperationalZone | null; trade_code: HeroTrade | null; trade_category: HeroTrade | null };
 type WorkBooking = Pick<WorkflowBooking, "id" | "category_id" | "service_address" | "job_details" | "status" | "total_price_paisa" | "scheduled_at" | "latitude" | "longitude">;
 const demoEarningsKey = "tirkha.demo-hero-earnings.v1";

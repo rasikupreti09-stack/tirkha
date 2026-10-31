@@ -5,6 +5,7 @@ import { REGIONS, catalogPriceLabel, catalogServiceMatchesQuery, inRegion, trans
 import { useMarketplace } from "./marketplace-provider";
 import { useAuth } from "./auth-provider";
 import { LanguageSwitcher, useLanguage } from "./language-provider";
+import { TirkhaMark } from "./tirkha-mark";
 const categories: readonly (readonly [UiTranslationKey, typeof Sparkles])[] = [["allServices",Sparkles],["homeRepairs",Wrench],["cleaning",Sparkles],["careWellness",HeartPulse],["everydaySupport",BookOpen]];
 const openingSeenKey = "tirkha.opening-story.seen.v1";
 
@@ -31,13 +32,13 @@ function OpeningStory() {
    <img src="/images/tirkha-hero-team.webp" alt="Tirkha local home-service professionals ready to help" fetchPriority="high"/>
    <div className="mk-opening-shade" aria-hidden="true"/>
    <div className="mk-opening-copy">
-    <p className="mk-opening-brand"><span className="mk-opening-mark">t</span><span>Tirkha <b>| तिर्खा</b></span></p>
+    <p className="mk-opening-brand"><TirkhaMark className="mk-opening-mark"/><span>Tirkha <b>| तिर्खा</b></span></p>
     <span className="mk-opening-kicker">A LITTLE STORY FROM HOME · घरको एउटा सानो कथा</span>
-    <h1 id="mk-opening-title">A tap starts dripping<br/>on a busy morning.</h1>
-    <p id="mk-opening-copy" className="mk-opening-english">Find the right home service, see the details clearly, and book at a time that works for you.</p>
+    <h1 id="mk-opening-title">A little fix.<br/>A fresher home.<br/>More time for you.</h1>
+    <p id="mk-opening-copy" className="mk-opening-english">From repairs and cleaning to care at home, find clear service details and book help that fits your day.</p>
     <div className="mk-opening-divider" aria-hidden="true"><span/><span/><span/></div>
-    <h2 lang="ne">व्यस्त बिहानमै धारा चुहिन थाल्यो?</h2>
-    <p className="mk-opening-nepali" lang="ne">सही घरायसी सेवा छान्नुहोस्, विवरण र मूल्य स्पष्ट हेर्नुहोस्, अनि आफूलाई मिल्ने समयमा बुक गर्नुहोस्।</p>
+    <h2 lang="ne">घरको काम थोरै, फुर्सद अलि बढी।</h2>
+    <p className="mk-opening-nepali" lang="ne">मर्मत, सरसफाइ वा घरमै हेरचाह—आफूलाई चाहिएको सेवा छान्नुहोस्, विवरण बुझ्नुहोस् र मिल्ने समयमा बुक गर्नुहोस्।</p>
     <div className="mk-opening-actions">
      <button ref={exploreRef} type="button" className="mk-opening-cta" onClick={()=>{dismiss();window.setTimeout(()=>document.getElementById("catalog")?.scrollIntoView({behavior:"smooth"}),80);}}>Explore services <span lang="ne">सेवा हेर्नुहोस्</span><ArrowUpRight size={17}/></button>
      <button type="button" className="mk-opening-skip" onClick={dismiss}>Skip intro <span lang="ne">परिचय छोड्नुहोस्</span></button>
@@ -73,7 +74,7 @@ export function Marketplace(){
  const signedIn=Boolean(session||state.session);
  return <><OpeningStory/><div className="mk">
   <div className="mk-announcement">{tr("tagline")} <span>{tr("madeForNepal")} <ArrowUpRight size={12}/></span></div>
-  <header className="mk-header"><a href="/" className="mk-brand" aria-label="Tirkha | तिर्खा home"><span className="mk-brand-mark">T<span>•</span></span><span className="mk-brand-name">Tirkha <span className="mk-brand-nepali">| तिर्खा</span></span></a>
+  <header className="mk-header"><a href="/" className="mk-brand" aria-label="Tirkha | तिर्खा home"><TirkhaMark className="mk-brand-mark"/><span className="mk-brand-name">Tirkha <span className="mk-brand-nepali">| तिर्खा</span></span></a>
    <label className="mk-region"><MapPin size={17}/><span className="sr-only">{language === "np" ? "सेवा क्षेत्र" : "Service region"}</span><select value={state.region} onChange={e=>setRegion(e.target.value as typeof state.region)}>{REGIONS.map(r=><option key={r} value={r}>{translateUi(r === "Pokhara" ? "pokhara" : r === "Kathmandu" ? "city" : r === "Lalitpur" ? "lalitpur" : r === "Bhaktapur" ? "bhaktapur" : "valley",language)}</option>)}</select></label>
    <nav className={nav?"mk-nav mk-nav-open":"mk-nav"} aria-label="Main navigation"><a href="#catalog" onClick={()=>setNav(false)}>{tr("exploreServices")}</a><a href="/map" onClick={()=>setNav(false)}>{tr("ourMap")}</a><a href="#how-it-works" onClick={()=>setNav(false)}>{tr("howItWorks")}</a><button onClick={()=>{setModal("orders");setNav(false);}}>{tr("myBookings")}</button></nav>
    <div className="mk-header-actions"><LanguageSwitcher/><button className="mk-bag" onClick={()=>setModal("cart")} aria-label={language === "np" ? `कार्ट खोल्नुहोस्, ${count} वस्तु` : `Open cart, ${count} items`}><ShoppingBag size={20}/>{count>0&&<span>{count}</span>}</button>
