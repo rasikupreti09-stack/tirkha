@@ -34,11 +34,11 @@ function OpeningStory() {
    <div className="mk-opening-copy">
     <p className="mk-opening-brand"><TirkhaMark className="mk-opening-mark"/><span>Tirkha <b>| तिर्खा</b></span></p>
     <span className="mk-opening-kicker">A LITTLE STORY FROM HOME · घरको एउटा सानो कथा</span>
-    <h1 id="mk-opening-title">A little fix.<br/>A fresher home.<br/>More time for you.</h1>
-    <p id="mk-opening-copy" className="mk-opening-english">From repairs and cleaning to care at home, find clear service details and book help that fits your day.</p>
+    <h1 id="mk-opening-title">Your home,<br/>effortlessly managed.<br/>More time for life.</h1>
+    <p id="mk-opening-copy" className="mk-opening-english">Thoughtful home repairs, cleaning, and care—with clear service details and local professionals ready when you need them.</p>
     <div className="mk-opening-divider" aria-hidden="true"><span/><span/><span/></div>
-    <h2 lang="ne">घरको काम थोरै, फुर्सद अलि बढी।</h2>
-    <p className="mk-opening-nepali" lang="ne">मर्मत, सरसफाइ वा घरमै हेरचाह—आफूलाई चाहिएको सेवा छान्नुहोस्, विवरण बुझ्नुहोस् र मिल्ने समयमा बुक गर्नुहोस्।</p>
+    <h2 lang="ne">घरको झन्झट सधैंलाई बिदा, आफ्नै घरमा आराम र सुविधा।</h2>
+    <p className="mk-opening-nepali" lang="ne">मर्मत, सरसफाइ र घरमै हेरचाह—स्पष्ट विवरणसहित, तपाईंको समयअनुसार विश्वासिलो स्थानीय सेवामा पहुँच।</p>
     <div className="mk-opening-actions">
      <button ref={exploreRef} type="button" className="mk-opening-cta" onClick={()=>{dismiss();window.setTimeout(()=>document.getElementById("catalog")?.scrollIntoView({behavior:"smooth"}),80);}}>Explore services <span lang="ne">सेवा हेर्नुहोस्</span><ArrowUpRight size={17}/></button>
      <button type="button" className="mk-opening-skip" onClick={dismiss}>Skip intro <span lang="ne">परिचय छोड्नुहोस्</span></button>

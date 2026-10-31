@@ -11,6 +11,7 @@ type RoadProperties = { class?: "expressway" | "arterial" | "connector" | "local
 type RoadFeature = { type: "Feature"; id?: string; properties?: RoadProperties; geometry: { type: "LineString"; coordinates: number[][] } };
 type RoadCollection = { type: "FeatureCollection"; features: RoadFeature[] };
 type RoadLabelCandidate = { key: string; name: string; kind: RoadProperties["class"]; positions: LatLngExpression[] };
+type RoadLabelPlacement = { startOffset: number; scale: number };
 type BuildingFeature = { type: "Feature"; id?: string; properties?: { kind?: string; center?: [number, number] }; geometry: { type: "Polygon"; coordinates: number[][][] } };
 type BuildingCollection = { type: "FeatureCollection"; features: BuildingFeature[] };
 const prominentNeighborhoods = new Set([
@@ -67,7 +68,7 @@ function labelPriority(kind: RoadProperties["class"]): number {
 }
 
 function chooseNonCollidingRoadLabels(candidates: RoadLabelCandidate[], map: ReturnType<typeof useMap>, zoom: number) {
-  if (zoom < 14) return new Set<string>();
+  if (zoom < 14) return new Map<string, RoadLabelPlacement>();
   const fontSize = Math.min(15, Math.max(9.5, 9.5 + (zoom - 15.5) * 0.48));
   const bounds = map.getBounds();
   const measure = typeof document !== "undefined" ? document.createElement("canvas").getContext("2d") : null;
@@ -78,37 +79,63 @@ function chooseNonCollidingRoadLabels(candidates: RoadLabelCandidate[], map: Ret
       const points = candidate.positions.map((position) => map.latLngToContainerPoint(position));
       let totalLength = 0;
       for (let index = 1; index < points.length; index += 1) totalLength += points[index - 1].distanceTo(points[index]);
-      let midpoint = points[0];
-      let angle = 0;
-      let remaining = totalLength / 2;
-      for (let index = 1; index < points.length; index += 1) {
-        const segment = points[index - 1].distanceTo(points[index]);
-        if (remaining <= segment) {
-          const ratio = segment ? remaining / segment : 0;
-          midpoint = points[index - 1].add(points[index].subtract(points[index - 1]).multiplyBy(ratio));
-          angle = Math.atan2(points[index].y - points[index - 1].y, points[index].x - points[index - 1].x);
-          break;
-        }
-        remaining -= segment;
-      }
-      const labelWidth = (measure?.measureText(candidate.name).width ?? candidate.name.length * fontSize * 0.62) + 4;
-      const labelHeight = fontSize * 1.35 + 3;
-      const boxWidth = Math.abs(labelWidth * Math.cos(angle)) + Math.abs(labelHeight * Math.sin(angle));
-      const boxHeight = Math.abs(labelWidth * Math.sin(angle)) + Math.abs(labelHeight * Math.cos(angle));
-      return { ...candidate, midpoint, totalLength, labelWidth, rect: { left: midpoint.x - boxWidth / 2, right: midpoint.x + boxWidth / 2, top: midpoint.y - boxHeight / 2, bottom: midpoint.y + boxHeight / 2 }, priority: labelPriority(candidate.kind) };
+      return { ...candidate, points, totalLength, priority: labelPriority(candidate.kind) };
     })
-    .filter((candidate) => bounds.contains(map.containerPointToLatLng(candidate.midpoint)))
     .sort((a, b) => a.priority - b.priority || b.totalLength - a.totalLength);
 
-  const occupied: { left: number; right: number; top: number; bottom: number }[] = [];
-  const selected = new Set<string>();
+  const cellSize = 96;
+  const occupied = new Map<string, { left: number; right: number; top: number; bottom: number }[]>();
+  const placements = new Map<string, RoadLabelPlacement>();
+  const rectCells = (rect: { left: number; right: number; top: number; bottom: number }) => {
+    const keys: string[] = [];
+    for (let x = Math.floor(rect.left / cellSize); x <= Math.floor(rect.right / cellSize); x += 1) {
+      for (let y = Math.floor(rect.top / cellSize); y <= Math.floor(rect.bottom / cellSize); y += 1) keys.push(`${x}:${y}`);
+    }
+    return keys;
+  };
+  const collidingRects = (rect: { left: number; right: number; top: number; bottom: number }) => {
+    const candidatesInCells = new Set(rectCells(rect).flatMap((cell) => occupied.get(cell) ?? []));
+    return [...candidatesInCells].filter((other) => rect.left < other.right && rect.right > other.left && rect.top < other.bottom && rect.bottom > other.top);
+  };
+
   for (const candidate of projected) {
-    const { rect } = candidate;
-    if (occupied.some((other) => rect.left < other.right && rect.right > other.left && rect.top < other.bottom && rect.bottom > other.top)) continue;
-    occupied.push(rect);
-    selected.add(candidate.key);
+    const textWidth = measure?.measureText(candidate.name).width ?? candidate.name.length * fontSize * 0.62;
+    const options: { startOffset: number; scale: number; rect: { left: number; right: number; top: number; bottom: number }; collisions: number }[] = [];
+    for (const scale of [1, 0.9, 0.8, 0.7, 0.62]) {
+      const labelWidth = (textWidth * scale) + 4;
+      for (const startOffset of [50, 36, 64, 22, 78, 10, 90, 5, 95]) {
+        let distance = candidate.totalLength * startOffset / 100;
+        let anchor = candidate.points[0];
+        let angle = 0;
+        for (let index = 1; index < candidate.points.length; index += 1) {
+          const segment = candidate.points[index - 1].distanceTo(candidate.points[index]);
+          if (distance <= segment) {
+            const ratio = segment ? distance / segment : 0;
+            anchor = candidate.points[index - 1].add(candidate.points[index].subtract(candidate.points[index - 1]).multiplyBy(ratio));
+            angle = Math.atan2(candidate.points[index].y - candidate.points[index - 1].y, candidate.points[index].x - candidate.points[index - 1].x);
+            break;
+          }
+          distance -= segment;
+        }
+        if (!bounds.contains(map.containerPointToLatLng(anchor))) continue;
+        const labelHeight = fontSize * scale * 1.35 + 3;
+        const boxWidth = Math.abs(labelWidth * Math.cos(angle)) + Math.abs(labelHeight * Math.sin(angle));
+        const boxHeight = Math.abs(labelWidth * Math.sin(angle)) + Math.abs(labelHeight * Math.cos(angle));
+        const rect = { left: anchor.x - boxWidth / 2, right: anchor.x + boxWidth / 2, top: anchor.y - boxHeight / 2, bottom: anchor.y + boxHeight / 2 };
+        options.push({ startOffset, scale, rect, collisions: collidingRects(rect).length });
+        if (options[options.length - 1].collisions === 0) break;
+      }
+      if (options.length && options[options.length - 1].collisions === 0) break;
+    }
+    if (!options.length) continue;
+    // Keep every in-view name. Prefer a clear placement; if the screen is very
+    // dense, use the smallest overlap and reduced type instead of dropping it.
+    const selected = options.find((option) => option.collisions === 0)
+      ?? options.reduce((best, option) => option.collisions < best.collisions ? option : best);
+    placements.set(candidate.key, { startOffset: selected.startOffset, scale: selected.scale });
+    for (const cell of rectCells(selected.rect)) occupied.set(cell, [...(occupied.get(cell) ?? []), selected.rect]);
   }
-  return selected;
+  return placements;
 }
 
 function orderedForScreenTextPath(positions: LatLngExpression[], map: ReturnType<typeof useMap>) {
@@ -121,7 +148,7 @@ function orderedForScreenTextPath(positions: LatLngExpression[], map: ReturnType
 
 let nextSvgPathLabelId = 0;
 
-function SvgPathName({ pathRef, label, fontSize }: { pathRef: { current: LeafletPolyline | null }; label: string; fontSize: number }) {
+function SvgPathName({ pathRef, label, fontSize, placement = { startOffset: 50, scale: 1 } }: { pathRef: { current: LeafletPolyline | null }; label: string; fontSize: number; placement?: RoadLabelPlacement }) {
   const labelNodeRef = useRef<SVGTextElement | null>(null);
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -131,13 +158,13 @@ function SvgPathName({ pathRef, label, fontSize }: { pathRef: { current: Leaflet
       if (!path.id) path.id = `tirkha-street-path-${nextSvgPathLabelId++}`;
       const labelNode = document.createElementNS("http://www.w3.org/2000/svg", "text");
       labelNode.setAttribute("class", "tirkha-road-inline-label");
-      labelNode.setAttribute("font-size", String(fontSize));
+      labelNode.setAttribute("font-size", String(fontSize * placement.scale));
       labelNode.setAttribute("aria-hidden", "true");
       labelNodeRef.current = labelNode;
       const textPath = document.createElementNS("http://www.w3.org/2000/svg", "textPath");
       textPath.setAttribute("href", `#${path.id}`);
       textPath.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", `#${path.id}`);
-      textPath.setAttribute("startOffset", "50%");
+      textPath.setAttribute("startOffset", `${placement.startOffset}%`);
       textPath.setAttribute("text-anchor", "middle");
       textPath.textContent = label;
       labelNode.appendChild(textPath);
@@ -148,10 +175,11 @@ function SvgPathName({ pathRef, label, fontSize }: { pathRef: { current: Leaflet
       labelNodeRef.current?.remove();
       labelNodeRef.current = null;
     };
-  }, [label, pathRef]);
+  }, [label, pathRef, placement.scale, placement.startOffset]);
   useEffect(() => {
-    labelNodeRef.current?.setAttribute("font-size", String(fontSize));
-  }, [fontSize]);
+    labelNodeRef.current?.setAttribute("font-size", String(fontSize * placement.scale));
+    labelNodeRef.current?.querySelector("textPath")?.setAttribute("startOffset", `${placement.startOffset}%`);
+  }, [fontSize, placement.scale, placement.startOffset]);
   return null;
 }
 
@@ -213,7 +241,7 @@ function CityBlockLayouts() {
       const fillColor = block.landUse === "commercial" ? "#e7e3d6" : block.landUse === "industrial" ? "#dce3df" : "#e0e8df";
       return <Fragment key={block.id}>
         <Polygon positions={block.outline} pathOptions={{ renderer, color: "#fffdf8", weight: zoom >= 18 ? 1.5 : 1, opacity: 0.95, fillColor, fillOpacity: zoom >= 18 ? 0.34 : 0.7, lineJoin: "round", interactive: false }} />
-        {zoom >= 19 && block.buildings.map((outline, index) => <Polygon key={`${block.id}-building-${index}`} positions={outline} pathOptions={{ renderer, color: "#fdfcf8", weight: Math.min(2.6, zoom >= 20 ? 1.25 + (zoom - 20) * 0.34 : 0.9), opacity: 0.98, fillColor: block.landUse === "commercial" ? "#cec9b9" : "#cbd8cc", fillOpacity: 0.92, lineJoin: "round", interactive: false }} />)}
+        {zoom >= 19 && block.buildings.map((outline, index) => <Polygon key={`${block.id}-building-${index}`} positions={outline} pathOptions={{ renderer, color: "#fdfcf8", weight: Math.min(3.15, zoom >= 20 ? 1.35 + (zoom - 20) * 0.36 : 0.9), opacity: 0.98, fillColor: block.landUse === "commercial" ? "#cec9b9" : "#cbd8cc", fillOpacity: 0.92, lineJoin: "round", interactive: false }} />)}
       </Fragment>;
     })}
   </>;
@@ -229,34 +257,34 @@ function CuratedRoadNetwork() {
     return subscribeAfterGesture(map, "zoomend moveend", update);
   }, [map]);
   const fontSize = Math.min(15, Math.max(9.5, 9.5 + (zoom - 15.5) * 0.48));
-  const labelKeys = useMemo(() => chooseNonCollidingRoadLabels(tirkhaRoads.map((road, index) => ({
+  const labelPlacements = useMemo(() => chooseNonCollidingRoadLabels(tirkhaRoads.map((road, index) => ({
     key: String(index),
     name: road.name ?? "",
     kind: road.kind,
     positions: road.points,
   })), map, zoom), [map, zoom]);
   return <>
-    {tirkhaRoads.map((road, index) => <CuratedRoadSegment key={`road-${index}`} road={road} zoom={zoom} fontSize={fontSize} showLabel={labelKeys.has(String(index))} casingRenderer={casingRenderer} roadRenderer={roadRenderer} />)}
+    {tirkhaRoads.map((road, index) => <CuratedRoadSegment key={`road-${index}`} road={road} zoom={zoom} fontSize={fontSize} labelPlacement={labelPlacements.get(String(index))} casingRenderer={casingRenderer} roadRenderer={roadRenderer} />)}
   </>;
 }
 
-function CuratedRoadSegment({ road, zoom, fontSize, showLabel, casingRenderer, roadRenderer }: {
+function CuratedRoadSegment({ road, zoom, fontSize, labelPlacement, casingRenderer, roadRenderer }: {
   road: (typeof tirkhaRoads)[number];
   zoom: number;
   fontSize: number;
-  showLabel: boolean;
+  labelPlacement?: RoadLabelPlacement;
   casingRenderer: ReturnType<typeof svg>;
   roadRenderer: ReturnType<typeof svg>;
 }) {
   const pathRef = useRef<LeafletPolyline | null>(null);
-  const widthScale = zoom < 19 ? 1 : Math.min(2.3, 1 + (zoom - 19) * 0.26);
+  const widthScale = zoom < 19 ? 1 : Math.min(2.56, 1 + (zoom - 19) * 0.26);
   const baseWidth = road.kind === "expressway" ? 5.2 : road.kind === "arterial" ? 3.8 : road.kind === "connector" ? 2.5 : 1.35;
   const width = baseWidth * widthScale;
   const color = road.kind === "expressway" ? "#4b7778" : road.kind === "arterial" ? "#829d99" : road.kind === "connector" ? "#b2c0b9" : "#d1d9d2";
   return <Fragment>
     <Polyline positions={road.points} pathOptions={{ color: "#fbfcf9", weight: width + 2.6, opacity: 0.98, lineCap: "round", lineJoin: "round", interactive: false, renderer: casingRenderer }} />
     <Polyline ref={pathRef} positions={road.points} pathOptions={{ color, weight: width, opacity: road.kind === "local" ? 0.92 : 1, lineCap: "round", lineJoin: "round", interactive: false, renderer: roadRenderer }} />
-    {road.name && showLabel && <SvgPathName pathRef={pathRef} label={road.name} fontSize={fontSize} />}
+    {road.name && labelPlacement && <SvgPathName pathRef={pathRef} label={road.name} fontSize={fontSize} placement={labelPlacement} />}
   </Fragment>;
 }
 
@@ -330,28 +358,35 @@ function CuratedLandmarkLabels() {
   }, [map]);
   const visible = useMemo(() => {
     const bounds = map.getBounds().pad(0.08);
-    const detailTier = zoom >= 20 ? 3 : zoom >= 18 ? 2 : zoom >= 16 ? 1 : 0;
-    const fontSize = detailTier >= 3 ? 12.5 : detailTier === 2 ? 11.5 : detailTier === 1 ? 10.5 : 10;
+    const detailTier = zoom >= 24 ? 5 : zoom >= 22 ? 4 : zoom >= 20 ? 3 : zoom >= 18 ? 2 : zoom >= 16 ? 1 : 0;
+    const fontSize = detailTier >= 5 ? 15.5 : detailTier === 4 ? 14 : detailTier === 3 ? 12.5 : detailTier === 2 ? 11.5 : detailTier === 1 ? 10.5 : 10;
     const measure = typeof document !== "undefined" ? document.createElement("canvas").getContext("2d") : null;
     if (measure) measure.font = `800 ${fontSize}px Arial, sans-serif`;
     const occupied: { left: number; right: number; top: number; bottom: number }[] = [];
     return [...tirkhaLandmarks]
       .filter((place) => zoom >= Math.max(place.minZoom, place.kind === "district" ? 10 : 14) && bounds.contains(place.point))
       .sort((a, b) => b.minZoom - a.minZoom)
-      .filter((place) => {
+      .map((place) => {
         const point = map.latLngToContainerPoint(place.point);
         const width = Math.min(210, (measure?.measureText(place.name).width ?? place.name.length * fontSize * 0.62) + 12);
         const height = fontSize + 8;
-        const rect = { left: point.x - width / 2, right: point.x + width / 2, top: point.y - height, bottom: point.y };
-        if (occupied.some(other => rect.left < other.right && rect.right > other.left && rect.top < other.bottom && rect.bottom > other.top)) return false;
-        occupied.push(rect);
-        return true;
+        const offsets: [number, number][] = [[0, -4], [0, -height - 9], [0, 8], [-width / 2 - 10, -4], [width / 2 + 10, -4], [0, -height * 2 - 14], [0, height + 10]];
+        const placements = offsets.map(([x, y]) => {
+          const left = point.x + x - width / 2;
+          const top = point.y + y - height;
+          const rect = { left, right: left + width, top, bottom: top + height };
+          return { offset: [x, y] as [number, number], rect, collisions: occupied.filter(other => rect.left < other.right && rect.right > other.left && rect.top < other.bottom && rect.bottom > other.top).length };
+        });
+        const placement = placements.find((candidate) => candidate.collisions === 0)
+          ?? placements.reduce((best, candidate) => candidate.collisions < best.collisions ? candidate : best);
+        occupied.push(placement.rect);
+        return { ...place, labelOffset: placement.offset };
       });
   }, [map, zoom]);
-  const detailTier = zoom >= 20 ? 3 : zoom >= 18 ? 2 : zoom >= 16 ? 1 : 0;
+  const detailTier = zoom >= 24 ? 5 : zoom >= 22 ? 4 : zoom >= 20 ? 3 : zoom >= 18 ? 2 : zoom >= 16 ? 1 : 0;
   return <>
     {visible.map((place) => <CircleMarker key={place.name} center={place.point} radius={(place.kind === "district" ? 3.2 : 2) + Math.min(detailTier, 2) * 0.35} pathOptions={{ color: "#fffdf8", weight: 1.5, fillColor: place.kind === "district" ? "#16675c" : "#718b83", fillOpacity: 1 }}>
-      <Tooltip permanent direction="top" offset={[0, -4]} className={`${place.kind === "district" ? "tirkha-city-label" : "tirkha-place-label"} ${prominentNeighborhoods.has(place.name.toUpperCase()) ? "tirkha-place-label-hub" : ""} tirkha-label-detail-${detailTier}`}>{place.name}</Tooltip>
+      <Tooltip permanent direction="top" offset={place.labelOffset} className={`${place.kind === "district" ? "tirkha-city-label" : "tirkha-place-label"} ${prominentNeighborhoods.has(place.name.toUpperCase()) ? "tirkha-place-label-hub" : ""} tirkha-label-detail-${detailTier}`}>{place.name}</Tooltip>
     </CircleMarker>)}
   </>;
 }
@@ -382,7 +417,7 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
     return { ...data, features };
   }, [boundsKey, data]);
   const zoom = map.getZoom();
-  const labelKeys = useMemo(() => chooseNonCollidingRoadLabels(visibleData.features.flatMap((feature) => {
+  const labelPlacements = useMemo(() => chooseNonCollidingRoadLabels(visibleData.features.flatMap((feature) => {
     const name = feature.properties?.name || feature.properties?.ref;
     if (!name) return [];
     return [{
@@ -392,13 +427,13 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
       positions: feature.geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude] as [number, number]),
     }];
   }), map, zoom), [map, visibleData.features, zoom]);
-  const labeledRoads = useMemo(() => visibleData.features.filter((feature) => labelKeys.has(roadFeatureKey(feature))), [labelKeys, visibleData.features]);
+  const labeledRoads = useMemo(() => visibleData.features.filter((feature) => labelPlacements.has(roadFeatureKey(feature))), [labelPlacements, visibleData.features]);
   // The bundled country road extract is sparse outside its original four-city
   // coverage. Keep the locally curated network visible in those views instead
   // of replacing it with an empty canvas when the extract finishes loading.
   if (visibleData.features.length < 12) {
     const zoom = map.getZoom();
-    const scale = zoom < 19 ? 1 : Math.min(2.25, 1 + (zoom - 19) * 0.25);
+    const scale = zoom < 19 ? 1 : Math.min(2.5, 1 + (zoom - 19) * 0.25);
     return <><CuratedRoadNetwork />{visibleData.features.length > 0 && <GeoJSON
       key={boundsKey}
       data={visibleData as never}
@@ -411,7 +446,7 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
     />}</>;
   }
   const fontSize = Math.min(15, Math.max(9.5, 9.5 + (zoom - 15.5) * 0.48));
-  const strokeScale = zoom < 19 ? 1 : Math.min(2.25, 1 + (zoom - 19) * 0.25);
+  const strokeScale = zoom < 19 ? 1 : Math.min(2.5, 1 + (zoom - 19) * 0.25);
   return <>
     <GeoJSON
       key={boundsKey}
@@ -430,7 +465,7 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
         };
       }}
     />
-    {labeledRoads.map((feature) => <RoadFeatureName key={roadFeatureKey(feature)} feature={feature} label={feature.properties?.name || feature.properties?.ref || ""} renderer={labelRenderer} fontSize={fontSize} />)}
+    {labeledRoads.map((feature) => <RoadFeatureName key={roadFeatureKey(feature)} feature={feature} label={feature.properties?.name || feature.properties?.ref || ""} renderer={labelRenderer} fontSize={fontSize} placement={labelPlacements.get(roadFeatureKey(feature))} />)}
   </>;
 }
 
@@ -442,7 +477,7 @@ function roadFeatureKey(feature: RoadFeature) {
   return `${feature.properties?.name ?? feature.properties?.ref ?? "road"}:${first}:${last}`;
 }
 
-function RoadFeatureName({ feature, label, renderer, fontSize }: { feature: RoadFeature; label: string; renderer: ReturnType<typeof svg>; fontSize: number }) {
+function RoadFeatureName({ feature, label, renderer, fontSize, placement }: { feature: RoadFeature; label: string; renderer: ReturnType<typeof svg>; fontSize: number; placement?: RoadLabelPlacement }) {
   const map = useMap();
   const pathRef = useRef<LeafletPolyline | null>(null);
   const positions = useMemo(() => orderedForScreenTextPath(
@@ -451,7 +486,7 @@ function RoadFeatureName({ feature, label, renderer, fontSize }: { feature: Road
   ), [feature, map]);
   return <>
     <Polyline ref={pathRef} positions={positions} pathOptions={{ renderer, color: "#000", opacity: 0, weight: 1, interactive: false }} />
-    <SvgPathName pathRef={pathRef} label={label} fontSize={fontSize} />
+    {placement && <SvgPathName pathRef={pathRef} label={label} fontSize={fontSize} placement={placement} />}
   </>;
 }
 
