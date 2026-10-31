@@ -1,11 +1,54 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapPin, ArrowUpRight, ArrowRight, Search, ShoppingBag, Wrench, Sparkles, HeartPulse, BookOpen, ShieldCheck, Clock3, Check, Menu, X } from "lucide-react";
 import { REGIONS, catalogPriceLabel, catalogServiceMatchesQuery, inRegion, translateCatalogLabel, translatePriceLabel, translateUi, type CatalogService, type UiTranslationKey } from "@tirkha/shared";
 import { useMarketplace } from "./marketplace-provider";
 import { useAuth } from "./auth-provider";
 import { LanguageSwitcher, useLanguage } from "./language-provider";
 const categories: readonly (readonly [UiTranslationKey, typeof Sparkles])[] = [["allServices",Sparkles],["homeRepairs",Wrench],["cleaning",Sparkles],["careWellness",HeartPulse],["everydaySupport",BookOpen]];
+const openingSeenKey = "tirkha.opening-story.seen.v1";
+
+function OpeningStory() {
+ const [visible,setVisible]=useState(true);
+ const exploreRef=useRef<HTMLButtonElement>(null);
+ const dismiss=()=>{
+  try{sessionStorage.setItem(openingSeenKey,"1");}catch{/* The welcome story still closes when session storage is unavailable. */}
+  document.body.style.overflow="";
+  setVisible(false);
+ };
+ useEffect(()=>{
+  try{if(sessionStorage.getItem(openingSeenKey)==="1"){setVisible(false);return;}}catch{/* Show the introduction when browser storage is unavailable. */}
+  document.body.style.overflow="hidden";
+  exploreRef.current?.focus();
+  const timeout=window.setTimeout(dismiss,6500);
+  const onKeyDown=(event:KeyboardEvent)=>{if(event.key==="Escape")dismiss();};
+  window.addEventListener("keydown",onKeyDown);
+  return()=>{window.clearTimeout(timeout);window.removeEventListener("keydown",onKeyDown);document.body.style.overflow="";};
+ },[]);
+ if(!visible)return null;
+ return <div className="mk-opening-backdrop" role="dialog" aria-modal="true" aria-labelledby="mk-opening-title" aria-describedby="mk-opening-copy">
+  <article className="mk-opening-card">
+   <img src="/images/tirkha-hero-team.webp" alt="Tirkha local home-service professionals ready to help" fetchPriority="high"/>
+   <div className="mk-opening-shade" aria-hidden="true"/>
+   <div className="mk-opening-copy">
+    <p className="mk-opening-brand"><span className="mk-opening-mark">t</span><span>Tirkha <b>| तिर्खा</b></span></p>
+    <span className="mk-opening-kicker">A LITTLE STORY FROM HOME · घरको एउटा सानो कथा</span>
+    <h1 id="mk-opening-title">A tap starts dripping<br/>on a busy morning.</h1>
+    <p id="mk-opening-copy" className="mk-opening-english">Find the right home service, see the details clearly, and book at a time that works for you.</p>
+    <div className="mk-opening-divider" aria-hidden="true"><span/><span/><span/></div>
+    <h2 lang="ne">व्यस्त बिहानमै धारा चुहिन थाल्यो?</h2>
+    <p className="mk-opening-nepali" lang="ne">सही घरायसी सेवा छान्नुहोस्, विवरण र मूल्य स्पष्ट हेर्नुहोस्, अनि आफूलाई मिल्ने समयमा बुक गर्नुहोस्।</p>
+    <div className="mk-opening-actions">
+     <button ref={exploreRef} type="button" className="mk-opening-cta" onClick={()=>{dismiss();window.setTimeout(()=>document.getElementById("catalog")?.scrollIntoView({behavior:"smooth"}),80);}}>Explore services <span lang="ne">सेवा हेर्नुहोस्</span><ArrowUpRight size={17}/></button>
+     <button type="button" className="mk-opening-skip" onClick={dismiss}>Skip intro <span lang="ne">परिचय छोड्नुहोस्</span></button>
+    </div>
+    <p className="mk-opening-footnote">Clear choices. Local service. · स्पष्ट छनोट। स्थानीय सेवा।</p>
+   </div>
+   <span className="mk-opening-gold-mark" aria-hidden="true">✦</span>
+  </article>
+ </div>;
+}
+
 export function ServiceCard({service,compact=false}:{service:CatalogService;compact?:boolean}){
  const {add,setDetail,ready}=useMarketplace();
  const {language}=useLanguage();
@@ -28,7 +71,7 @@ export function Marketplace(){
  const filtered=useMemo(()=>services.filter(s=>s.active&&inRegion(s,state.region)&&(vertical==="All services"||s.vertical===vertical)&&catalogServiceMatchesQuery(s,query)),[services,state.region,vertical,query]);
  const count=state.cart.reduce((sum,l)=>sum+l.quantity,0);
  const signedIn=Boolean(session||state.session);
- return <div className="mk">
+ return <><OpeningStory/><div className="mk">
   <div className="mk-announcement">{tr("tagline")} <span>{tr("madeForNepal")} <ArrowUpRight size={12}/></span></div>
   <header className="mk-header"><a href="/" className="mk-brand" aria-label="Tirkha | तिर्खा home"><span className="mk-brand-mark">T<span>•</span></span><span className="mk-brand-name">Tirkha <span className="mk-brand-nepali">| तिर्खा</span></span></a>
    <label className="mk-region"><MapPin size={17}/><span className="sr-only">{language === "np" ? "सेवा क्षेत्र" : "Service region"}</span><select value={state.region} onChange={e=>setRegion(e.target.value as typeof state.region)}>{REGIONS.map(r=><option key={r} value={r}>{translateUi(r === "Pokhara" ? "pokhara" : r === "Kathmandu" ? "city" : r === "Lalitpur" ? "lalitpur" : r === "Bhaktapur" ? "bhaktapur" : "valley",language)}</option>)}</select></label>
@@ -63,6 +106,6 @@ export function Marketplace(){
      {[["01","Find your service","Explore clear scopes, time estimates, and itemized starting prices.",Search],["02","Make it yours","Pick a time and a familiar landmark. Drop a pin for extra clarity.",MapPin],["03","Leave the details to us","Save your demo booking, review the receipt, and manage it from this browser.",ShieldCheck]].map(([n,title,body,Icon])=>{const Symbol=Icon as typeof Search;return <article key={String(n)}><span className="mk-step">{String(n)}</span><Symbol size={24}/><h3>{String(title)}</h3><p>{String(body)}</p></article>;})}
    </section>
   </main>
- </div>;
+ </div></>;
 }
 
