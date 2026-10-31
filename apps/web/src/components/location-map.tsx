@@ -56,7 +56,7 @@ export default function LocationMap(props: Props) {
   const center = props.value || (regionView ? { latitude: regionView.center[0], longitude: regionView.center[1] } : KATHMANDU_CENTER);
   useEffect(() => {
     if (previousRegion.current !== props.region && regionView) {
-      mapRef.current?.flyTo(regionView.center, regionView.zoom, { animate: true, duration: 0.65 });
+      mapRef.current?.flyTo(regionView.center, regionView.zoom, { animate: true, duration: 0.8, easeLinearity: 0.25 });
     }
     previousRegion.current = props.region;
   }, [props.region, props.value, regionView]);
