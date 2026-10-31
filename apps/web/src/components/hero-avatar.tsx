@@ -7,7 +7,7 @@ const tradeMarks: Record<HeroTrade, string> = {
 
 /** Local, brand-safe SVG fallback portrait for a Tirkha Hero without an uploaded avatar. */
 export function HeroAvatar({ trade, label, size = 56 }: { trade?: HeroTrade | null; label: string; size?: number }) {
-  const mark = trade ? tradeMarks[trade] : "T";
+  const mark = trade ? tradeMarks[trade] : null;
   return <svg width={size} height={size} viewBox="0 0 64 64" role="img" aria-label={`${label}, Tirkha service professional`} className="shrink-0 rounded-full ring-2 ring-white">
     <circle cx="32" cy="32" r="32" fill="#e2e8f0"/>
     <path d="M9 59c2-12 10-18 23-18s21 6 23 18" fill="#1f2937"/>
@@ -17,6 +17,6 @@ export function HeroAvatar({ trade, label, size = 56 }: { trade?: HeroTrade | nu
     <path d="M28 38c2 2 6 2 8 0" fill="none" stroke="#874d42" strokeWidth="1.6" strokeLinecap="round"/>
     <path d="M25 45l7 7 7-7" fill="#f8fafc"/>
     <rect x="38" y="48" width="17" height="12" rx="4" fill="#059669" stroke="#fff" strokeWidth="2"/>
-    <text x="46.5" y="56.5" textAnchor="middle" fontSize="7" fontWeight="700" fill="#fff">{mark}</text>
+    {mark ? <text x="46.5" y="56.5" textAnchor="middle" fontSize="7" fontWeight="700" fill="#fff">{mark}</text> : <path d="m41 53 5.5-4.5L52 53v5h-11z" fill="none" stroke="#fff" strokeWidth="1.4" strokeLinejoin="round"/>}
   </svg>;
 }

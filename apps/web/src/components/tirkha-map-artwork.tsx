@@ -5,6 +5,7 @@ import { canvas, DomEvent } from "leaflet";
 import { CircleMarker, GeoJSON, Polygon, Polyline, Tooltip, useMap } from "react-leaflet";
 import { Crosshair } from "lucide-react";
 import { tirkhaCityViews, tirkhaLandmarks, tirkhaParks, tirkhaRoads, tirkhaWaterways } from "@/lib/tirkha-map-data";
+import { TirkhaMark } from "./tirkha-mark";
 
 type RoadProperties = { class?: "expressway" | "arterial" | "connector" | "local"; name?: string | null; ref?: string | null };
 type RoadFeature = { type: "Feature"; id?: string; properties?: RoadProperties; geometry: { type: "LineString"; coordinates: number[][] } };
@@ -243,5 +244,5 @@ export function TirkhaMapZoomControl({ recenterPoints, onLocate, locating = fals
 }
 
 export function TirkhaMapSignature({ caption = "A closer view of home" }: { caption?: string }) {
-  return <div className="tirkha-map-signature" aria-label="Tirkha custom map"><span className="tirkha-map-signature-mark">t</span><span><strong>TIRKHA MAP</strong><small>{caption}</small><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors · ODbL</a></span><span className="tirkha-map-live-dot" aria-hidden="true" /></div>;
+  return <div className="tirkha-map-signature" aria-label="Tirkha custom map"><TirkhaMark className="tirkha-map-signature-mark"/><span><strong>TIRKHA MAP</strong><small>{caption}</small><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors · ODbL</a></span><span className="tirkha-map-live-dot" aria-hidden="true" /></div>;
 }
