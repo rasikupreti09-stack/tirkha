@@ -76,7 +76,7 @@ export default function LocationMap(props: Props) {
   if (typeof window === "undefined") return <div className="h-[300px] w-full animate-pulse rounded-lg bg-slate-100" role="status">Loading map…</div>;
   return <>
     <div className="tirkha-map-frame">
-      <MapContainer ref={mapRef} center={[center.latitude, center.longitude]} zoom={props.value && props.focusPinOnChange !== false ? 16 : regionView?.zoom ?? 12} minZoom={6} maxZoom={21} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={120} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} preferCanvas style={{ height: props.height ?? 300, width: "100%", zIndex: 0 }} className="tirkha-vector-map" aria-label="Choose your service location">
+      <MapContainer ref={mapRef} center={[center.latitude, center.longitude]} zoom={props.value && props.focusPinOnChange !== false ? 16 : regionView?.zoom ?? 12} minZoom={6} maxZoom={22} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={60} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} preferCanvas style={{ height: props.height ?? 300, width: "100%", zIndex: 0 }} className="tirkha-vector-map" aria-label="Choose your service location">
         <TirkhaMapArtwork />
         <TirkhaMapRegionControl onRegionSelect={region => props.onRegionChange?.(region as typeof REGIONS[number])} />
         <TirkhaMapZoomControl onLocate={locateMe} locating={locating} pinningEnabled={pinningEnabled} onTogglePinning={() => setPinningEnabled(value => !value)} />
