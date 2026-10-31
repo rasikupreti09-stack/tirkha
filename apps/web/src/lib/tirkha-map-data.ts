@@ -67,6 +67,117 @@ export const tirkhaRoads: TirkhaRoad[] = [
   { name: "Pathlaiya market approach", kind: "local", points: [[27.209,84.997],[27.214,85.003],[27.219,85.006],[27.224,85.010]] },
 ];
 
+export type TirkhaUrbanBlock = {
+  id: string;
+  region: "Hetauda" | "Simara";
+  landUse: "commercial" | "residential" | "industrial";
+  outline: [number, number][];
+  buildings: [number, number][][];
+};
+
+/**
+ * Stylized block and parcel geometry for the local city centers. These shapes
+ * communicate urban structure; they are not cadastral or survey-grade building
+ * footprints. Curated roads are drawn above them for a readable street layer.
+ */
+function buildUrbanBlocks(config: {
+  region: TirkhaUrbanBlock["region"];
+  bounds: { south: number; north: number; west: number; east: number };
+  openZones: { south: number; north: number; west: number; east: number }[];
+  rows: number;
+  columns: number;
+  rowWidths: number[];
+  commercialCenter: [number, number];
+}): TirkhaUrbanBlock[] {
+  const latStep = (config.bounds.north - config.bounds.south) / config.rows;
+  const lngStep = (config.bounds.east - config.bounds.west) / config.columns;
+  const blocks: TirkhaUrbanBlock[] = [];
+
+  for (let row = 0; row < config.rows; row += 1) {
+    const width = config.rowWidths[row] ?? config.columns;
+    const offset = (config.columns - width) / 2;
+    for (let localColumn = 0; localColumn < width; localColumn += 1) {
+      const column = localColumn + offset;
+      // Keep larger gaps every few cells for neighborhood connectors and
+      // municipal avenues; the named road layer is rendered on top of these.
+      if ((row === 2 || row === config.rows - 3) && localColumn % 4 === 2) continue;
+      if (row % 4 === 3 && localColumn % 5 === 4) continue;
+
+      const jitterLat = (((row * 7 + localColumn * 3) % 5) - 2) * latStep * 0.025;
+      const jitterLng = (((row * 5 + localColumn * 11) % 5) - 2) * lngStep * 0.025;
+      const south = config.bounds.south + row * latStep + latStep * 0.12 + jitterLat;
+      const north = config.bounds.south + (row + 1) * latStep - latStep * 0.12 + jitterLat;
+      const west = config.bounds.west + column * lngStep + lngStep * 0.12 + jitterLng;
+      const east = config.bounds.west + (column + 1) * lngStep - lngStep * 0.12 + jitterLng;
+      const outline: [number, number][] = [
+        [south, west + lngStep * 0.06],
+        [south + latStep * 0.04, east],
+        [north - latStep * 0.035, east - lngStep * 0.04],
+        [north, west],
+      ];
+
+      const center: [number, number] = [(south + north) / 2, (west + east) / 2];
+      if (config.openZones.some((zone) => center[0] >= zone.south && center[0] <= zone.north && center[1] >= zone.west && center[1] <= zone.east)) continue;
+      const distanceToCore = Math.hypot(
+        (center[0] - config.commercialCenter[0]) * 90,
+        (center[1] - config.commercialCenter[1]) * 90,
+      );
+      const landUse = distanceToCore < 650
+        ? "commercial"
+        : config.region === "Hetauda" && center[1] > 85.047
+          ? "industrial"
+          : "residential";
+      const buildings: [number, number][][] = [];
+      const plotRows = 3;
+      const plotColumns = 4;
+      const plotLatStep = (north - south) / plotRows;
+      const plotLngStep = (east - west) / plotColumns;
+
+      for (let plotRow = 0; plotRow < plotRows; plotRow += 1) {
+        for (let plotColumn = 0; plotColumn < plotColumns; plotColumn += 1) {
+          if ((row + localColumn + plotRow * 2 + plotColumn) % 7 === 0) continue;
+          const padLat = plotLatStep * (0.19 + ((plotRow + plotColumn) % 2) * 0.04);
+          const padLng = plotLngStep * (0.18 + ((row + plotColumn) % 2) * 0.05);
+          const plotSouth = south + plotRow * plotLatStep + padLat;
+          const plotNorth = south + (plotRow + 1) * plotLatStep - padLat;
+          const plotWest = west + plotColumn * plotLngStep + padLng;
+          const plotEast = west + (plotColumn + 1) * plotLngStep - padLng;
+          buildings.push([
+            [plotSouth, plotWest],
+            [plotSouth, plotEast],
+            [plotNorth, plotEast - plotLngStep * 0.04],
+            [plotNorth, plotWest],
+          ]);
+        }
+      }
+
+      blocks.push({ id: `${config.region.toLowerCase()}-${row}-${localColumn}`, region: config.region, landUse, outline, buildings });
+    }
+  }
+  return blocks;
+}
+
+export const tirkhaUrbanBlocks: TirkhaUrbanBlock[] = [
+  ...buildUrbanBlocks({
+    region: "Hetauda",
+    bounds: { south: 27.416, north: 27.446, west: 85.015, east: 85.052 },
+    openZones: [{ south: 27.433, north: 27.438, west: 85.023, east: 85.030 }],
+    rows: 9,
+    columns: 10,
+    rowWidths: [5, 7, 9, 10, 10, 10, 9, 7, 5],
+    commercialCenter: [27.43075, 85.03258],
+  }),
+  ...buildUrbanBlocks({
+    region: "Simara",
+    bounds: { south: 27.154, north: 27.179, west: 84.964, east: 84.993 },
+    openZones: [{ south: 27.1575, north: 27.1612, west: 84.973, east: 84.986 }],
+    rows: 8,
+    columns: 10,
+    rowWidths: [5, 7, 9, 10, 10, 9, 7, 5],
+    commercialCenter: [27.1666, 84.9786],
+  }),
+];
+
 export const tirkhaWaterways: LatLngExpression[][] = [
   [[27.744,85.296],[27.738,85.300],[27.732,85.303],[27.726,85.305],[27.720,85.307],[27.714,85.307],[27.708,85.305],[27.702,85.302],[27.696,85.300]],
   [[27.727,85.356],[27.720,85.351],[27.713,85.347],[27.706,85.342],[27.699,85.337],[27.692,85.333],[27.685,85.328],[27.678,85.323],[27.670,85.320]],
@@ -163,9 +274,18 @@ export const tirkhaLandmarks: { name: string; point: [number, number]; kind: "di
   { name: "HETAUDA HOSPITAL", point: [27.43231,85.02772], kind: "service", minZoom: 14 },
   { name: "SANOPOKHARA CHOWK", point: [27.420,85.040], kind: "service", minZoom: 14 },
   { name: "RAPTI ROAD", point: [27.424,85.039], kind: "service", minZoom: 15 },
+  { name: "HETAUDA MARKET LANES", point: [27.429,85.034], kind: "service", minZoom: 16 },
+  { name: "HUPRA CHAUR APPROACH", point: [27.436,85.025], kind: "service", minZoom: 16 },
+  { name: "KAMANE RESIDENTIAL AREA", point: [27.408,85.039], kind: "service", minZoom: 15 },
+  { name: "RATOMATE MARKET", point: [27.431,85.046], kind: "service", minZoom: 15 },
+  { name: "CHAU KITOL ROAD", point: [27.442,85.023], kind: "service", minZoom: 16 },
   { name: "SIMARA CHOWK", point: [27.1666,84.9786], kind: "landmark", minZoom: 13 },
-  { name: "SIMARA AIRPORT", point: [27.15944,84.98000], kind: "service", minZoom: 13 },
+  { name: "SIMARA AIRPORT", point: [27.164201,84.980135], kind: "service", minZoom: 13 },
+  { name: "PIPARA SIMARA", point: [27.162,84.975], kind: "service", minZoom: 15 },
+  { name: "AIRPORT ROAD", point: [27.164,84.982], kind: "service", minZoom: 15 },
+  { name: "SIMARA BAZAAR LANES", point: [27.167,84.981], kind: "service", minZoom: 16 },
   { name: "JEETPUR BAZAAR", point: [27.185,84.989], kind: "service", minZoom: 14 },
+  { name: "JEETPUR APPROACH", point: [27.178,84.987], kind: "service", minZoom: 16 },
   { name: "PATHLAIYA", point: [27.214,85.003], kind: "service", minZoom: 13 },
   { name: "HUPRA CHAUR", point: [27.434,85.029], kind: "service", minZoom: 14 },
   { name: "BHUTANDEVI TEMPLE", point: [27.429,85.031], kind: "service", minZoom: 15 },
@@ -178,6 +298,14 @@ export const tirkhaLandmarks: { name: string; point: [number, number]; kind: "di
   { name: "HATTISAR", point: [27.137,85.015], kind: "service", minZoom: 14 },
   { name: "POTA", point: [27.129,85.021], kind: "service", minZoom: 14 },
   { name: "PHATTEPUR", point: [27.125,85.015], kind: "service", minZoom: 14 },
+  { name: "KICHHA POKHARI", point: [27.703,85.312], kind: "service", minZoom: 16 },
+  { name: "DALLU", point: [27.716,85.296], kind: "service", minZoom: 15 },
+  { name: "NAYABAZAR", point: [27.722,85.309], kind: "service", minZoom: 15 },
+  { name: "DHUMBARAHI", point: [27.735,85.341], kind: "service", minZoom: 15 },
+  { name: "INACHO", point: [27.671,85.431], kind: "service", minZoom: 16 },
+  { name: "BOLACHHEN", point: [27.673,85.430], kind: "service", minZoom: 16 },
+  { name: "SUKULDHOKA", point: [27.676,85.433], kind: "service", minZoom: 16 },
+  { name: "TACHAPAL", point: [27.668,85.435], kind: "service", minZoom: 16 },
 ];
 
 export const tirkhaParks: LatLngExpression[][][] = [

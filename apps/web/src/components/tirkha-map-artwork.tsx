@@ -4,7 +4,7 @@ import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { canvas, DomEvent } from "leaflet";
 import { CircleMarker, GeoJSON, Polygon, Polyline, Tooltip, useMap } from "react-leaflet";
 import { Crosshair, MapPin, MapPinned } from "lucide-react";
-import { tirkhaCityViews, tirkhaLandmarks, tirkhaParks, tirkhaRoads, tirkhaWaterways } from "@/lib/tirkha-map-data";
+import { tirkhaCityViews, tirkhaLandmarks, tirkhaParks, tirkhaRoads, tirkhaUrbanBlocks, tirkhaWaterways } from "@/lib/tirkha-map-data";
 import { TirkhaMark } from "./tirkha-mark";
 
 type RoadProperties = { class?: "expressway" | "arterial" | "connector" | "local"; name?: string | null; ref?: string | null };
@@ -70,12 +70,50 @@ export const TirkhaMapArtwork = memo(function TirkhaMapArtwork() {
     {tirkhaParks.map((park, index) => <Polygon key={`park-${index}`} positions={park} pathOptions={{ color: "#b8d3bf", weight: 1, fillColor: "#dcebdd", fillOpacity: 0.8, interactive: false }} />)}
     {tirkhaWaterways.map((line, index) => <Polyline key={`water-${index}`} positions={line} pathOptions={{ color: "#a9c9ce", weight: 8, opacity: 0.42, lineCap: "round", lineJoin: "round", interactive: false }} />)}
     {tirkhaWaterways.map((line, index) => <Polyline key={`water-core-${index}`} positions={line} pathOptions={{ color: "#8db8c0", weight: 2.4, opacity: 0.82, lineCap: "round", lineJoin: "round", interactive: false }} />)}
+    <CityBlockLayouts />
     {!roadData && <CuratedRoadNetwork />}
     {roadData && <DetailedRoadNetwork data={roadData} />}
     <DetailedBuildingFootprints />
     <CuratedLandmarkLabels />
   </>;
 });
+
+function CityBlockLayouts() {
+  const map = useMap();
+  const renderer = useMemo(() => canvas({ padding: 0.15 }), []);
+  const [zoom, setZoom] = useState(map.getZoom());
+  const [boundsKey, setBoundsKey] = useState(map.getBounds().pad(0.12).toBBoxString());
+
+  useEffect(() => {
+    const update = () => {
+      setZoom(map.getZoom());
+      setBoundsKey(map.getBounds().pad(0.12).toBBoxString());
+    };
+    return subscribeAfterGesture(map, "zoomend moveend", update);
+  }, [map]);
+
+  const visibleBlocks = useMemo(() => {
+    if (zoom < 14) return [];
+    const [west, south, east, north] = boundsKey.split(",").map(Number);
+    return tirkhaUrbanBlocks.filter((block) => {
+      const lats = block.outline.map(([latitude]) => latitude);
+      const lngs = block.outline.map(([, longitude]) => longitude);
+      return Math.max(...lats) >= south && Math.min(...lats) <= north
+        && Math.max(...lngs) >= west && Math.min(...lngs) <= east;
+    });
+  }, [boundsKey, zoom]);
+
+  if (!visibleBlocks.length) return null;
+  return <>
+    {visibleBlocks.map((block) => {
+      const fillColor = block.landUse === "commercial" ? "#e7e3d6" : block.landUse === "industrial" ? "#dce3df" : "#e0e8df";
+      return <Fragment key={block.id}>
+        <Polygon positions={block.outline} pathOptions={{ renderer, color: "#fffdf8", weight: zoom >= 18 ? 1.5 : 1, opacity: 0.95, fillColor, fillOpacity: zoom >= 18 ? 0.34 : 0.7, lineJoin: "round", interactive: false }} />
+        {zoom >= 18 && block.buildings.map((outline, index) => <Polygon key={`${block.id}-building-${index}`} positions={outline} pathOptions={{ renderer, color: "#fdfcf8", weight: 0.9, opacity: 0.95, fillColor: block.landUse === "commercial" ? "#cec9b9" : "#cbd8cc", fillOpacity: 0.88, lineJoin: "round", interactive: false }} />)}
+      </Fragment>;
+    })}
+  </>;
+}
 
 function CuratedRoadNetwork() {
   const map = useMap();
@@ -85,6 +123,7 @@ function CuratedRoadNetwork() {
     const update = () => setZoom(map.getZoom());
     return subscribeAfterGesture(map, "zoomend", update);
   }, [map]);
+  const detailTier = zoom >= 20 ? 3 : zoom >= 18 ? 2 : zoom >= 16 ? 1 : 0;
   return <>
     {tirkhaRoads.map((road, index) => {
       const width = road.kind === "expressway" ? 8 : road.kind === "arterial" ? 6 : road.kind === "connector" ? 4.4 : 2.4;
@@ -93,7 +132,7 @@ function CuratedRoadNetwork() {
       return <Fragment key={`road-${index}`}>
         <Polyline positions={road.points} pathOptions={{ color: "#fbfcf9", weight: width + 3, opacity: 0.94, lineCap: "round", lineJoin: "round", interactive: false, renderer }} />
         <Polyline positions={road.points} pathOptions={{ color, weight: width, opacity: road.kind === "local" ? 0.85 : 1, lineCap: "round", lineJoin: "round", interactive: zoom >= labelZoom, renderer }}>
-          {road.name && zoom >= labelZoom && <Tooltip sticky permanent={zoom >= labelZoom + 2} direction="top" className="tirkha-road-label">{road.name}</Tooltip>}
+          {road.name && zoom >= labelZoom && <Tooltip sticky permanent={zoom >= labelZoom + 2} direction="top" className={`tirkha-road-label tirkha-label-detail-${detailTier}`}>{road.name}</Tooltip>}
         </Polyline>
       </Fragment>;
     })}
@@ -169,23 +208,26 @@ function CuratedLandmarkLabels() {
   }, [map]);
   const visible = useMemo(() => {
     const bounds = map.getBounds().pad(0.08);
+    const detailTier = zoom >= 20 ? 3 : zoom >= 18 ? 2 : zoom >= 16 ? 1 : 0;
     const occupied: { left: number; right: number; top: number; bottom: number }[] = [];
     return [...tirkhaLandmarks]
       .filter((place) => zoom >= place.minZoom && bounds.contains(place.point))
       .sort((a, b) => b.minZoom - a.minZoom)
       .filter((place) => {
         const point = map.latLngToContainerPoint(place.point);
-        const width = Math.min(180, place.name.length * 5.8 + 16);
-        const height = place.kind === "district" ? 30 : 25;
+        const fontScale = detailTier >= 3 ? 7.3 : detailTier === 2 ? 6.7 : detailTier === 1 ? 6.1 : 5.8;
+        const width = Math.min(210, place.name.length * fontScale + 20 + detailTier * 2);
+        const height = (place.kind === "district" ? 30 : 25) + detailTier * 2;
         const rect = { left: point.x - width / 2, right: point.x + width / 2, top: point.y - height, bottom: point.y };
         if (occupied.some(other => rect.left < other.right + 5 && rect.right + 5 > other.left && rect.top < other.bottom + 4 && rect.bottom + 4 > other.top)) return false;
         occupied.push(rect);
         return true;
       });
   }, [map, zoom]);
+  const detailTier = zoom >= 20 ? 3 : zoom >= 18 ? 2 : zoom >= 16 ? 1 : 0;
   return <>
-    {visible.map((place) => <CircleMarker key={place.name} center={place.point} radius={place.kind === "district" ? 3.2 : 2} pathOptions={{ color: "#fffdf8", weight: 1.5, fillColor: place.kind === "district" ? "#16675c" : "#718b83", fillOpacity: 1 }}>
-      <Tooltip permanent direction="top" offset={[0, -4]} className={place.kind === "district" ? "tirkha-city-label" : "tirkha-place-label"}>{place.name}</Tooltip>
+    {visible.map((place) => <CircleMarker key={place.name} center={place.point} radius={(place.kind === "district" ? 3.2 : 2) + Math.min(detailTier, 2) * 0.35} pathOptions={{ color: "#fffdf8", weight: 1.5, fillColor: place.kind === "district" ? "#16675c" : "#718b83", fillOpacity: 1 }}>
+      <Tooltip permanent direction="top" offset={[0, -4]} className={`${place.kind === "district" ? "tirkha-city-label" : "tirkha-place-label"} tirkha-label-detail-${detailTier}`}>{place.name}</Tooltip>
     </CircleMarker>)}
   </>;
 }
@@ -247,7 +289,18 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
     onEachFeature={(feature, layer) => {
       const props = feature.properties as RoadProperties | undefined;
       const label = props?.name || props?.ref;
-      if (label) layer.bindTooltip(label, { sticky: true, direction: "top", className: "tirkha-road-label" });
+      const type = props?.class;
+      const minLabelZoom = type === "expressway" ? 12 : type === "arterial" ? 14 : type === "connector" ? 16 : 18;
+      if (label && map.getZoom() >= minLabelZoom) {
+        const zoom = map.getZoom();
+        const detailTier = zoom >= 20 ? 3 : zoom >= 18 ? 2 : zoom >= 16 ? 1 : 0;
+        layer.bindTooltip(label, {
+          sticky: true,
+          permanent: zoom >= minLabelZoom + 1,
+          direction: "top",
+          className: `tirkha-road-label tirkha-label-detail-${detailTier}`,
+        });
+      }
     }}
   />;
 }

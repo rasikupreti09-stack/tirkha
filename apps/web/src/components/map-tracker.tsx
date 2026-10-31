@@ -122,7 +122,7 @@ export const MapTracker = memo(function MapTracker({ points, origin, destination
   if (typeof window === "undefined") return <div className="h-[360px] animate-pulse rounded-xl bg-muted" role="status">Loading live map…</div>;
   return <section className="tirkha-map-surface">
     <div className="tirkha-map-frame tirkha-live-map-canvas">
-      <MapContainer ref={mapRef} center={view} zoom={16} minZoom={6} maxZoom={19} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={120} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} preferCanvas className="tirkha-vector-map !h-full !w-full" aria-label="Live service map">
+      <MapContainer ref={mapRef} center={view} zoom={16} minZoom={6} maxZoom={21} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={120} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} preferCanvas className="tirkha-vector-map !h-full !w-full" aria-label="Live service map">
       <TirkhaMapArtwork />
       <TirkhaMapZoomControl recenterPoints={points.map(point => [point.coordinates.latitude, point.coordinates.longitude])} />
       <FitPoints points={points} />
