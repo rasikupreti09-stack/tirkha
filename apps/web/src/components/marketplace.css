@@ -1,4 +1,4 @@
-.mk{--ink:#1f2937;--muted:#64748b;--line:#cbd5e1;--green:#047857;--green-dark:#065f46;--cream:#f8fafc;--paper:#fff;--sage:#f7f7f3;--gold:#c49a45;width:100%;max-width:100%;min-width:0;color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+.mk{--ink:#1f2937;--muted:#64748b;--line:#cbd5e1;--green:#047857;--green-dark:#065f46;--cream:#f8fafc;--paper:#fff;--sage:#f7f7f3;--gold:#c49a45;width:100vw;max-width:100vw;min-width:0;color:var(--ink);font-family:Arial,Helvetica,sans-serif}
 .mk-language-switch{display:inline-flex;align-items:center;gap:5px;padding:4px 6px;border:1px solid #dbe3df;border-radius:999px;background:#f8fafc;color:#64748b;font-size:10px;white-space:nowrap}
 .mk-language-switch button{border:0;border-radius:999px;background:transparent;color:#526057;padding:5px 7px;font-size:10px;font-weight:650}
 .mk-language-switch button[aria-pressed="true"]{background:#1f2937;color:#fff}
@@ -10,7 +10,7 @@
 .mk>main{width:100%;min-width:0}
 .mk-announcement{height:34px;background:#1f2937;color:#e7ede9;display:flex;align-items:center;justify-content:center;font-size:11px;letter-spacing:.07em;position:relative}
 .mk-announcement span{position:absolute;right:max(4vw,24px);display:flex;align-items:center;gap:5px}
-.mk-header{width:100%;height:76px;display:flex;align-items:center;gap:34px;padding:0 max(calc((100vw - 1240px)/2),5vw);background:#fff;position:relative;z-index:5;border-bottom:1px solid #edf0ed}
+.mk-header{width:100%;max-width:100%;height:76px;display:flex;align-items:center;gap:34px;padding:0 max(calc((100vw - 1240px)/2),5vw);background:#fff;position:relative;z-index:5;border-bottom:1px solid #edf0ed}
 .mk-brand{display:inline-flex;align-items:center;gap:9px;font-size:22px;font-weight:700;letter-spacing:-.06em;white-space:nowrap}
 .mk-brand-mark{display:block;width:36px;height:36px;flex:0 0 36px}
 .mk-brand-dot{color:#91a48f}
@@ -325,3 +325,27 @@
 @keyframes mk-opening-fade-in{from{opacity:0}to{opacity:1}}
 @media(max-width:650px){.mk-opening-backdrop{padding:10px}.mk-opening-card{min-height:min(680px,calc(100dvh - 20px));border-radius:18px}.mk-opening-card>img{object-position:57% center}.mk-opening-shade{background:linear-gradient(90deg,rgba(15,23,42,.92),rgba(22,35,43,.7)),linear-gradient(0deg,rgba(15,23,42,.5),transparent 70%)}.mk-opening-copy{padding:26px 22px}.mk-opening-brand{margin-bottom:38px}.mk-opening-copy h1{font-size:clamp(36px,10vw,49px)}.mk-opening-english{font-size:13px}.mk-opening-nepali{font-size:12px}.mk-opening-actions{align-items:flex-start;flex-direction:column;gap:14px;margin-top:23px}.mk-opening-cta{width:100%}.mk-opening-gold-mark{right:17px;bottom:13px}}
 @media(prefers-reduced-motion:reduce){.mk-opening-backdrop{animation:none}}
+.tirkha-launch-splash{position:fixed;z-index:3000;inset:0;display:grid;overflow:hidden;place-items:center;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);background:radial-gradient(ellipse at 50% 38%,#1f493d 0%,#142f29 38%,#101923 100%);color:#f8fafc;opacity:1;transition:opacity .38s ease;}
+.tirkha-launch-splash.is-leaving{opacity:0;pointer-events:none}
+.tirkha-splash-glow{position:absolute;width:min(74vw,520px);aspect-ratio:1;border:1px solid #d6b9691f;border-radius:50%;box-shadow:0 0 0 32px #d6b96908,0 0 0 72px #d6b96906;animation:tirkha-splash-glow 2.8s ease-in-out infinite alternate}
+.tirkha-splash-content{position:relative;display:flex;align-items:center;flex-direction:column;padding:24px;text-align:center;animation:tirkha-splash-arrive .75s cubic-bezier(.2,.8,.2,1) both}
+.tirkha-splash-orbit{position:absolute;top:5px;width:128px;height:128px;border:1px solid #a7f3d04a;border-radius:39px;transform:rotate(45deg);animation:tirkha-splash-orbit 12s linear infinite}
+.tirkha-splash-logo{position:relative;width:106px;height:106px;filter:drop-shadow(0 12px 28px #02061770);animation:tirkha-splash-logo-in .8s .08s cubic-bezier(.2,.8,.2,1) both}
+.tirkha-splash-overline{margin-top:31px;color:#c7d9ce;font-size:9px;font-weight:800;letter-spacing:.25em;animation:tirkha-splash-copy-in .55s .25s both}
+.tirkha-splash-name{margin-top:12px;color:#fff;font-family:Georgia,"Times New Roman",serif;font-size:38px;font-weight:600;letter-spacing:.015em;line-height:1.05;animation:tirkha-splash-copy-in .55s .32s both}
+.tirkha-splash-nepali{margin-top:7px;color:#f1d996;font-family:"Noto Sans Devanagari","Nirmala UI",Arial,sans-serif;font-size:29px;font-weight:650;line-height:1.35;animation:tirkha-splash-copy-in .55s .4s both}
+.tirkha-splash-rule{width:42px;height:2px;margin:19px 0 13px;border-radius:2px;background:linear-gradient(90deg,#10b981,#f1d996);animation:tirkha-splash-rule-in .7s .5s both}
+.tirkha-splash-tagline,.tirkha-splash-tagline-nepali{color:#d3e0d9;font-size:12px;line-height:1.7;animation:tirkha-splash-copy-in .55s .5s both}
+.tirkha-splash-tagline-nepali{margin-top:2px;color:#aebfb5;font-family:"Noto Sans Devanagari","Nirmala UI",Arial,sans-serif;font-size:11px;animation-delay:.57s}
+.tirkha-splash-loader{display:flex;gap:5px;margin-top:31px}
+.tirkha-splash-loader i{width:4px;height:4px;border-radius:50%;background:#a7f3d0;animation:tirkha-splash-dot .8s ease-in-out infinite alternate}
+.tirkha-splash-loader i:nth-child(2){animation-delay:.18s;background:#f1d996}.tirkha-splash-loader i:nth-child(3){animation-delay:.36s}
+@keyframes tirkha-splash-arrive{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes tirkha-splash-logo-in{from{opacity:0;transform:scale(.78) rotate(-8deg)}to{opacity:1;transform:scale(1) rotate(0)}}
+@keyframes tirkha-splash-copy-in{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+@keyframes tirkha-splash-rule-in{from{width:0;opacity:0}to{width:42px;opacity:1}}
+@keyframes tirkha-splash-dot{to{opacity:.25;transform:translateY(-3px)}}
+@keyframes tirkha-splash-orbit{to{transform:rotate(405deg)}}
+@keyframes tirkha-splash-glow{to{opacity:.45;transform:scale(1.07)}}
+@media(max-width:650px){.tirkha-splash-logo{width:98px;height:98px}.tirkha-splash-orbit{width:118px;height:118px}.tirkha-splash-name{font-size:36px}}
+@media(prefers-reduced-motion:reduce){.tirkha-launch-splash,.tirkha-splash-content,.tirkha-splash-logo,.tirkha-splash-orbit,.tirkha-splash-glow,.tirkha-splash-loader i{animation:none;transition:none}.tirkha-splash-content{opacity:1}}
