@@ -5,8 +5,11 @@ import type { ServiceCategory } from "@tirkha/shared";
 import { loadCategories } from "@/lib/discovery";
 import { CategoryIcon } from "./category-icon";
 import { Button } from "./ui/button";
+import { useLanguage } from "./language-provider";
+import { translateCatalogLabel, translateUi } from "@tirkha/shared";
 
 export function CategoryGrid() {
+  const { language } = useLanguage();
   const [categories, setCategories] = useState<ServiceCategory[] | null>(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -25,9 +28,9 @@ export function CategoryGrid() {
     {categories.map((category) => <Link key={category.id} href={`/services?category=${encodeURIComponent(category.slug)}`}
       className="group rounded-lg border bg-card p-6 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
       <div className="mb-5 text-primary"><CategoryIcon name={category.icon_name} /></div>
-      <h3 className="text-lg font-semibold">{category.name}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{category.description || "Explore professionals for this service."}</p>
-      <p className="mt-5 text-sm font-medium underline underline-offset-4">View professionals</p>
+      <h3 className="text-lg font-semibold">{translateCatalogLabel(category.name, language)}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{category.description || translateUi("exploreProfessionals", language)}</p>
+      <p className="mt-5 text-sm font-medium underline underline-offset-4">{translateUi("exploreProfessionals", language)}</p>
     </Link>)}
   </div>;
 }

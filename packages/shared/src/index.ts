@@ -31,3 +31,4 @@ export * from "./home-diagnostics";
 export * from "./universal-diagnostics.ts";
 
 export * from "./hero-portal";
+export * from "./i18n";

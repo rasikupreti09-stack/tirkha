@@ -3,9 +3,10 @@ import { useEffect, useState, type FormEvent } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ArrowLeft, CalendarDays, Check, ChevronRight, Clock3, Copy, LocateFixed, MapPin, Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
-import { buildDemoPaymentQrUrl, catalogMoney, catalogPriceLabel, codCommissionPaisa, serviceTotal, type Coordinates, type DemoOrder } from "@tirkha/shared";
+import { buildDemoPaymentQrUrl, catalogMoney, catalogPriceLabel, codCommissionPaisa, serviceTotal, translateCatalogLabel, translatePriceLabel, translateUi, type Coordinates, type DemoOrder } from "@tirkha/shared";
 import { MarketplaceDialog } from "./marketplace-dialog";
 import { useMarketplace } from "./marketplace-provider";
+import { useLanguage } from "./language-provider";
 const LocationMap = dynamic(() => import("./location-map"), { ssr: false, loading: () => <div className="mk-map-loading">Loading Kathmandu map…</div> });
 const landmarks = [
  {name:"New Baneshwor",region:"Kathmandu" as const,latitude:27.6915,longitude:85.342},
@@ -27,6 +28,7 @@ function nepalInputFromDate(date:Date){
 }
 export function MarketplaceOverlays(){
  const {state,services,modal,detail,setModal,setDetail,add,quantity,place,cancel,ready,setRegion,requireCheckoutAuth}=useMarketplace();
+ const {language}=useLanguage();
  const [stage,setStage]=useState<"cart"|"address"|"payment">("cart"),[address,setAddress]=useState(""),[pin,setPin]=useState<Coordinates|null>(null),[scheduled,setScheduled]=useState("");
  const [paymentMethod,setPaymentMethod]=useState<NonNullable<DemoOrder["payment_method"]>>("COD"),[paymentReference,setPaymentReference]=useState(""),[copyNotice,setCopyNotice]=useState("");
  const [busy,setBusy]=useState(false),[formError,setFormError]=useState(""),[geoBusy,setGeoBusy]=useState(false);
@@ -91,10 +93,10 @@ export function MarketplaceOverlays(){
    </div>
  </section>;
  return <>
-   {current&&<MarketplaceDialog key={current.id} title={current.title} onClose={()=>setDetail(null)} wide><div className="mk-detail"><img className="mk-detail-image" src={current.image} alt={`Local professional providing ${current.title.toLowerCase()} in a Kathmandu Valley home`}/><div className="mk-detail-body"><span className="mk-kicker">{current.category_name} · {current.vertical}</span><h2>{current.title}</h2><p>{current.description}</p><div className="mk-rate-card"><div><small>Listed rate · सेवा दर</small><b>{catalogPriceLabel(current)}</b></div>{current.visit_paisa>0?<><span>+</span><div><small>Visit fee</small><b>{catalogMoney(current.visit_paisa)}</b></div><i></i><div><small>Starting total</small><b>{catalogMoney(serviceTotal(current))}</b></div></>:<><i></i><div><small>Scope</small><b>As listed</b></div></>}</div>{current.pricing_note&&<p className="mk-pricing-note">{current.pricing_note}</p>}
-     <div className="mk-duration"><Clock3 size={16}/> Estimated time: {current.duration_minutes>=60?Math.floor(current.duration_minutes/60)+" hr"+(current.duration_minutes%60?" "+current.duration_minutes%60+" min":""):current.duration_minutes+" min"}</div>
-     <div className="mk-scope-grid"><div><h3><Check size={16}/> What’s included</h3><ul>{current.included.map(x=><li key={x}>{x}</li>)}</ul></div><div><h3><X size={16}/> What’s excluded</h3><ul>{current.excluded.map(x=><li key={x}>{x}</li>)}</ul></div></div>
-     <p className="mk-detail-disclaimer">Parts and extra work require a separate quote and your approval. Photos illustrate the activity; no provider availability is implied.</p><div className="mk-detail-actions"><button className="mk-outline" onClick={()=>add(current.id)}>Add to cart</button><button className="mk-primary" onClick={()=>add(current.id,true)}>Book now <ChevronRight size={17}/></button></div></div></div></MarketplaceDialog>}
+   {current&&<MarketplaceDialog key={current.id} title={translateCatalogLabel(current.title,language)} onClose={()=>setDetail(null)} wide><div className="mk-detail"><img className="mk-detail-image" src={current.image} alt={`Local professional providing ${translateCatalogLabel(current.title,language).toLowerCase()} in a Kathmandu Valley home`}/><div className="mk-detail-body"><span className="mk-kicker">{translateCatalogLabel(current.category_name,language)} · {translateCatalogLabel(current.vertical,language)}</span><h2>{translateCatalogLabel(current.title,language)}</h2><p>{translateCatalogLabel(current.description,language)}</p><div className="mk-rate-card"><div><small>{translateUi("listedRate",language)}</small><b>{translatePriceLabel(catalogPriceLabel(current),language)}</b></div>{current.visit_paisa>0?<><span>+</span><div><small>{language === "np" ? "भ्रमण शुल्क" : "Visit fee"}</small><b>{catalogMoney(current.visit_paisa)}</b></div><i></i><div><small>{language === "np" ? "सुरुवाती कुल" : "Starting total"}</small><b>{catalogMoney(serviceTotal(current))}</b></div></>:<><i></i><div><small>{language === "np" ? "कामको दायरा" : "Scope"}</small><b>{language === "np" ? "सूचीअनुसार" : "As listed"}</b></div></>}</div>{current.pricing_note&&<p className="mk-pricing-note">{translateCatalogLabel(current.pricing_note,language)}</p>}
+     <div className="mk-duration"><Clock3 size={16}/> {translateUi("estimatedTime",language)}: {current.duration_minutes>=60?Math.floor(current.duration_minutes/60)+(language === "np" ? " घण्टा" : " hr")+(current.duration_minutes%60?(language === "np" ? " "+current.duration_minutes%60+" मिनेट" : " "+current.duration_minutes%60+" min"):""):current.duration_minutes+" "+translateUi("minutesShort",language)}</div>
+     <div className="mk-scope-grid"><div><h3><Check size={16}/> {translateUi("whatIncluded",language)}</h3><ul>{current.included.map(x=><li key={x}>{x}</li>)}</ul></div><div><h3><X size={16}/> {translateUi("whatExcluded",language)}</h3><ul>{current.excluded.map(x=><li key={x}>{x}</li>)}</ul></div></div>
+     <p className="mk-detail-disclaimer">{language === "np" ? "थप पार्टपुर्जा वा कामका लागि छुट्टै मूल्य प्रस्ताव र तपाईंको स्वीकृति आवश्यक हुन्छ। तस्बिर उदाहरणका लागि हुन्; सेवा प्रदायक उपलब्ध छन् भन्ने ग्यारेन्टी होइन।" : "Parts and extra work require a separate quote and your approval. Photos illustrate the activity; no provider availability is implied."}</p><div className="mk-detail-actions"><button className="mk-outline" onClick={()=>add(current.id)}>{translateUi("addToCart",language)}</button><button className="mk-primary" onClick={()=>add(current.id,true)}>{translateUi("bookNow",language)} <ChevronRight size={17}/></button></div></div></div></MarketplaceDialog>}
    {modal&&<MarketplaceDialog key={modal} title={modal==="cart"?"Your Tirkha cart":modal==="auth"?"Tirkha portals":"My demo bookings"} onClose={()=>setModal(null)}>{modal==="cart"?cartContent:modal==="auth"?authContent:orderContent}</MarketplaceDialog>}
  </>;
 }
