@@ -13,20 +13,25 @@ type RoadCollection = { type: "FeatureCollection"; features: RoadFeature[] };
 type RoadLabelCandidate = { key: string; name: string; kind: RoadProperties["class"]; positions: LatLngExpression[] };
 type BuildingFeature = { type: "Feature"; id?: string; properties?: { kind?: string; center?: [number, number] }; geometry: { type: "Polygon"; coordinates: number[][][] } };
 type BuildingCollection = { type: "FeatureCollection"; features: BuildingFeature[] };
+const prominentNeighborhoods = new Set([
+  "THAMEL", "DURBAR MARG", "LAZIMPAT", "NAXAL", "PUTALISADAK", "GAUSHALA",
+  "NEW BANESHWOR", "MID-BANESHWOR", "OLD BANESHWOR", "KOTESHWOR NEIGHBORHOOD",
+  "KUPONDOLE", "JHAMSIKHEL", "PULCHOWK", "JAWALAKHEL", "BHAKTAPUR DURBAR SQUARE",
+  "POKHARA LAKESIDE", "BUDDHA CHOWK", "SIMARA CHOWK",
+]);
 
 function subscribeAfterGesture(map: ReturnType<typeof useMap>, events: string, callback: () => void) {
-  let timeout: number | undefined;
   let frame: number | undefined;
   const schedule = () => {
-    if (timeout !== undefined) window.clearTimeout(timeout);
-    timeout = window.setTimeout(() => {
-      frame = window.requestAnimationFrame(callback);
-    }, 150);
+    if (frame !== undefined) return;
+    frame = window.requestAnimationFrame(() => {
+      frame = undefined;
+      callback();
+    });
   };
   map.on(events, schedule);
   return () => {
     map.off(events, schedule);
-    if (timeout !== undefined) window.clearTimeout(timeout);
     if (frame !== undefined) window.cancelAnimationFrame(frame);
   };
 }
@@ -208,7 +213,7 @@ function CityBlockLayouts() {
       const fillColor = block.landUse === "commercial" ? "#e7e3d6" : block.landUse === "industrial" ? "#dce3df" : "#e0e8df";
       return <Fragment key={block.id}>
         <Polygon positions={block.outline} pathOptions={{ renderer, color: "#fffdf8", weight: zoom >= 18 ? 1.5 : 1, opacity: 0.95, fillColor, fillOpacity: zoom >= 18 ? 0.34 : 0.7, lineJoin: "round", interactive: false }} />
-        {zoom >= 19 && block.buildings.map((outline, index) => <Polygon key={`${block.id}-building-${index}`} positions={outline} pathOptions={{ renderer, color: "#fdfcf8", weight: zoom >= 20 ? 1.25 : 0.9, opacity: 0.98, fillColor: block.landUse === "commercial" ? "#cec9b9" : "#cbd8cc", fillOpacity: 0.92, lineJoin: "round", interactive: false }} />)}
+        {zoom >= 19 && block.buildings.map((outline, index) => <Polygon key={`${block.id}-building-${index}`} positions={outline} pathOptions={{ renderer, color: "#fdfcf8", weight: Math.min(2.6, zoom >= 20 ? 1.25 + (zoom - 20) * 0.34 : 0.9), opacity: 0.98, fillColor: block.landUse === "commercial" ? "#cec9b9" : "#cbd8cc", fillOpacity: 0.92, lineJoin: "round", interactive: false }} />)}
       </Fragment>;
     })}
   </>;
@@ -244,7 +249,7 @@ function CuratedRoadSegment({ road, zoom, fontSize, showLabel, casingRenderer, r
   roadRenderer: ReturnType<typeof svg>;
 }) {
   const pathRef = useRef<LeafletPolyline | null>(null);
-  const widthScale = zoom < 19 ? 1 : Math.min(1.8, 1 + (zoom - 19) * 0.2);
+  const widthScale = zoom < 19 ? 1 : Math.min(2.3, 1 + (zoom - 19) * 0.26);
   const baseWidth = road.kind === "expressway" ? 5.2 : road.kind === "arterial" ? 3.8 : road.kind === "connector" ? 2.5 : 1.35;
   const width = baseWidth * widthScale;
   const color = road.kind === "expressway" ? "#4b7778" : road.kind === "arterial" ? "#829d99" : road.kind === "connector" ? "#b2c0b9" : "#d1d9d2";
@@ -298,7 +303,8 @@ function DetailedBuildingFootprints() {
     style={(feature) => {
       const kind = String(feature?.properties?.kind ?? "");
       const fillColor = kind === "apartments" || kind === "residential" ? "#cbd1c9" : kind === "commercial" ? "#d7d3c7" : "#dedbd1";
-      return { color: "#fffefb", weight: 0.65, opacity: 0.95, fillColor, fillOpacity: 0.96, lineJoin: "round", renderer };
+      const footprintScale = view.zoom < 20 ? 1 : Math.min(2.8, 1.35 + (view.zoom - 20) * 0.36);
+      return { color: "#fffefb", weight: 0.65 * footprintScale, opacity: 0.95, fillColor, fillOpacity: 0.96, lineJoin: "round", renderer };
     }}
     interactive={false}
   />;
@@ -345,7 +351,7 @@ function CuratedLandmarkLabels() {
   const detailTier = zoom >= 20 ? 3 : zoom >= 18 ? 2 : zoom >= 16 ? 1 : 0;
   return <>
     {visible.map((place) => <CircleMarker key={place.name} center={place.point} radius={(place.kind === "district" ? 3.2 : 2) + Math.min(detailTier, 2) * 0.35} pathOptions={{ color: "#fffdf8", weight: 1.5, fillColor: place.kind === "district" ? "#16675c" : "#718b83", fillOpacity: 1 }}>
-      <Tooltip permanent direction="top" offset={[0, -4]} className={`${place.kind === "district" ? "tirkha-city-label" : "tirkha-place-label"} tirkha-label-detail-${detailTier}`}>{place.name}</Tooltip>
+      <Tooltip permanent direction="top" offset={[0, -4]} className={`${place.kind === "district" ? "tirkha-city-label" : "tirkha-place-label"} ${prominentNeighborhoods.has(place.name.toUpperCase()) ? "tirkha-place-label-hub" : ""} tirkha-label-detail-${detailTier}`}>{place.name}</Tooltip>
     </CircleMarker>)}
   </>;
 }
@@ -392,7 +398,7 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
   // of replacing it with an empty canvas when the extract finishes loading.
   if (visibleData.features.length < 12) {
     const zoom = map.getZoom();
-    const scale = zoom < 19 ? 1 : Math.min(1.45, 1 + (zoom - 19) * 0.22);
+    const scale = zoom < 19 ? 1 : Math.min(2.25, 1 + (zoom - 19) * 0.25);
     return <><CuratedRoadNetwork />{visibleData.features.length > 0 && <GeoJSON
       key={boundsKey}
       data={visibleData as never}
@@ -405,7 +411,7 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
     />}</>;
   }
   const fontSize = Math.min(15, Math.max(9.5, 9.5 + (zoom - 15.5) * 0.48));
-  const strokeScale = zoom < 19 ? 1 : Math.min(1.45, 1 + (zoom - 19) * 0.22);
+  const strokeScale = zoom < 19 ? 1 : Math.min(2.25, 1 + (zoom - 19) * 0.25);
   return <>
     <GeoJSON
       key={boundsKey}
