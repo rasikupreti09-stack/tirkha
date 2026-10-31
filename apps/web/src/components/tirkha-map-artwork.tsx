@@ -79,6 +79,7 @@ export const TirkhaMapArtwork = memo(function TirkhaMapArtwork() {
 
 function CuratedRoadNetwork() {
   const map = useMap();
+  const renderer = useMemo(() => canvas({ padding: 0.25 }), []);
   const [zoom, setZoom] = useState(map.getZoom());
   useEffect(() => {
     const update = () => setZoom(map.getZoom());
@@ -90,9 +91,9 @@ function CuratedRoadNetwork() {
       const color = road.kind === "expressway" ? "#4b7778" : road.kind === "arterial" ? "#829d99" : road.kind === "connector" ? "#b2c0b9" : "#d1d9d2";
       const labelZoom = road.kind === "expressway" ? 11 : road.kind === "arterial" ? 13 : road.kind === "connector" ? 15 : 16;
       return <Fragment key={`road-${index}`}>
-        <Polyline positions={road.points} pathOptions={{ color: "#fbfcf9", weight: width + 3, opacity: 0.94, lineCap: "round", lineJoin: "round", interactive: false }} />
-        <Polyline positions={road.points} pathOptions={{ color, weight: width, opacity: road.kind === "local" ? 0.85 : 1, lineCap: "round", lineJoin: "round", interactive: zoom >= labelZoom }}>
-          {road.name && zoom >= labelZoom && <Tooltip sticky direction="top" className="tirkha-road-label">{road.name}</Tooltip>}
+        <Polyline positions={road.points} pathOptions={{ color: "#fbfcf9", weight: width + 3, opacity: 0.94, lineCap: "round", lineJoin: "round", interactive: false, renderer }} />
+        <Polyline positions={road.points} pathOptions={{ color, weight: width, opacity: road.kind === "local" ? 0.85 : 1, lineCap: "round", lineJoin: "round", interactive: zoom >= labelZoom, renderer }}>
+          {road.name && zoom >= labelZoom && <Tooltip sticky permanent={zoom >= labelZoom + 2} direction="top" className="tirkha-road-label">{road.name}</Tooltip>}
         </Polyline>
       </Fragment>;
     })}
@@ -168,15 +169,17 @@ function CuratedLandmarkLabels() {
   }, [map]);
   const visible = useMemo(() => {
     const bounds = map.getBounds().pad(0.08);
-    const occupied = new Set<string>();
+    const occupied: { left: number; right: number; top: number; bottom: number }[] = [];
     return [...tirkhaLandmarks]
       .filter((place) => zoom >= place.minZoom && bounds.contains(place.point))
       .sort((a, b) => b.minZoom - a.minZoom)
       .filter((place) => {
         const point = map.latLngToContainerPoint(place.point);
-        const cell = `${Math.floor(point.x / 78)}:${Math.floor(point.y / 32)}`;
-        if (occupied.has(cell)) return false;
-        occupied.add(cell);
+        const width = Math.min(180, place.name.length * 5.8 + 16);
+        const height = place.kind === "district" ? 30 : 25;
+        const rect = { left: point.x - width / 2, right: point.x + width / 2, top: point.y - height, bottom: point.y };
+        if (occupied.some(other => rect.left < other.right + 5 && rect.right + 5 > other.left && rect.top < other.bottom + 4 && rect.bottom + 4 > other.top)) return false;
+        occupied.push(rect);
         return true;
       });
   }, [map, zoom]);
@@ -211,6 +214,20 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
     });
     return { ...data, features };
   }, [boundsKey, data]);
+  // The bundled country road extract is sparse outside its original four-city
+  // coverage. Keep the locally curated network visible in those views instead
+  // of replacing it with an empty canvas when the extract finishes loading.
+  if (visibleData.features.length < 12) {
+    return <><CuratedRoadNetwork />{visibleData.features.length > 0 && <GeoJSON
+      key={boundsKey}
+      data={visibleData as never}
+      style={(feature) => {
+        const properties = feature?.properties as RoadProperties | undefined;
+        const type = properties?.class;
+        return { color: type === "expressway" ? "#3e716c" : type === "arterial" ? "#718f87" : type === "connector" ? "#aabbb2" : "#cbd5ce", weight: type === "expressway" ? 3.4 : type === "arterial" ? 2.5 : 1.1, opacity: 0.95, lineCap: "round", lineJoin: "round", renderer };
+      }}
+    />}</>;
+  }
   return <GeoJSON
     key={boundsKey}
     data={visibleData as never}

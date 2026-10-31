@@ -18,7 +18,7 @@ export default function TirkhaMapExplorer() {
   const [selected, setSelected] = useState<Coordinates | null>(null);
   return <section className="tirkha-map-explorer" aria-label="Explore the Tirkha city map">
     <div className="tirkha-map-explorer-canvas">
-      <LocationMap height={580} value={selected ? { ...selected, resolved_address: null } : null} onPick={setSelected} disabled={false} />
+      <LocationMap height={580} value={selected ? { ...selected, resolved_address: null } : null} onPick={setSelected} disabled={false} focusPinOnChange={false} />
     </div>
     <aside className="tirkha-map-explorer-panel">
       <div><span className="tirkha-map-panel-overline">SIX CITIES. ONE LOCAL MAP.</span><h2>Where should we<br />meet you?</h2><p>Pick a city, then zoom in to reveal locally curated streets and neighborhood names. Enable pin mode before tapping to choose a home or entrance.</p></div>

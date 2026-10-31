@@ -6,8 +6,8 @@ import { KATHMANDU_CENTER, REGIONS, type Coordinates, type MapPin } from "@tirkh
 import { TirkhaMapArtwork, TirkhaMapRegionControl, TirkhaMapSignature, TirkhaMapZoomControl } from "./tirkha-map-artwork";
 import { tirkhaCityViews } from "@/lib/tirkha-map-data";
 
-type Props = { value: MapPin | null; onPick: (point: Coordinates) => void; disabled: boolean; height?: number; region?: typeof REGIONS[number]; onRegionChange?: (region: typeof REGIONS[number]) => void };
-const Pin = memo(function Pin({ value, onPick, disabled, pinningEnabled, icon }: Pick<Props, "value" | "onPick" | "disabled"> & { pinningEnabled: boolean; icon: ReturnType<typeof divIcon> }) {
+type Props = { value: MapPin | null; onPick: (point: Coordinates) => void; disabled: boolean; height?: number; region?: typeof REGIONS[number]; onRegionChange?: (region: typeof REGIONS[number]) => void; focusPinOnChange?: boolean };
+const Pin = memo(function Pin({ value, onPick, disabled, pinningEnabled, focusPinOnChange, icon }: Pick<Props, "value" | "onPick" | "disabled" | "focusPinOnChange"> & { pinningEnabled: boolean; icon: ReturnType<typeof divIcon> }) {
   const markerRef = useRef<LeafletMarker | null>(null);
   const pickRef = useRef(onPick);
   const clickEnabledRef = useRef(pinningEnabled && !disabled);
@@ -18,10 +18,10 @@ const Pin = memo(function Pin({ value, onPick, disabled, pinningEnabled, icon }:
   }, []);
   const map = useMapEvents({ click: onMapClick });
   useEffect(() => {
-    if (!value) return;
+    if (!value || focusPinOnChange === false) return;
     markerRef.current?.setLatLng([value.latitude, value.longitude]);
     if (!map.getBounds().contains([value.latitude, value.longitude]) || map.getZoom() < 16) map.flyTo([value.latitude, value.longitude], Math.max(16, map.getZoom()), { animate: true, duration: 0.45 });
-  }, [map, value?.latitude, value?.longitude]);
+  }, [focusPinOnChange, map, value?.latitude, value?.longitude]);
   return value ? <Marker ref={markerRef} position={[value.latitude, value.longitude]} icon={icon} draggable={!disabled && pinningEnabled} title={pinningEnabled ? "Service location — drag to move" : "Enable pin mode to drag the location"} eventHandlers={{
     dragend(event) {
       if (disabled) return;
@@ -67,11 +67,11 @@ export default function LocationMap(props: Props) {
   if (typeof window === "undefined") return <div className="h-[300px] w-full animate-pulse rounded-lg bg-slate-100" role="status">Loading map…</div>;
   return <>
     <div className="tirkha-map-frame">
-      <MapContainer ref={mapRef} center={[center.latitude, center.longitude]} zoom={props.value ? 16 : regionView?.zoom ?? 12} minZoom={6} maxZoom={19} zoomControl={false} zoomSnap={0.5} zoomDelta={0.5} wheelPxPerZoomLevel={120} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} preferCanvas style={{ height: props.height ?? 300, width: "100%", zIndex: 0 }} className="tirkha-vector-map" aria-label="Choose your service location">
+      <MapContainer ref={mapRef} center={[center.latitude, center.longitude]} zoom={props.value && props.focusPinOnChange !== false ? 16 : regionView?.zoom ?? 12} minZoom={6} maxZoom={19} zoomControl={false} zoomSnap={0.5} zoomDelta={0.5} wheelPxPerZoomLevel={120} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} preferCanvas style={{ height: props.height ?? 300, width: "100%", zIndex: 0 }} className="tirkha-vector-map" aria-label="Choose your service location">
         <TirkhaMapArtwork />
         <TirkhaMapRegionControl onRegionSelect={region => props.onRegionChange?.(region as typeof REGIONS[number])} />
         <TirkhaMapZoomControl onLocate={locateMe} locating={locating} pinningEnabled={pinningEnabled} onTogglePinning={() => setPinningEnabled(value => !value)} />
-        <Pin value={props.value} onPick={props.onPick} disabled={props.disabled} pinningEnabled={pinningEnabled} icon={pinIcon} />
+        <Pin value={props.value} onPick={props.onPick} disabled={props.disabled} focusPinOnChange={props.focusPinOnChange} pinningEnabled={pinningEnabled} icon={pinIcon} />
       </MapContainer>
       <TirkhaMapSignature caption="Kathmandu Valley · Pokhara · Hetauda · Simara" />
     </div>
