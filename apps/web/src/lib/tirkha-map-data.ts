@@ -187,10 +187,10 @@ export const tirkhaParks: LatLngExpression[][][] = [
 ];
 
 export const tirkhaCityViews = [
-  { label: "Kathmandu", center: [27.7172,85.324] as [number,number], zoom: 13 },
+  { label: "Kathmandu", center: [27.7172,85.324] as [number,number], zoom: 14 },
   { label: "Lalitpur", center: [27.674,85.322] as [number,number], zoom: 14 },
   { label: "Bhaktapur", center: [27.676,85.432] as [number,number], zoom: 14 },
-  { label: "Pokhara", center: [28.217,83.985] as [number,number], zoom: 13 },
-  { label: "Hetauda", center: [27.4303,85.0322] as [number,number], zoom: 13 },
-  { label: "Simara", center: [27.1666,84.9786] as [number,number], zoom: 13 },
+  { label: "Pokhara", center: [28.217,83.985] as [number,number], zoom: 14 },
+  { label: "Hetauda", center: [27.4303,85.0322] as [number,number], zoom: 14 },
+  { label: "Simara", center: [27.1666,84.9786] as [number,number], zoom: 14 },
 ];
