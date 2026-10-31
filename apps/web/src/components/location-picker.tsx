@@ -31,7 +31,7 @@ export function LocationPicker({ value, onChange, disabled = false }: { value: M
     </details>
     <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" disabled={!value || lookup.busy || disabled} onClick={() => void lookup.resolve()}>{lookup.busy ? "Resolving area…" : "Resolve area"}</Button>
       {value && <Button type="button" variant="outline" disabled={disabled} onClick={() => lookup.pick(null)}>Remove pin</Button>}</div>
-    <p role="status" className="text-sm">{value ? `${value.latitude.toFixed(5)}, ${value.longitude.toFixed(5)} · ${value.resolved_address || "Area not resolved; you can enter it manually."}` : "No pin selected. The map starts in Kathmandu."}</p>
+    <p role="status" className="text-sm">{value ? `${value.latitude.toFixed(5)}, ${value.longitude.toFixed(5)} · ${value.resolved_address || "Area not resolved; you can enter it manually."}` : "No pin selected. Choose a city above, then enable pin mode to mark your location."}</p>
     {(lookup.error || inputError) && <p role="alert" className="text-sm">{inputError || lookup.error}</p>}
     <p className="text-xs text-muted-foreground">Area lookup sends the selected coordinates to OpenStreetMap, not your landmark or job details. Results are approximate; check your address. © <a href="https://www.openstreetmap.org/copyright" className="underline">OpenStreetMap contributors</a>.</p>
   </div>;

@@ -3,7 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { divIcon, type Map as LeafletMap, type Marker as LeafletMarker } from "leaflet";
 import { MapContainer, Marker, Tooltip, useMap } from "react-leaflet";
 import type { BookingStatus } from "@tirkha/shared";
-import { TirkhaMapArtwork, TirkhaMapSignature, TirkhaMapZoomControl } from "@/components/tirkha-map-artwork";
+import { TirkhaMapArtwork, TirkhaMapRegionControl, TirkhaMapSignature, TirkhaMapZoomControl } from "@/components/tirkha-map-artwork";
 
 type HeroLocation = {
   professional_id: string; latitude: number; longitude: number; heading: number | null;
@@ -69,8 +69,9 @@ export function OperationsMap({ heroes, locations, jobs }: { heroes: Hero[]; loc
   if (typeof window === "undefined") return <div className="grid min-h-[480px] place-items-center rounded-xl border bg-muted text-sm text-muted-foreground" role="status">Loading Valley fleet map…</div>;
   return <div className="grid min-h-[480px] overflow-hidden rounded-xl border bg-card lg:grid-cols-[minmax(0,1fr)_320px]">
     <div className="tirkha-map-frame relative min-h-[420px]">
-      <MapContainer ref={mapRef} center={VALLEY_CENTER} zoom={12} minZoom={6} maxZoom={19} zoomControl={false} zoomSnap={0.5} zoomDelta={0.5} wheelPxPerZoomLevel={120} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} className="tirkha-vector-map !h-full !min-h-[420px] !w-full" aria-label="Live Kathmandu Valley Hero fleet map">
+      <MapContainer ref={mapRef} center={VALLEY_CENTER} zoom={12} minZoom={6} maxZoom={19} zoomControl={false} zoomSnap={0.5} zoomDelta={0.5} wheelPxPerZoomLevel={120} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} preferCanvas className="tirkha-vector-map !h-full !min-h-[420px] !w-full" aria-label="Live Hero fleet map across Tirkha service regions">
         <TirkhaMapArtwork />
+        <TirkhaMapRegionControl />
         <TirkhaMapZoomControl recenterPoints={selectedLocation ? [[selectedLocation.latitude, selectedLocation.longitude]] : [VALLEY_CENTER]} />
         <SelectedHeroFocus location={selectedLocation} />
         {liveLocations.map(location => <FleetMarker key={location.professional_id} location={location} stale={Date.now() - Date.parse(location.updated_at) > 90_000} name={heroes.find(hero => hero.id === location.professional_id)?.name || "Hero"} onSelect={selectHero} />)}

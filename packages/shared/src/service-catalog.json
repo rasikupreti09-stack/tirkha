@@ -33,7 +33,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 0,
@@ -73,7 +75,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 1
@@ -110,7 +114,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 2
@@ -149,7 +155,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 3
@@ -185,7 +193,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 4,
@@ -225,7 +235,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 5
@@ -263,7 +275,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 6
@@ -302,7 +316,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 7
@@ -340,7 +356,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 8
@@ -377,7 +395,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 9
@@ -415,7 +435,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 10
@@ -453,7 +475,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 11
@@ -491,7 +515,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 12
@@ -530,7 +556,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 13
@@ -567,7 +595,9 @@
     "regions": [
       "Kathmandu",
       "Lalitpur",
-      "Bhaktapur"
+      "Bhaktapur",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 14
@@ -606,7 +636,9 @@
     "regions": [
       "Kathmandu",
       "Lalitpur",
-      "Bhaktapur"
+      "Bhaktapur",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 15
@@ -645,7 +677,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 16
@@ -683,7 +717,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 17,
@@ -721,7 +757,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 18,
@@ -759,7 +797,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 19,
@@ -796,7 +836,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 20,
@@ -833,7 +875,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 21,
@@ -869,7 +913,9 @@
       "Kathmandu",
       "Lalitpur",
       "Bhaktapur",
-      "Pokhara"
+      "Pokhara",
+      "Hetauda",
+      "Simara"
     ],
     "active": true,
     "sort_order": 22,

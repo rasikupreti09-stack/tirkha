@@ -13,7 +13,11 @@
 .tirkha-map-frame { position: relative; overflow: hidden; border-radius: inherit; }
 .tirkha-vector-map.leaflet-container { background: #f3f5ef; color: #20372f; font-family: inherit; touch-action: none; overscroll-behavior: none; }
 .tirkha-vector-map .leaflet-pane { z-index: 200; }
+.tirkha-vector-map .leaflet-map-pane,
+.tirkha-vector-map .leaflet-overlay-pane,
+.tirkha-vector-map .leaflet-marker-pane { will-change: transform; backface-visibility: hidden; }
 .tirkha-vector-map .leaflet-overlay-pane svg { overflow: visible; }
+.tirkha-vector-map .leaflet-tooltip { text-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; }
 .leaflet-tooltip.tirkha-place-label,
 .leaflet-tooltip.tirkha-city-label { border: 1px solid #d1d9d2; border-radius: 7px; padding: 4px 7px; background: #fffffff2; box-shadow: 0 2px 8px #0f172a26; color: #1f2937; font: 800 10px/1.2 Arial, sans-serif; letter-spacing: .08em; text-shadow: none; white-space: nowrap; }
 .leaflet-tooltip.tirkha-city-label { color: #064e3b; font-size: 11px; font-weight: 850; letter-spacing: .12em; }
@@ -38,6 +42,8 @@
 .tirkha-zoom-stack button { display: grid; width: 44px; height: 44px; place-items: center; border: 0; background: #fff; color: #1f2937; cursor: pointer; font: 600 27px/1 Arial, sans-serif; touch-action: manipulation; transition: background-color .16s ease, color .16s ease; }
 .tirkha-zoom-stack button + button { border-top: 1px solid #e2e8f0; }
 .tirkha-zoom-stack button:hover { background: #ecfdf5; color: #047857; }
+.tirkha-zoom-stack button.is-pinning { background: #047857; color: #fff; box-shadow: inset 0 0 0 2px #a7f3d0; }
+.tirkha-zoom-stack button.is-pinning:hover { background: #065f46; color: #fff; }
 .tirkha-zoom-stack button:focus-visible { position: relative; z-index: 1; outline: 3px solid #10b981; outline-offset: -3px; }
 @media (max-width: 640px) { .tirkha-zoom-control { margin: 10px 0 0 10px; } .tirkha-zoom-stack button { width: 46px; height: 46px; } }
 .tirkha-map-live-dot { width: 6px; height: 6px; margin-left: 5px; border-radius: 50%; background: #31a776; box-shadow: 0 0 0 4px #31a7761d; }

@@ -10,6 +10,8 @@ const regions = [
   { name: "Lalitpur", caption: "Patan and the southern valley", coordinate: [27.674, 85.322] as [number,number] },
   { name: "Bhaktapur", caption: "Heritage streets, familiar turns", coordinate: [27.676, 85.432] as [number,number] },
   { name: "Pokhara", caption: "Lakeside and the city center", coordinate: [28.217, 83.985] as [number,number] },
+  { name: "Hetauda", caption: "Buddha Chowk and Rapti Road", coordinate: [27.4303, 85.0322] as [number,number] },
+  { name: "Simara", caption: "Simara Chowk and Jeetpur-Simara", coordinate: [27.1666, 84.9786] as [number,number] },
 ];
 
 export default function TirkhaMapExplorer() {
@@ -19,7 +21,7 @@ export default function TirkhaMapExplorer() {
       <LocationMap height={580} value={selected ? { ...selected, resolved_address: null } : null} onPick={setSelected} disabled={false} />
     </div>
     <aside className="tirkha-map-explorer-panel">
-      <div><span className="tirkha-map-panel-overline">FOUR CITIES. ONE LOCAL MAP.</span><h2>Where should we<br />meet you?</h2><p>Pick a city, then zoom in to reveal local names and mapped building outlines. Tap the map to place your service pin at the right home or entrance.</p></div>
+      <div><span className="tirkha-map-panel-overline">SIX CITIES. ONE LOCAL MAP.</span><h2>Where should we<br />meet you?</h2><p>Pick a city, then zoom in to reveal locally curated streets and neighborhood names. Enable pin mode before tapping to choose a home or entrance.</p></div>
       <div className="tirkha-map-city-list" aria-label="Map regions">
         {regions.map((region, index) => <button type="button" key={region.name} onClick={() => { setSelected({ latitude: region.coordinate[0], longitude: region.coordinate[1] }); }}>
           <span className="tirkha-map-city-number">0{index + 1}</span><span className="tirkha-map-city-copy"><strong>{region.name}</strong><small>{region.caption}</small></span><span className="tirkha-map-city-arrow" aria-hidden="true">↗</span>

@@ -16,6 +16,10 @@ const landmarks = [
  {name:"Kupondole",region:"Lalitpur" as const,latitude:27.688,longitude:85.313},
  {name:"Bhaktapur Durbar Square",region:"Bhaktapur" as const,latitude:27.672,longitude:85.429},
  {name:"Lakeside, Pokhara",region:"Pokhara" as const,latitude:28.2096,longitude:83.959},
+ {name:"Buddha Chowk, Hetauda",region:"Hetauda" as const,latitude:27.43075,longitude:85.03258},
+ {name:"Hetauda Bus Park",region:"Hetauda" as const,latitude:27.43018,longitude:85.02882},
+ {name:"Simara Chowk",region:"Simara" as const,latitude:27.1666,longitude:84.9786},
+ {name:"Simara Airport",region:"Simara" as const,latitude:27.15944,longitude:84.98000},
 ];
 function formatSchedule(value:string){
  const date=new Date(value);
@@ -73,10 +77,10 @@ export function MarketplaceOverlays(){
    {formError&&<p className="mk-form-error" role="alert">{formError}</p>}
    <button className="mk-primary mk-primary-wide" disabled={busy||!ready}>{busy?"Saving…":"Save demo booking"} <Check size={16}/></button><p className="mk-demo-caption">{paymentMethod==="COD"?"No payment now. COD is due after service.":"Payment stays unverified in this test flow; the receipt will clearly show that no money was collected."}</p>
    </>:<>
-   <div className="mk-overlay-heading"><div><span className="mk-kicker">THE FINAL DETAILS</span><h2>Where should we meet you?</h2><p>Choose a Kathmandu Valley or Pokhara landmark, then add your street and house details.</p></div></div>
+   <div className="mk-overlay-heading"><div><span className="mk-kicker">THE FINAL DETAILS</span><h2>Where should we meet you?</h2><p>Choose a service city and landmark, then add your street, tole and house details.</p></div></div>
    <label className="mk-field-label" htmlFor="mk-landmark">Popular landmarks</label><div className="mk-landmarks">{landmarks.map(item=><button type="button" key={item.name} className={address.startsWith(item.name)?"is-selected":""} onClick={()=>selectLandmark(item)}><MapPin size={14}/>{item.name}</button>)}</div>
    <div className="mk-map-tools"><span><MapPin size={15}/>{pin?pin.latitude.toFixed(5)+", "+pin.longitude.toFixed(5):"Tap the map to place your pin"}</span><button type="button" onClick={locate} disabled={geoBusy}><LocateFixed size={15}/>{geoBusy?"Finding you…":"Use my location"}</button></div>
-   <div className="mk-map-frame"><LocationMap value={pin?{...pin,resolved_address:address||null}:null} onPick={point=>{setPin(point);setFormError("Pin saved. Add the street, tole and house details below.");}} disabled={false}/></div>
+   <div className="mk-map-frame"><LocationMap region={state.region} onRegionChange={setRegion} value={pin?{...pin,resolved_address:address||null}:null} onPick={point=>{setPin(point);setFormError("Pin saved. Add the street, tole and house details below.");}} disabled={false}/></div>
    <label className="mk-label">Full address<textarea required minLength={5} maxLength={500} value={address} onChange={e=>setAddress(e.target.value)} placeholder="House number, street/tole, landmark, ward and city" rows={3}/></label>
    <label className="mk-label">Appointment time (Nepal Time)<input required type="datetime-local" value={scheduled} onChange={e=>setScheduled(e.target.value)} min={nepalInputFromDate(new Date(Date.now()+3600000))}/></label>
    {formError&&<p className="mk-form-error" role="alert">{formError}</p>}

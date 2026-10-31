@@ -43,6 +43,18 @@ export const tirkhaRoads: TirkhaRoad[] = [
   { name: "Mahendrapul neighborhood", kind: "local", points: [[28.226,83.983],[28.230,83.986],[28.233,83.990],[28.237,83.988],[28.240,83.985]] },
   { name: "Pokhara city grid", kind: "local", points: [[28.201,83.976],[28.205,83.979],[28.210,83.980],[28.215,83.979],[28.220,83.981],[28.225,83.985]] },
   { name: "Lakeside access lanes", kind: "local", points: [[28.207,83.956],[28.212,83.960],[28.216,83.964],[28.219,83.970],[28.222,83.976]] },
+  // Hetauda street spine and nearby neighborhoods. Coordinates are city-center references.
+  { name: "Tribhuvan Highway · Hetauda spine", kind: "arterial", points: [[27.408,85.018],[27.416,85.023],[27.423,85.027],[27.4303,85.0322],[27.438,85.037],[27.446,85.042],[27.455,85.048]] },
+  { name: "Rapti Road · Buddha Chowk", kind: "connector", points: [[27.4308,85.0326],[27.428,85.035],[27.424,85.039],[27.420,85.043],[27.416,85.047]] },
+  { name: "Hetauda Bus Park approach", kind: "connector", points: [[27.4298,85.0288],[27.4303,85.0322],[27.4323,85.0277],[27.434,85.024],[27.438,85.021]] },
+  { name: "Hetauda market streets", kind: "local", points: [[27.426,85.024],[27.429,85.028],[27.431,85.032],[27.434,85.036],[27.438,85.039]] },
+  { name: "Sanopokhara neighborhood", kind: "local", points: [[27.420,85.040],[27.424,85.043],[27.428,85.045],[27.433,85.044],[27.437,85.041]] },
+  // Simara / Jeetpur-Simara and the Mahendra Highway corridor.
+  { name: "Mahendra Highway · Simara", kind: "arterial", points: [[27.145,84.955],[27.152,84.963],[27.159,84.970],[27.1666,84.9786],[27.174,84.986],[27.182,84.994],[27.191,85.003]] },
+  { name: "Simara Airport Road", kind: "connector", points: [[27.1594,84.9800],[27.163,84.980],[27.1666,84.9786],[27.171,84.976],[27.176,84.973]] },
+  { name: "Simara Chowk neighborhood", kind: "local", points: [[27.161,84.973],[27.164,84.976],[27.1666,84.9786],[27.170,84.982],[27.174,84.983]] },
+  { name: "Jeetpur bazaar connector", kind: "connector", points: [[27.177,84.985],[27.184,84.988],[27.191,84.991],[27.199,84.993],[27.207,84.995]] },
+  { name: "Pathlaiya approach", kind: "local", points: [[27.204,84.996],[27.209,84.999],[27.214,85.003],[27.220,85.007]] },
 ];
 
 export const tirkhaWaterways: LatLngExpression[][] = [
@@ -55,6 +67,8 @@ export const tirkhaLandmarks: { name: string; point: [number, number]; kind: "di
   { name: "LALITPUR · PATAN", point: [27.674,85.322], kind: "district", minZoom: 10 },
   { name: "BHAKTAPUR", point: [27.676,85.432], kind: "district", minZoom: 10 },
   { name: "POKHARA", point: [28.217,83.985], kind: "district", minZoom: 10 },
+  { name: "HETAUDA", point: [27.4303,85.0322], kind: "district", minZoom: 10 },
+  { name: "SIMARA · JEETPUR-SIMARA", point: [27.1666,84.9786], kind: "district", minZoom: 10 },
   { name: "THAMEL", point: [27.7153,85.3123], kind: "landmark", minZoom: 13 },
   { name: "DURBAR MARG", point: [27.7114,85.3174], kind: "landmark", minZoom: 14 },
   { name: "NEW BANESHWOR", point: [27.6915,85.342], kind: "landmark", minZoom: 13 },
@@ -103,6 +117,15 @@ export const tirkhaLandmarks: { name: string; point: [number, number]; kind: "di
   { name: "Birauta", point: [28.184,83.968], kind: "service", minZoom: 14 },
   { name: "Chhorepatan", point: [28.185,83.946], kind: "service", minZoom: 14 },
   { name: "Srijana Chowk", point: [28.215,83.987], kind: "service", minZoom: 15 },
+  { name: "BUDDHA CHOWK", point: [27.43075,85.03258], kind: "landmark", minZoom: 13 },
+  { name: "HETAUDA BUS PARK", point: [27.43018,85.02882], kind: "service", minZoom: 13 },
+  { name: "HETAUDA HOSPITAL", point: [27.43231,85.02772], kind: "service", minZoom: 14 },
+  { name: "SANOPOKHARA CHOWK", point: [27.420,85.040], kind: "service", minZoom: 14 },
+  { name: "RAPTI ROAD", point: [27.424,85.039], kind: "service", minZoom: 15 },
+  { name: "SIMARA CHOWK", point: [27.1666,84.9786], kind: "landmark", minZoom: 13 },
+  { name: "SIMARA AIRPORT", point: [27.15944,84.98000], kind: "service", minZoom: 13 },
+  { name: "JEETPUR BAZAAR", point: [27.185,84.989], kind: "service", minZoom: 14 },
+  { name: "PATHLAIYA", point: [27.214,85.003], kind: "service", minZoom: 13 },
 ];
 
 export const tirkhaParks: LatLngExpression[][][] = [
@@ -116,4 +139,6 @@ export const tirkhaCityViews = [
   { label: "Lalitpur", center: [27.674,85.322] as [number,number], zoom: 14 },
   { label: "Bhaktapur", center: [27.676,85.432] as [number,number], zoom: 14 },
   { label: "Pokhara", center: [28.217,83.985] as [number,number], zoom: 13 },
+  { label: "Hetauda", center: [27.4303,85.0322] as [number,number], zoom: 14 },
+  { label: "Simara", center: [27.1666,84.9786] as [number,number], zoom: 14 },
 ];

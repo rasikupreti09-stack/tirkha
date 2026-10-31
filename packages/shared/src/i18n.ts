@@ -56,6 +56,8 @@ const uiDictionary = {
   city: ["Kathmandu", "काठमाडौं"],
   lalitpur: ["Lalitpur", "ललितपुर"],
   bhaktapur: ["Bhaktapur", "भक्तपुर"],
+  hetauda: ["Hetauda", "हेटौँडा"],
+  simara: ["Simara", "सिमरा"],
   valleyHome: ["Our home. Just like yours.", "हाम्रो घर। तपाईंको जस्तै।"],
   localHeroTeam: ["Local Tirkha Hero team", "स्थानीय Tirkha Hero टोली"],
   discoveryEyebrow: ["GOOD HELP STARTS HERE", "राम्रो सहयोगको सुरुवात यहीँबाट"],

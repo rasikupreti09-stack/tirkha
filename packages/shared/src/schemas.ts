@@ -34,7 +34,7 @@ export const professionalProfileSchema = z.object({
   hourly_rate_paisa: paisaSchema.nullable(),
   trade_code: z.enum(["PLUMBING", "ELECTRICAL", "APPLIANCE_TECHNICIAN", "BEAUTICIAN", "PAINTER", "CLEANER", "HANDYMAN"]).nullable(),
   trade_category: z.enum(["PLUMBING", "ELECTRICAL", "APPLIANCE_TECHNICIAN", "BEAUTICIAN", "PAINTER", "CLEANER", "HANDYMAN"]).nullable().optional(),
-  operational_zone: z.enum(["Kathmandu Valley", "Pokhara"]).nullable(),
+  operational_zone: z.enum(["Kathmandu Valley", "Pokhara", "Hetauda", "Simara"]).nullable(),
   citizenship_document_path: z.string().nullable(),
   suspended_at: timestampSchema.nullable(),
 });

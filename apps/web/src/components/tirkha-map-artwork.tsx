@@ -3,7 +3,7 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { canvas, DomEvent } from "leaflet";
 import { CircleMarker, GeoJSON, Polygon, Polyline, Tooltip, useMap } from "react-leaflet";
-import { Crosshair } from "lucide-react";
+import { Crosshair, MapPin, MapPinned } from "lucide-react";
 import { tirkhaCityViews, tirkhaLandmarks, tirkhaParks, tirkhaRoads, tirkhaWaterways } from "@/lib/tirkha-map-data";
 import { TirkhaMark } from "./tirkha-mark";
 
@@ -104,7 +104,7 @@ function DetailedBuildingFootprints() {
   const readView = () => {
     const zoom = map.getZoom();
     const region = footprintRegion(map.getCenter().lat, map.getCenter().lng);
-    const tiles = zoom >= 16 ? mapBuildingTiles(map) : [];
+    const tiles = zoom >= 16 && region ? mapBuildingTiles(map) : [];
     return { zoom, region, tiles, signature: `${region}:${tiles.join(",")}`, viewport: map.getBounds().toBBoxString() };
   };
   const [view, setView] = useState(readView);
@@ -117,10 +117,11 @@ function DetailedBuildingFootprints() {
   }, [map]);
 
   useEffect(() => {
-    if (view.zoom < 16 || !view.tiles.length || view.tiles.length > 32 || data?.signature === view.signature) return;
+    if (view.zoom < 16 || !view.region || !view.tiles.length || view.tiles.length > 32 || data?.signature === view.signature) return;
     const controller = new AbortController();
-    void Promise.all(view.tiles.map((tile) => loadBuildingTile(view.region, tile, controller.signal)))
-      .then((collections) => { if (!controller.signal.aborted) setData({ signature: view.signature, region: view.region, features: collections.flat() }); })
+    const region = view.region;
+    void Promise.all(view.tiles.map((tile) => loadBuildingTile(region, tile, controller.signal)))
+      .then((collections) => { if (!controller.signal.aborted) setData({ signature: view.signature, region, features: collections.flat() }); })
       .catch(() => undefined);
     return () => controller.abort();
   }, [data?.signature, view.region, view.signature, view.zoom]);
@@ -147,7 +148,11 @@ function DetailedBuildingFootprints() {
   />;
 }
 
-function footprintRegion(latitude: number, longitude: number) {
+function footprintRegion(latitude: number, longitude: number): string | null {
+  // Detailed footprint packs currently cover these four cities only. New cities
+  // keep their native road and landmark artwork without requesting fake tiles.
+  if ((latitude >= 27.38 && latitude <= 27.49 && longitude >= 84.94 && longitude <= 85.10)
+    || (latitude >= 27.12 && latitude <= 27.23 && longitude >= 84.91 && longitude <= 85.04)) return null;
   if (latitude >= 28.12) return "pokhara";
   if (longitude >= 85.39) return "bhaktapur";
   if (latitude < 27.70 || longitude < 85.30) return "lalitpur";
@@ -185,9 +190,30 @@ function CuratedLandmarkLabels() {
 function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
   const map = useMap();
   const renderer = useMemo(() => canvas({ padding: 0.5 }), []);
+  const readBounds = () => map.getBounds().pad(0.3).toBBoxString();
+  const [boundsKey, setBoundsKey] = useState(readBounds);
   useEffect(() => { map.invalidateSize({ pan: false }); }, [map]);
+  useEffect(() => {
+    const update = () => setBoundsKey(readBounds());
+    return subscribeAfterGesture(map, "zoomend moveend", update);
+  }, [map]);
+  const visibleData = useMemo(() => {
+    const [west, south, east, north] = boundsKey.split(",").map(Number);
+    const features = data.features.filter(feature => {
+      const points = feature.geometry.coordinates;
+      if (!points.length) return false;
+      let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+      for (const [longitude, latitude] of points) {
+        minLng = Math.min(minLng, longitude); minLat = Math.min(minLat, latitude);
+        maxLng = Math.max(maxLng, longitude); maxLat = Math.max(maxLat, latitude);
+      }
+      return maxLng >= west && minLng <= east && maxLat >= south && minLat <= north;
+    });
+    return { ...data, features };
+  }, [boundsKey, data]);
   return <GeoJSON
-    data={data as never}
+    key={boundsKey}
+    data={visibleData as never}
     style={(feature) => {
       const properties = feature?.properties as RoadProperties | undefined;
       const type = properties?.class;
@@ -209,22 +235,24 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
   />;
 }
 
-export function TirkhaMapRegionControl() {
+export function TirkhaMapRegionControl({ onRegionSelect }: { onRegionSelect?: (region: string) => void } = {}) {
   const map = useMap();
   const controlRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (controlRef.current) DomEvent.disableClickPropagation(controlRef.current); }, []);
   return <div ref={controlRef} className="leaflet-top leaflet-right tirkha-region-control" aria-label="Choose map region">
-    <div className="tirkha-region-pills">{tirkhaCityViews.map((city) => <button key={city.label} type="button" onClick={(event) => { event.stopPropagation(); map.flyTo(city.center, city.zoom, { duration: 0.7 }); }} aria-label={`Show ${city.label}`}>
+    <div className="tirkha-region-pills">{tirkhaCityViews.map((city) => <button key={city.label} type="button" onClick={(event) => { event.stopPropagation(); map.flyTo(city.center, city.zoom, { duration: 0.7 }); onRegionSelect?.(city.label); }} aria-label={`Show ${city.label}`}>
       <span className="tirkha-region-dot" />{city.label}
     </button>)}</div>
   </div>;
 }
 
 /** Shared animated map controls sized for mouse, stylus, and touch use. */
-export function TirkhaMapZoomControl({ recenterPoints, onLocate, locating = false }: {
+export function TirkhaMapZoomControl({ recenterPoints, onLocate, locating = false, pinningEnabled, onTogglePinning }: {
   recenterPoints?: [number, number][];
   onLocate?: () => void;
   locating?: boolean;
+  pinningEnabled?: boolean;
+  onTogglePinning?: () => void;
 }) {
   const map = useMap();
   const controlRef = useRef<HTMLDivElement>(null);
@@ -239,6 +267,7 @@ export function TirkhaMapZoomControl({ recenterPoints, onLocate, locating = fals
         else if (recenterPoints[0]) map.flyTo(recenterPoints[0], Math.max(16, map.getZoom()), { animate: true, duration: 0.65 });
       }}><Crosshair size={18} aria-hidden="true" /></button>}
       {onLocate && <button type="button" aria-label="My Location" title={locating ? "Finding your location…" : "My Location"} disabled={locating} onClick={(event) => { event.stopPropagation(); onLocate(); }}><Crosshair size={18} aria-hidden="true" /></button>}
+      {onTogglePinning && <button className={pinningEnabled ? "is-pinning" : ""} type="button" aria-label={pinningEnabled ? "Disable location pin mode" : "Enable location pin mode"} aria-pressed={pinningEnabled} title={pinningEnabled ? "Pin mode on · tap the map to place your pin" : "Pin mode off · safe to pan the map"} onClick={(event) => { event.stopPropagation(); onTogglePinning(); }}>{pinningEnabled ? <MapPinned size={18} aria-hidden="true" /> : <MapPin size={18} aria-hidden="true" />}</button>}
     </div>
   </div>;
 }

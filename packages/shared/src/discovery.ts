@@ -7,6 +7,8 @@ export const NEPAL_AREA_SUGGESTIONS = [
   { municipality: "Lalitpur", landmarks: ["Patan Dhoka", "Jawalakhel", "Satdobato", "Bhaisepati"] },
   { municipality: "Bhaktapur", landmarks: ["Suryabinayak", "Kamalbinayak", "Dudhpati"] },
   { municipality: "Pokhara", landmarks: ["Lakeside", "Prithvi Chowk", "Mahendrapul"] },
+  { municipality: "Hetauda", landmarks: ["Buddha Chowk", "Hetauda Bus Park", "Sanopokhara", "Rapti Road"] },
+  { municipality: "Simara", landmarks: ["Simara Chowk", "Simara Airport", "Pathlaiya", "Jeetpur Bazaar"] },
   { municipality: "Bharatpur", landmarks: ["Narayanghat", "Hakim Chowk"] },
   { municipality: "Biratnagar", landmarks: ["Traffic Chowk", "Rani"] },
   { municipality: "Butwal", landmarks: ["Traffic Chowk", "Kalikanagar"] },

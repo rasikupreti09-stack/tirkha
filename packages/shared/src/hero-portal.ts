@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const HERO_TRADES = ["PLUMBING", "ELECTRICAL", "APPLIANCE_TECHNICIAN", "BEAUTICIAN", "PAINTER", "CLEANER", "HANDYMAN"] as const;
-export const HERO_OPERATIONAL_ZONES = ["Kathmandu Valley", "Pokhara"] as const;
+export const HERO_OPERATIONAL_ZONES = ["Kathmandu Valley", "Pokhara", "Hetauda", "Simara"] as const;
 export const heroTradeSchema = z.enum(HERO_TRADES);
 export const heroOperationalZoneSchema = z.enum(HERO_OPERATIONAL_ZONES);
 export const heroRegistrationSchema = z.strictObject({
