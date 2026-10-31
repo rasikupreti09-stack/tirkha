@@ -17,7 +17,8 @@
 .tirkha-vector-map .leaflet-map-pane,
 .tirkha-vector-map .leaflet-overlay-pane,
 .tirkha-vector-map .leaflet-marker-pane { will-change: transform; backface-visibility: hidden; }
-.tirkha-vector-map .leaflet-overlay-pane svg { overflow: visible; }
+.tirkha-vector-map .leaflet-overlay-pane svg { overflow: visible; will-change: transform; transform: translate3d(0, 0, 0); backface-visibility: hidden; }
+.tirkha-vector-map .leaflet-overlay-pane canvas { will-change: transform; transform: translate3d(0, 0, 0); backface-visibility: hidden; }
 .tirkha-vector-map .leaflet-tooltip { text-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; }
 .tirkha-vector-map.leaflet-zoom-anim .leaflet-zoom-animated { transition-duration: 100ms !important; }
 .leaflet-tooltip.tirkha-place-label,
@@ -44,7 +45,7 @@
 .tirkha-map-signature strong { color: #255448; font-size: 9px; letter-spacing: .13em; }
 .tirkha-map-signature small { color: #718179; font-size: 9px; }
 .tirkha-map-signature a { color: #7b8982; font-size: 7px; text-decoration: underline; text-underline-offset: 2px; }
-.tirkha-road-inline-label { fill: #fff; stroke: #354b47; stroke-width: 2.6px; stroke-linecap: round; stroke-linejoin: round; paint-order: stroke fill; font-family: Arial, sans-serif; font-weight: 800; letter-spacing: .04em; pointer-events: none; user-select: none; text-rendering: geometricPrecision; transition: font-size 140ms linear; }
+.tirkha-road-inline-label { fill: #21463b; stroke: #fffffff0; stroke-width: 5px; stroke-linecap: round; stroke-linejoin: round; paint-order: stroke fill; font-family: Arial, sans-serif; font-weight: 850; letter-spacing: .035em; pointer-events: none; user-select: none; text-rendering: geometricPrecision; transition: font-size 100ms linear; }
 .tirkha-zoom-control { z-index: 700; margin: 12px 0 0 12px; }
 .tirkha-zoom-stack { display: grid; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; box-shadow: 0 4px 16px #0f172a2b; }
 .tirkha-zoom-stack button { display: grid; width: 44px; height: 44px; place-items: center; border: 0; background: #fff; color: #1f2937; cursor: pointer; font: 600 27px/1 Arial, sans-serif; touch-action: manipulation; transition: background-color .16s ease, color .16s ease; }

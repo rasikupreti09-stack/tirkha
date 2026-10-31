@@ -15,9 +15,10 @@ type RoadLabelPlacement = { startOffset: number; scale: number };
 type BuildingFeature = { type: "Feature"; id?: string; properties?: { kind?: string; center?: [number, number] }; geometry: { type: "Polygon"; coordinates: number[][][] } };
 type BuildingCollection = { type: "FeatureCollection"; features: BuildingFeature[] };
 const prominentNeighborhoods = new Set([
-  "THAMEL", "DURBAR MARG", "LAZIMPAT", "NAXAL", "PUTALISADAK", "GAUSHALA",
-  "NEW BANESHWOR", "MID-BANESHWOR", "OLD BANESHWOR", "KOTESHWOR NEIGHBORHOOD",
-  "KUPONDOLE", "JHAMSIKHEL", "PULCHOWK", "JAWALAKHEL", "BHAKTAPUR DURBAR SQUARE",
+  "THAMEL", "DURBAR MARG", "LAZIMPAT", "NAXAL", "PUTALISADAK", "GAUSHALA", "BALKHU", "KALANKI",
+  "TRIPURESHWOR", "MAITIGHAR", "SINAMANGAL", "KOTESHWOR", "KOTESHWOR NEIGHBORHOOD", "BOUDDHA · BOUDHANATH",
+  "NEW BANESHWOR", "MID-BANESHWOR", "OLD BANESHWOR", "LALITPUR · PATAN",
+  "KUPONDOLE", "JHAMSIKHEL", "PULCHOWK", "JAWALAKHEL", "PATAN DURBAR SQUARE", "BHAKTAPUR DURBAR SQUARE",
   "POKHARA LAKESIDE", "BUDDHA CHOWK", "SIMARA CHOWK",
 ]);
 
@@ -59,16 +60,43 @@ function mapBuildingTiles(map: ReturnType<typeof useMap>) {
 }
 
 function roadLabelZoom(kind: RoadProperties["class"]): number {
-  if (kind === "expressway") return 14.5;
-  return 15.5;
+  if (kind === "expressway") return 11.5;
+  if (kind === "arterial") return 12.5;
+  if (kind === "connector") return 13.5;
+  return 14;
+}
+
+function MapZoomCeiling() {
+  const map = useMap();
+  useEffect(() => { map.setMaxZoom(28); }, [map]);
+  return null;
 }
 
 function labelPriority(kind: RoadProperties["class"]): number {
   return kind === "expressway" ? 0 : kind === "arterial" ? 1 : kind === "connector" ? 2 : 3;
 }
 
+function segmentViewportFraction(start: { x: number; y: number }, end: { x: number; y: number }, width: number, height: number) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  let low = 0;
+  let high = 1;
+  const clips: [number, number][] = [[-dx, start.x], [dx, width - start.x], [-dy, start.y], [dy, height - start.y]];
+  for (const [p, q] of clips) {
+    if (Math.abs(p) < 1e-8) {
+      if (q < 0) return null;
+      continue;
+    }
+    const ratio = q / p;
+    if (p < 0) low = Math.max(low, ratio);
+    else high = Math.min(high, ratio);
+    if (low > high) return null;
+  }
+  return (low + high) / 2;
+}
+
 function chooseNonCollidingRoadLabels(candidates: RoadLabelCandidate[], map: ReturnType<typeof useMap>, zoom: number) {
-  if (zoom < 14) return new Map<string, RoadLabelPlacement>();
+  if (zoom < 11.5) return new Map<string, RoadLabelPlacement>();
   const fontSize = Math.min(15, Math.max(9.5, 9.5 + (zoom - 15.5) * 0.48));
   const bounds = map.getBounds();
   const measure = typeof document !== "undefined" ? document.createElement("canvas").getContext("2d") : null;
@@ -78,8 +106,17 @@ function chooseNonCollidingRoadLabels(candidates: RoadLabelCandidate[], map: Ret
     .map((candidate) => {
       const points = candidate.positions.map((position) => map.latLngToContainerPoint(position));
       let totalLength = 0;
-      for (let index = 1; index < points.length; index += 1) totalLength += points[index - 1].distanceTo(points[index]);
-      return { ...candidate, points, totalLength, priority: labelPriority(candidate.kind) };
+      const segments = points.slice(1).map((point, index) => ({ start: points[index], end: point, length: points[index].distanceTo(point) }));
+      for (const segment of segments) totalLength += segment.length;
+      let traveled = 0;
+      const visibleOffsets: number[] = [];
+      const size = map.getSize();
+      for (const segment of segments) {
+        const fraction = segmentViewportFraction(segment.start, segment.end, size.x, size.y);
+        if (fraction !== null && totalLength > 0) visibleOffsets.push((traveled + segment.length * fraction) / totalLength * 100);
+        traveled += segment.length;
+      }
+      return { ...candidate, points, totalLength, visibleOffsets: visibleOffsets.sort((a, b) => Math.abs(a - 50) - Math.abs(b - 50)).slice(0, 8), priority: labelPriority(candidate.kind) };
     })
     .sort((a, b) => a.priority - b.priority || b.totalLength - a.totalLength);
 
@@ -103,7 +140,8 @@ function chooseNonCollidingRoadLabels(candidates: RoadLabelCandidate[], map: Ret
     const options: { startOffset: number; scale: number; rect: { left: number; right: number; top: number; bottom: number }; collisions: number }[] = [];
     for (const scale of [1, 0.9, 0.8, 0.7, 0.62]) {
       const labelWidth = (textWidth * scale) + 4;
-      for (const startOffset of [50, 36, 64, 22, 78, 10, 90, 5, 95]) {
+      const offsets = [...new Set([50, 36, 64, 22, 78, 10, 90, 5, 95, ...candidate.visibleOffsets])];
+      for (const startOffset of offsets) {
         let distance = candidate.totalLength * startOffset / 100;
         let anchor = candidate.points[0];
         let angle = 0;
@@ -199,6 +237,7 @@ export const TirkhaMapArtwork = memo(function TirkhaMapArtwork() {
     return () => { active = false; };
   }, []);
   return <>
+    <MapZoomCeiling />
     {tirkhaParks.map((park, index) => <Polygon key={`park-${index}`} positions={park} pathOptions={{ color: "#b8d3bf", weight: 1, fillColor: "#dcebdd", fillOpacity: 0.8, interactive: false }} />)}
     {tirkhaWaterways.map((line, index) => <Polyline key={`water-${index}`} positions={line} pathOptions={{ color: "#a9c9ce", weight: 8, opacity: 0.42, lineCap: "round", lineJoin: "round", interactive: false }} />)}
     {tirkhaWaterways.map((line, index) => <Polyline key={`water-core-${index}`} positions={line} pathOptions={{ color: "#8db8c0", weight: 2.4, opacity: 0.82, lineCap: "round", lineJoin: "round", interactive: false }} />)}
@@ -241,7 +280,7 @@ function CityBlockLayouts() {
       const fillColor = block.landUse === "commercial" ? "#e7e3d6" : block.landUse === "industrial" ? "#dce3df" : "#e0e8df";
       return <Fragment key={block.id}>
         <Polygon positions={block.outline} pathOptions={{ renderer, color: "#fffdf8", weight: zoom >= 18 ? 1.5 : 1, opacity: 0.95, fillColor, fillOpacity: zoom >= 18 ? 0.34 : 0.7, lineJoin: "round", interactive: false }} />
-        {zoom >= 19 && block.buildings.map((outline, index) => <Polygon key={`${block.id}-building-${index}`} positions={outline} pathOptions={{ renderer, color: "#fdfcf8", weight: Math.min(3.15, zoom >= 20 ? 1.35 + (zoom - 20) * 0.36 : 0.9), opacity: 0.98, fillColor: block.landUse === "commercial" ? "#cec9b9" : "#cbd8cc", fillOpacity: 0.92, lineJoin: "round", interactive: false }} />)}
+        {zoom >= 19 && block.buildings.map((outline, index) => <Polygon key={`${block.id}-building-${index}`} positions={outline} pathOptions={{ renderer, color: "#fdfcf8", weight: Math.min(4.07, zoom >= 20 ? 1.35 + (zoom - 20) * 0.34 : 0.9), opacity: 0.98, fillColor: block.landUse === "commercial" ? "#cec9b9" : "#cbd8cc", fillOpacity: 0.92, lineJoin: "round", interactive: false }} />)}
       </Fragment>;
     })}
   </>;
@@ -277,7 +316,7 @@ function CuratedRoadSegment({ road, zoom, fontSize, labelPlacement, casingRender
   roadRenderer: ReturnType<typeof svg>;
 }) {
   const pathRef = useRef<LeafletPolyline | null>(null);
-  const widthScale = zoom < 19 ? 1 : Math.min(2.56, 1 + (zoom - 19) * 0.26);
+  const widthScale = zoom < 19 ? 1 : Math.min(3.34, 1 + (zoom - 19) * 0.26);
   const baseWidth = road.kind === "expressway" ? 5.2 : road.kind === "arterial" ? 3.8 : road.kind === "connector" ? 2.5 : 1.35;
   const width = baseWidth * widthScale;
   const color = road.kind === "expressway" ? "#4b7778" : road.kind === "arterial" ? "#829d99" : road.kind === "connector" ? "#b2c0b9" : "#d1d9d2";
@@ -331,7 +370,7 @@ function DetailedBuildingFootprints() {
     style={(feature) => {
       const kind = String(feature?.properties?.kind ?? "");
       const fillColor = kind === "apartments" || kind === "residential" ? "#cbd1c9" : kind === "commercial" ? "#d7d3c7" : "#dedbd1";
-      const footprintScale = view.zoom < 20 ? 1 : Math.min(2.8, 1.35 + (view.zoom - 20) * 0.36);
+      const footprintScale = view.zoom < 20 ? 1 : Math.min(4.23, 1.35 + (view.zoom - 20) * 0.36);
       return { color: "#fffefb", weight: 0.65 * footprintScale, opacity: 0.95, fillColor, fillOpacity: 0.96, lineJoin: "round", renderer };
     }}
     interactive={false}
@@ -364,8 +403,18 @@ function CuratedLandmarkLabels() {
     if (measure) measure.font = `800 ${fontSize}px Arial, sans-serif`;
     const occupied: { left: number; right: number; top: number; bottom: number }[] = [];
     return [...tirkhaLandmarks]
-      .filter((place) => zoom >= Math.max(place.minZoom, place.kind === "district" ? 10 : 14) && bounds.contains(place.point))
-      .sort((a, b) => b.minZoom - a.minZoom)
+      .filter((place) => {
+        const minZoom = place.kind === "district"
+          ? 9.5
+          : prominentNeighborhoods.has(place.name.toUpperCase())
+            ? 11.5
+            : Math.max(13.5, Math.min(place.minZoom, 14));
+        return zoom >= minZoom && bounds.contains(place.point);
+      })
+      .sort((a, b) => {
+        const priority = (place: (typeof tirkhaLandmarks)[number]) => prominentNeighborhoods.has(place.name.toUpperCase()) ? 0 : place.kind === "district" ? 1 : 2;
+        return priority(a) - priority(b) || b.minZoom - a.minZoom;
+      })
       .map((place) => {
         const point = map.latLngToContainerPoint(place.point);
         const width = Math.min(210, (measure?.measureText(place.name).width ?? place.name.length * fontSize * 0.62) + 12);
@@ -424,7 +473,7 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
       key: roadFeatureKey(feature),
       name,
       kind: feature.properties?.class,
-      positions: feature.geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude] as [number, number]),
+      positions: orderedForScreenTextPath(feature.geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude] as [number, number]), map),
     }];
   }), map, zoom), [map, visibleData.features, zoom]);
   const labeledRoads = useMemo(() => visibleData.features.filter((feature) => labelPlacements.has(roadFeatureKey(feature))), [labelPlacements, visibleData.features]);
@@ -433,7 +482,7 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
   // of replacing it with an empty canvas when the extract finishes loading.
   if (visibleData.features.length < 12) {
     const zoom = map.getZoom();
-    const scale = zoom < 19 ? 1 : Math.min(2.5, 1 + (zoom - 19) * 0.25);
+    const scale = zoom < 19 ? 1 : Math.min(3.25, 1 + (zoom - 19) * 0.25);
     return <><CuratedRoadNetwork />{visibleData.features.length > 0 && <GeoJSON
       key={boundsKey}
       data={visibleData as never}
@@ -446,7 +495,7 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
     />}</>;
   }
   const fontSize = Math.min(15, Math.max(9.5, 9.5 + (zoom - 15.5) * 0.48));
-  const strokeScale = zoom < 19 ? 1 : Math.min(2.5, 1 + (zoom - 19) * 0.25);
+  const strokeScale = zoom < 19 ? 1 : Math.min(3.25, 1 + (zoom - 19) * 0.25);
   return <>
     <GeoJSON
       key={boundsKey}
