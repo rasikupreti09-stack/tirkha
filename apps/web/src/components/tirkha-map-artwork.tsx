@@ -15,12 +15,14 @@ type RoadLabelPlacement = { startOffset: number; scale: number };
 type BuildingFeature = { type: "Feature"; id?: string; properties?: { kind?: string; center?: [number, number] }; geometry: { type: "Polygon"; coordinates: number[][][] } };
 type BuildingCollection = { type: "FeatureCollection"; features: BuildingFeature[] };
 const buildingTileCache = new Map<string, BuildingFeature[]>();
+const buildingTileRequests = new Map<string, Promise<BuildingFeature[]>>();
 const prominentNeighborhoods = new Set([
   "THAMEL", "DURBAR MARG", "LAZIMPAT", "NAXAL", "PUTALISADAK", "GAUSHALA", "BALKHU", "KALANKI", "KIRTIPUR",
   "TRIPURESHWOR", "MAITIGHAR", "SINAMANGAL", "KOTESHWOR", "KOTESHWOR NEIGHBORHOOD", "BOUDDHA · BOUDHANATH",
   "NEW BANESHWOR", "MID-BANESHWOR", "OLD BANESHWOR", "LALITPUR · PATAN",
   "KUPONDOLE", "JHAMSIKHEL", "PULCHOWK", "JAWALAKHEL", "PATAN DURBAR SQUARE", "BHAKTAPUR DURBAR SQUARE",
   "POKHARA LAKESIDE", "BUDDHA CHOWK", "RAKTIM ROAD", "SIMARA CHOWK", "JEETPUR · SIMARA CORRIDOR",
+  "NAWALPUR · HETAUDA", "HATIYA · HETAUDA", "RATOMATE · HETAUDA", "JEETPUR", "NARABASTI", "PATHLAIYA", "DUMARWANA",
   "KIRTIPUR BAZAAR", "PANGA · LACHHI", "NAGAUN · PANGA DOBATO", "TYANGLA CHOWK", "TYANGLAPOKHARI", "TRIBHUVAN UNIVERSITY",
   "BAGH BHAIRAB · LAYEKU", "UMA MAHESHWOR · KWACHO",
 ]);
@@ -41,23 +43,43 @@ function subscribeAfterGesture(map: ReturnType<typeof useMap>, events: string, c
   };
 }
 
-async function loadBuildingTile(region: string, tile: string, signal: AbortSignal): Promise<BuildingFeature[]> {
-  const cacheKey = `${region}:${tile}`;
-  const cached = buildingTileCache.get(cacheKey);
-  if (cached) return cached;
+async function loadBuildingTile(region: string, tile: string): Promise<BuildingFeature[]> {
   // The existing Kathmandu and Lalitpur footprint packs meet across Kirtipur.
   // Reuse the source pack covering each 0.01-degree tile instead of copying
   // duplicate building data into a third folder.
   const sourceRegion = region === "kirtipur"
     ? (Number(tile.split("_")[0]) < 2767 ? "lalitpur" : "kathmandu")
     : region;
-  const response = await fetch(`/data/buildings/${sourceRegion}/${tile}.geojson.gz`, { cache: "force-cache", signal });
-  if (!response.ok || typeof DecompressionStream === "undefined") return [];
-  const stream = new Blob([await response.arrayBuffer()]).stream().pipeThrough(new DecompressionStream("gzip"));
-  const collection = await new Response(stream).json() as BuildingCollection;
-  const features = collection.features ?? [];
-  if (!signal.aborted) buildingTileCache.set(cacheKey, features);
-  return features;
+  const cacheKey = `${sourceRegion}:${tile}`;
+  const cached = buildingTileCache.get(cacheKey);
+  if (cached) {
+    buildingTileCache.delete(cacheKey);
+    buildingTileCache.set(cacheKey, cached);
+    return cached;
+  }
+  let request = buildingTileRequests.get(cacheKey);
+  if (!request) {
+    request = (async () => {
+      const response = await fetch(`/data/buildings/${sourceRegion}/${tile}.geojson.gz`, { cache: "force-cache" });
+      if (!response.ok || typeof DecompressionStream === "undefined") return [];
+      const stream = new Blob([await response.arrayBuffer()]).stream().pipeThrough(new DecompressionStream("gzip"));
+      const collection = await new Response(stream).json() as BuildingCollection;
+      return collection.features ?? [];
+    })();
+    buildingTileRequests.set(cacheKey, request);
+  }
+  try {
+    const features = await request;
+    buildingTileCache.set(cacheKey, features);
+    while (buildingTileCache.size > 256) {
+      const oldestKey = buildingTileCache.keys().next().value;
+      if (oldestKey === undefined) break;
+      buildingTileCache.delete(oldestKey);
+    }
+    return features;
+  } finally {
+    if (buildingTileRequests.get(cacheKey) === request) buildingTileRequests.delete(cacheKey);
+  }
 }
 
 function mapBuildingTiles(map: ReturnType<typeof useMap>) {
@@ -362,7 +384,7 @@ function DetailedBuildingFootprints() {
     if (view.zoom < 17.5 || !view.region || !view.tiles.length || view.tiles.length > 32 || data?.signature === view.signature) return;
     const controller = new AbortController();
     const region = view.region;
-    void Promise.all(view.tiles.map((tile) => loadBuildingTile(region, tile, controller.signal)))
+    void Promise.all(view.tiles.map((tile) => loadBuildingTile(region, tile)))
       .then((collections) => { if (!controller.signal.aborted) setData({ signature: view.signature, region, features: collections.flat() }); })
       .catch(() => undefined);
     return () => controller.abort();
@@ -394,8 +416,8 @@ function DetailedBuildingFootprints() {
 function footprintRegion(latitude: number, longitude: number): string | null {
   // Hetauda and Simara have curated parcel artwork; Kirtipur reuses the
   // adjoining Kathmandu/Lalitpur footprint packs where source tiles exist.
-  if ((latitude >= 27.38 && latitude <= 27.49 && longitude >= 84.94 && longitude <= 85.10)
-    || (latitude >= 27.12 && latitude <= 27.23 && longitude >= 84.91 && longitude <= 85.04)) return null;
+  if ((latitude >= 27.35 && latitude <= 27.49 && longitude >= 84.97 && longitude <= 85.12)
+    || (latitude >= 27.12 && latitude <= 27.23 && longitude >= 84.94 && longitude <= 85.06)) return null;
   if (latitude >= 28.12) return "pokhara";
   if (longitude >= 85.39) return "bhaktapur";
   if (latitude >= 27.645 && latitude <= 27.705 && longitude >= 85.245 && longitude <= 85.310) return "kirtipur";
