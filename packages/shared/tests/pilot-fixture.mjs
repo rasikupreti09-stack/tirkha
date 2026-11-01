@@ -45,7 +45,7 @@ export async function createPilotFixture() {
       await db.query("select set_config('request.jwt.claim.sub',$1,false)", [user || ""]);
       await db.exec("set role " + ({ authenticated: "authenticated", service_role: "service_role", anon: "anon" }[role]));
     }
-    async function prepareVerifiedHero(profileId, zone = "Kathmandu") {
+    async function prepareVerifiedHero(profileId, zone = "Kathmandu Valley") {
       await db.query(`update public.professional_profiles
         set verification_status='verified', trade_code='PLUMBING', trade_category='PLUMBING',
             operational_zone=$2, citizenship_document_path=profile_id::text || '/test-id.pdf',

@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { formatBookingDate, type Database, type HeroTrade, type WorkflowBooking } from "@tirkha/shared";
 import { changeBooking } from "@/lib/bookings";
 import { useAuth } from "./auth-provider";
@@ -18,6 +18,8 @@ export function HeroDispatchInbox({ onAccepted, demo = false, trade = null }: { 
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [demoAccepted, setDemoAccepted] = useState(false);
+  const lifecycle = useRef(0);
+  const requestSequence = useRef(0);
   const demoNotice: DispatchNotice = {
     id: "tirkha-demo-dispatch", booking_id: "tirkha-demo-booking", professional_id: userId ?? "tirkha-demo-hero", status: "new",
     trade_category: trade,
@@ -32,9 +34,12 @@ export function HeroDispatchInbox({ onAccepted, demo = false, trade = null }: { 
     if (demo) { setLoading(false); return; }
     if (!client || !userId) return;
     if (!heroTradeCategory) { setItems([]); setError(""); setLoading(false); return; }
+    const currentLifecycle = lifecycle.current;
+    const request = ++requestSequence.current;
     const { data, error: loadError } = await client.from("hero_dispatch_notifications")
       .select("*").eq("professional_id", userId).eq("trade_category", heroTradeCategory).in("status", ["new", "seen"])
       .order("created_at", { ascending: false }).limit(20);
+    if (lifecycle.current !== currentLifecycle || request !== requestSequence.current) return;
     if (loadError) { setError("Nearby job alerts are temporarily unavailable. Refresh the jobs list to check for requests."); }
     else { setItems(data ?? []); setError(""); }
     setLoading(false);
@@ -43,6 +48,7 @@ export function HeroDispatchInbox({ onAccepted, demo = false, trade = null }: { 
     if (demo) { setLoading(false); return; }
     if (!client || !userId || !heroTradeCategory) { setLoading(false); setItems([]); return; }
     let active = true;
+    const currentLifecycle = ++lifecycle.current;
     const load = async () => { if (active) await refresh(); };
     void load();
     const channel = client.channel(`hero-dispatch:${userId}`)
@@ -50,7 +56,7 @@ export function HeroDispatchInbox({ onAccepted, demo = false, trade = null }: { 
       .subscribe();
     const timer = window.setInterval(() => void load(), 30_000);
     window.addEventListener("focus", load);
-    return () => { active = false; window.clearInterval(timer); window.removeEventListener("focus", load); void client.removeChannel(channel); };
+    return () => { active = false; lifecycle.current = currentLifecycle + 1; requestSequence.current += 1; window.clearInterval(timer); window.removeEventListener("focus", load); void client.removeChannel(channel); };
   }, [client, userId, refresh, demo, trade]);
   async function accept(item: DispatchNotice) {
     if (busy) return;

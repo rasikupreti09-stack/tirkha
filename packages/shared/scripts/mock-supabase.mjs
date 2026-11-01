@@ -49,7 +49,7 @@ export async function startMockSupabase(port = 54321) {
   }
   const customer = await signup({email:"customer@tirkha.test",password:"TirkhaLocal123!",data:{full_name:"Pilot Customer",requested_role:"customer"}});
   const professional = await signup({email:"professional@tirkha.test",password:"TirkhaLocal123!",data:{full_name:"Pilot Professional",requested_role:"professional"}});
-  await fixture.prepareVerifiedHero(professional.id, "Lalitpur");
+  await fixture.prepareVerifiedHero(professional.id, "Kathmandu Valley");
   await db.query("insert into public.professional_service_categories select $1,id from public.service_categories",[professional.id]);
   let queue = Promise.resolve();
   const server = createServer((request,response) => {

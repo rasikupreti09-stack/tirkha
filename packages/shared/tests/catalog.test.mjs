@@ -24,7 +24,7 @@ test("assistant matches plumbing leaks, explains platform coverage and declines 
   const leak=assistantReply("My tap under the sink is leaking water everywhere",seed);
   assert.deepEqual(leak.services.map(service=>service.id),["sink-leak"]);
   const coverage=assistantReply("Where does Tirkha operate?",seed);
-  assert.match(coverage.text,/Kathmandu, Lalitpur, Bhaktapur and Pokhara/);
+  assert.match(coverage.text,/Kathmandu Valley, Pokhara, Hetauda and Simara/);
   const emergency=assistantReply("I have chest pain and cannot breathe",seed);
   assert.match(emergency.text,/not an emergency service/);
   assert.deepEqual(emergency.services,[]);

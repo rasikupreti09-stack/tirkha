@@ -21,7 +21,7 @@ test("diagnostic booking dispatches a private live alert only to nearby verified
     await db.query("select public.update_hero_location($1,$2,null,null,null,null)", [latitude, longitude]);
   };
   await installLocation(nearby, 27.7000, 85.3200);
-  await installLocation(far, 27.9500, 85.3200);
+  await installLocation(far, 28.2000, 85.3200);
 
   await as(customer);
   const requestId = randomUUID();

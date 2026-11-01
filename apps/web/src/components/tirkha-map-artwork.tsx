@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
-import { canvas, DomEvent, svg, type Polyline as LeafletPolyline, type LatLngExpression } from "leaflet";
+import { canvas, DomEvent, svg, type GeoJSON as LeafletGeoJSON, type Polyline as LeafletPolyline, type LatLngExpression } from "leaflet";
 import { CircleMarker, GeoJSON, Polygon, Polyline, Tooltip, useMap } from "react-leaflet";
 import { Crosshair, MapPin, MapPinned } from "lucide-react";
 import { getTirkhaUrbanBlocksInBounds, tirkhaCityViews, tirkhaLandmarks, tirkhaParks, tirkhaRoads, tirkhaWaterways } from "@/lib/tirkha-map-data";
@@ -14,10 +14,91 @@ type RoadLabelCandidate = { key: string; name: string; kind: RoadProperties["cla
 type RoadLabelPlacement = { startOffset: number; scale: number };
 type RoadBounds = { south: number; west: number; north: number; east: number };
 type RoadSpatialIndex = { cells: Map<string, Set<RoadFeature>>; bounds: Map<RoadFeature, RoadBounds>; broadFeatures: RoadFeature[] };
-type BuildingFeature = { type: "Feature"; id?: string; properties?: { kind?: string; center?: [number, number] }; geometry: { type: "Polygon"; coordinates: number[][][] } };
+type BuildingFeature = { type: "Feature"; id?: string; properties?: { kind?: string; center?: [number, number]; bounds?: [number, number, number, number] }; geometry: { type: "Polygon"; coordinates: number[][][] } };
 type BuildingCollection = { type: "FeatureCollection"; features: BuildingFeature[] };
-const buildingTileCache = new Map<string, BuildingFeature[]>();
+type MapFeature = { type: "Feature"; id: string; properties: { kind: string }; geometry: { type: "Polygon"; coordinates: number[][][] } };
+type MapFeatureCollection = { type: "FeatureCollection"; features: MapFeature[] };
+type BuildingCacheEntry = { features: BuildingFeature[]; estimatedBytes: number };
+const buildingTileCache = new Map<string, BuildingCacheEntry>();
 const buildingTileRequests = new Map<string, Promise<BuildingFeature[]>>();
+const MAX_BUILDING_CACHE_ENTRIES = 192;
+const MAX_BUILDING_CACHE_BYTES = 48 * 1024 * 1024;
+const MAX_BUILDING_TILE_FEATURES = 30_000;
+let buildingCacheBytes = 0;
+
+function isCoordinatePair(value: unknown): value is [number, number] {
+  return Array.isArray(value) && value.length >= 2
+    && Number.isFinite(value[0]) && Number.isFinite(value[1])
+    && Math.abs(value[0]) <= 180 && Math.abs(value[1]) <= 90;
+}
+
+function parseBuildingCollection(value: unknown): BuildingFeature[] {
+  if (!value || typeof value !== "object" || (value as { type?: unknown }).type !== "FeatureCollection") return [];
+  const rawFeatures = (value as { features?: unknown }).features;
+  if (!Array.isArray(rawFeatures) || rawFeatures.length > MAX_BUILDING_TILE_FEATURES) return [];
+  const features: BuildingFeature[] = [];
+  for (const raw of rawFeatures) {
+    if (!raw || typeof raw !== "object") continue;
+    const feature = raw as Partial<BuildingFeature>;
+    const rings = feature.geometry?.type === "Polygon" ? feature.geometry.coordinates : null;
+    if (!Array.isArray(rings) || rings.length === 0 || !rings.every(ring => Array.isArray(ring) && ring.length >= 4 && ring.length <= 20_000 && ring.every(isCoordinatePair))) continue;
+    const outer = rings[0];
+    let south = Infinity;
+    let west = Infinity;
+    let north = -Infinity;
+    let east = -Infinity;
+    for (const [longitude, latitude] of outer) {
+      south = Math.min(south, latitude);
+      west = Math.min(west, longitude);
+      north = Math.max(north, latitude);
+      east = Math.max(east, longitude);
+    }
+    const center: [number, number] = feature.properties?.center && isCoordinatePair(feature.properties.center)
+      ? feature.properties.center
+      : [(south + north) / 2, (west + east) / 2];
+    features.push({
+      type: "Feature",
+      ...(typeof feature.id === "string" ? { id: feature.id } : {}),
+      properties: { kind: typeof feature.properties?.kind === "string" ? feature.properties.kind : "building", center, bounds: [south, west, north, east] },
+      geometry: { type: "Polygon", coordinates: rings },
+    });
+  }
+  return features;
+}
+
+function parseRoadCollection(value: unknown): RoadCollection | null {
+  if (!value || typeof value !== "object" || (value as { type?: unknown }).type !== "FeatureCollection") return null;
+  const rawFeatures = (value as { features?: unknown }).features;
+  if (!Array.isArray(rawFeatures) || rawFeatures.length > 500_000) return null;
+  const features: RoadFeature[] = [];
+  for (const raw of rawFeatures) {
+    if (!raw || typeof raw !== "object") continue;
+    const feature = raw as Partial<RoadFeature>;
+    const coordinates = feature.geometry?.type === "LineString" ? feature.geometry.coordinates : null;
+    if (!Array.isArray(coordinates) || coordinates.length < 2 || !coordinates.every(isCoordinatePair)) continue;
+    const properties = feature.properties && typeof feature.properties === "object" ? feature.properties : {};
+    const roadClass: RoadProperties["class"] = ["expressway", "arterial", "connector", "local"].includes(String(properties.class))
+      ? properties.class
+      : "local";
+    features.push({
+      type: "Feature",
+      ...(typeof feature.id === "string" ? { id: feature.id } : {}),
+      properties: {
+        class: roadClass,
+        ...(typeof properties.name === "string" ? { name: properties.name } : {}),
+        ...(typeof properties.ref === "string" ? { ref: properties.ref } : {}),
+      },
+      geometry: { type: "LineString", coordinates },
+    });
+  }
+  return { type: "FeatureCollection", features };
+}
+
+function estimateBuildingBytes(features: BuildingFeature[]) {
+  let coordinates = 0;
+  for (const feature of features) for (const ring of feature.geometry.coordinates) coordinates += ring.length;
+  return coordinates * 32 + features.length * 192;
+}
 const prominentNeighborhoods = new Set([
   "THAMEL", "DURBAR MARG", "LAZIMPAT", "NAXAL", "PUTALISADAK", "GAUSHALA", "BALKHU", "KALANKI", "KIRTIPUR",
   "TRIPURESHWOR", "MAITIGHAR", "SINAMANGAL", "KOTESHWOR", "KOTESHWOR NEIGHBORHOOD", "BOUDDHA · BOUDHANATH",
@@ -28,6 +109,7 @@ const prominentNeighborhoods = new Set([
   "KIRTIPUR BAZAAR", "PANGA · LACHHI", "NAGAUN · PANGA DOBATO", "TYANGLA CHOWK", "TYANGLAPOKHARI", "TRIBHUVAN UNIVERSITY",
   "BAGH BHAIRAB · LAYEKU", "UMA MAHESHWOR · KWACHO",
 ]);
+const EMPTY_ROAD_LABEL_PLACEMENTS = new Map<string, RoadLabelPlacement>();
 
 function subscribeAfterGesture(map: ReturnType<typeof useMap>, events: string, callback: () => void) {
   let frame: number | undefined;
@@ -57,25 +139,33 @@ async function loadBuildingTile(region: string, tile: string): Promise<BuildingF
   if (cached) {
     buildingTileCache.delete(cacheKey);
     buildingTileCache.set(cacheKey, cached);
-    return cached;
+    return cached.features;
   }
   let request = buildingTileRequests.get(cacheKey);
   if (!request) {
     request = (async () => {
-      const response = await fetch(`/data/buildings/${sourceRegion}/${tile}.geojson.gz`, { cache: "force-cache" });
+      const response = await fetch(`/data/buildings/${sourceRegion}/${tile}.geojson.gz`, { cache: "force-cache", signal: AbortSignal.timeout(15_000) });
       if (!response.ok || typeof DecompressionStream === "undefined") return [];
       const stream = new Blob([await response.arrayBuffer()]).stream().pipeThrough(new DecompressionStream("gzip"));
-      const collection = await new Response(stream).json() as BuildingCollection;
-      return collection.features ?? [];
+      const collection: unknown = await new Response(stream).json();
+      return parseBuildingCollection(collection);
     })();
     buildingTileRequests.set(cacheKey, request);
   }
   try {
     const features = await request;
-    buildingTileCache.set(cacheKey, features);
-    while (buildingTileCache.size > 256) {
+    const estimatedBytes = estimateBuildingBytes(features);
+    if (features.length && estimatedBytes <= MAX_BUILDING_CACHE_BYTES) {
+      const previous = buildingTileCache.get(cacheKey);
+      if (previous) buildingCacheBytes -= previous.estimatedBytes;
+      buildingTileCache.delete(cacheKey);
+      buildingTileCache.set(cacheKey, { features, estimatedBytes });
+      buildingCacheBytes += estimatedBytes;
+    }
+    while (buildingTileCache.size > MAX_BUILDING_CACHE_ENTRIES || buildingCacheBytes > MAX_BUILDING_CACHE_BYTES) {
       const oldestKey = buildingTileCache.keys().next().value;
       if (oldestKey === undefined) break;
+      buildingCacheBytes -= buildingTileCache.get(oldestKey)?.estimatedBytes ?? 0;
       buildingTileCache.delete(oldestKey);
     }
     return features;
@@ -98,37 +188,46 @@ function mapBuildingTiles(map: ReturnType<typeof useMap>) {
 }
 
 const ROAD_INDEX_CELL_DEGREES = 0.1;
-function createRoadSpatialIndex(features: RoadFeature[]): RoadSpatialIndex {
-  const cells = new Map<string, Set<RoadFeature>>();
-  const boundsByFeature = new Map<RoadFeature, RoadBounds>();
-  const broadFeatures: RoadFeature[] = [];
-  for (const feature of features) {
-    const bounds = feature.geometry.coordinates.reduce<RoadBounds>((current, [longitude, latitude]) => ({
-      south: Math.min(current.south, latitude),
-      west: Math.min(current.west, longitude),
-      north: Math.max(current.north, latitude),
-      east: Math.max(current.east, longitude),
-    }), { south: Infinity, west: Infinity, north: -Infinity, east: -Infinity });
-    if (!Number.isFinite(bounds.south) || !Number.isFinite(bounds.west)) continue;
-    boundsByFeature.set(feature, bounds);
-    const minRow = Math.floor(bounds.south / ROAD_INDEX_CELL_DEGREES);
-    const maxRow = Math.floor(bounds.north / ROAD_INDEX_CELL_DEGREES);
-    const minColumn = Math.floor(bounds.west / ROAD_INDEX_CELL_DEGREES);
-    const maxColumn = Math.floor(bounds.east / ROAD_INDEX_CELL_DEGREES);
-    if ((maxRow - minRow + 1) * (maxColumn - minColumn + 1) > 64) {
-      broadFeatures.push(feature);
-      continue;
-    }
-    for (let row = minRow; row <= maxRow; row += 1) {
-      for (let column = minColumn; column <= maxColumn; column += 1) {
-        const key = `${row}:${column}`;
-        const cell = cells.get(key) ?? new Set<RoadFeature>();
-        cell.add(feature);
-        cells.set(key, cell);
+function scheduleRoadSpatialIndex(features: RoadFeature[], onReady: (index: RoadSpatialIndex) => void) {
+  const index: RoadSpatialIndex = { cells: new Map(), bounds: new Map(), broadFeatures: [] };
+  let featureOffset = 0;
+  let frame = 0;
+  let cancelled = false;
+  const buildBatch = () => {
+    if (cancelled) return;
+    const batchEnd = Math.min(featureOffset + 400, features.length);
+    for (; featureOffset < batchEnd; featureOffset += 1) {
+      const feature = features[featureOffset];
+      const bounds = feature.geometry.coordinates.reduce<RoadBounds>((current, [longitude, latitude]) => ({
+        south: Math.min(current.south, latitude),
+        west: Math.min(current.west, longitude),
+        north: Math.max(current.north, latitude),
+        east: Math.max(current.east, longitude),
+      }), { south: Infinity, west: Infinity, north: -Infinity, east: -Infinity });
+      if (!Number.isFinite(bounds.south) || !Number.isFinite(bounds.west)) continue;
+      index.bounds.set(feature, bounds);
+      const minRow = Math.floor(bounds.south / ROAD_INDEX_CELL_DEGREES);
+      const maxRow = Math.floor(bounds.north / ROAD_INDEX_CELL_DEGREES);
+      const minColumn = Math.floor(bounds.west / ROAD_INDEX_CELL_DEGREES);
+      const maxColumn = Math.floor(bounds.east / ROAD_INDEX_CELL_DEGREES);
+      if ((maxRow - minRow + 1) * (maxColumn - minColumn + 1) > 64) {
+        index.broadFeatures.push(feature);
+        continue;
+      }
+      for (let row = minRow; row <= maxRow; row += 1) {
+        for (let column = minColumn; column <= maxColumn; column += 1) {
+          const key = `${row}:${column}`;
+          const cell = index.cells.get(key) ?? new Set<RoadFeature>();
+          cell.add(feature);
+          index.cells.set(key, cell);
+        }
       }
     }
-  }
-  return { cells, bounds: boundsByFeature, broadFeatures };
+    if (featureOffset < features.length) frame = window.requestAnimationFrame(buildBatch);
+    else onReady(index);
+  };
+  frame = window.requestAnimationFrame(buildBatch);
+  return () => { cancelled = true; window.cancelAnimationFrame(frame); };
 }
 
 function roadsInBounds(index: RoadSpatialIndex, bounds: RoadBounds): RoadFeature[] {
@@ -186,30 +285,40 @@ function segmentViewportFraction(start: { x: number; y: number }, end: { x: numb
   return (low + high) / 2;
 }
 
-function chooseNonCollidingRoadLabels(candidates: RoadLabelCandidate[], map: ReturnType<typeof useMap>, zoom: number) {
+type ProjectedRoadLabel = RoadLabelCandidate & { points: ReturnType<ReturnType<typeof useMap>["latLngToContainerPoint"]>[]; totalLength: number; visibleOffsets: number[]; priority: number };
+
+function* chooseNonCollidingRoadLabels(candidates: RoadLabelCandidate[], map: ReturnType<typeof useMap>, zoom: number): Generator<void, Map<string, RoadLabelPlacement>, void> {
   if (zoom < 11.5) return new Map<string, RoadLabelPlacement>();
   const fontSize = Math.min(15, Math.max(9.5, 9.5 + (zoom - 15.5) * 0.48));
   const bounds = map.getBounds();
   const measure = typeof document !== "undefined" ? document.createElement("canvas").getContext("2d") : null;
   if (measure) measure.font = `800 ${fontSize}px Arial, sans-serif`;
-  const projected = candidates
-    .filter((candidate) => candidate.positions.length >= 2 && candidate.name.trim() && zoom >= roadLabelZoom(candidate.kind))
-    .map((candidate) => {
-      const points = candidate.positions.map((position) => map.latLngToContainerPoint(position));
+  const projected: ProjectedRoadLabel[] = [];
+  const size = map.getSize();
+  for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
+    const candidate = candidates[candidateIndex];
+    if (candidate.positions.length >= 2 && candidate.name.trim() && zoom >= roadLabelZoom(candidate.kind)) {
+      const positions = orderedForScreenTextPath(candidate.positions, map);
+      const points = positions.map((position) => map.latLngToContainerPoint(position));
       let totalLength = 0;
-      const segments = points.slice(1).map((point, index) => ({ start: points[index], end: point, length: points[index].distanceTo(point) }));
-      for (const segment of segments) totalLength += segment.length;
+      const segmentLengths: number[] = [];
+      for (let index = 1; index < points.length; index += 1) {
+        const length = points[index - 1].distanceTo(points[index]);
+        segmentLengths.push(length);
+        totalLength += length;
+      }
       let traveled = 0;
       const visibleOffsets: number[] = [];
-      const size = map.getSize();
-      for (const segment of segments) {
-        const fraction = segmentViewportFraction(segment.start, segment.end, size.x, size.y);
-        if (fraction !== null && totalLength > 0) visibleOffsets.push((traveled + segment.length * fraction) / totalLength * 100);
-        traveled += segment.length;
+      for (let index = 0; index < segmentLengths.length; index += 1) {
+        const fraction = segmentViewportFraction(points[index], points[index + 1], size.x, size.y);
+        if (fraction !== null && totalLength > 0) visibleOffsets.push((traveled + segmentLengths[index] * fraction) / totalLength * 100);
+        traveled += segmentLengths[index];
       }
-      return { ...candidate, points, totalLength, visibleOffsets: visibleOffsets.sort((a, b) => Math.abs(a - 50) - Math.abs(b - 50)).slice(0, 8), priority: labelPriority(candidate.kind) };
-    })
-    .sort((a, b) => a.priority - b.priority || b.totalLength - a.totalLength);
+      if (visibleOffsets.length) projected.push({ ...candidate, positions, points, totalLength, visibleOffsets: visibleOffsets.sort((a, b) => Math.abs(a - 50) - Math.abs(b - 50)).slice(0, 8), priority: labelPriority(candidate.kind) });
+    }
+    if ((candidateIndex + 1) % 32 === 0) yield;
+  }
+  projected.sort((a, b) => a.priority - b.priority || b.totalLength - a.totalLength);
 
   const cellSize = 96;
   const occupied = new Map<string, { left: number; right: number; top: number; bottom: number }[]>();
@@ -226,7 +335,8 @@ function chooseNonCollidingRoadLabels(candidates: RoadLabelCandidate[], map: Ret
     return [...candidatesInCells].filter((other) => rect.left < other.right && rect.right > other.left && rect.top < other.bottom && rect.bottom > other.top);
   };
 
-  for (const candidate of projected) {
+  for (let candidateIndex = 0; candidateIndex < projected.length; candidateIndex += 1) {
+    const candidate = projected[candidateIndex];
     const textWidth = measure?.measureText(candidate.name).width ?? candidate.name.length * fontSize * 0.62;
     const options: { startOffset: number; scale: number; rect: { left: number; right: number; top: number; bottom: number }; collisions: number }[] = [];
     for (const scale of [1, 0.9, 0.8, 0.7, 0.62]) {
@@ -263,8 +373,23 @@ function chooseNonCollidingRoadLabels(candidates: RoadLabelCandidate[], map: Ret
       ?? options.reduce((best, option) => option.collisions < best.collisions ? option : best);
     placements.set(candidate.key, { startOffset: selected.startOffset, scale: selected.scale });
     for (const cell of rectCells(selected.rect)) occupied.set(cell, [...(occupied.get(cell) ?? []), selected.rect]);
+    if ((candidateIndex + 1) % 12 === 0) yield;
   }
   return placements;
+}
+
+function scheduleRoadLabelPlacement(candidates: RoadLabelCandidate[], map: ReturnType<typeof useMap>, zoom: number, onReady: (placements: Map<string, RoadLabelPlacement>) => void) {
+  const task = chooseNonCollidingRoadLabels(candidates, map, zoom);
+  let frame = 0;
+  let cancelled = false;
+  const runBatch = () => {
+    if (cancelled) return;
+    const result = task.next();
+    if (result.done) onReady(result.value);
+    else frame = window.requestAnimationFrame(runBatch);
+  };
+  frame = window.requestAnimationFrame(runBatch);
+  return () => { cancelled = true; window.cancelAnimationFrame(frame); };
 }
 
 function orderedForScreenTextPath(positions: LatLngExpression[], map: ReturnType<typeof useMap>) {
@@ -317,15 +442,19 @@ export const TirkhaMapArtwork = memo(function TirkhaMapArtwork() {
   const [roadData, setRoadData] = useState<RoadCollection | null>(null);
   useEffect(() => {
     let active = true;
-    void fetch("/data/tirkha-nepal-roads.geojson.gz", { cache: "force-cache" })
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20_000);
+    void fetch("/data/tirkha-nepal-roads.geojson.gz", { cache: "force-cache", signal: controller.signal })
       .then(async (response) => {
         if (!response.ok || typeof DecompressionStream === "undefined") return null;
         const stream = new Blob([await response.arrayBuffer()]).stream().pipeThrough(new DecompressionStream("gzip"));
-        return new Response(stream).json() as Promise<RoadCollection>;
+        const collection: unknown = await new Response(stream).json();
+        return parseRoadCollection(collection);
       })
       .then((result) => { if (active && result?.features?.length) setRoadData(result); })
-      .catch(() => undefined);
-    return () => { active = false; };
+      .catch(() => undefined)
+      .finally(() => window.clearTimeout(timeout));
+    return () => { active = false; controller.abort(); window.clearTimeout(timeout); };
   }, []);
   return <>
     <MapZoomCeiling />
@@ -360,34 +489,92 @@ function CityBlockLayouts() {
     return getTirkhaUrbanBlocksInBounds({ south, west, north, east });
   }, [boundsKey, zoom]);
 
+  const parcels = useMemo<MapFeatureCollection>(() => ({
+    type: "FeatureCollection",
+    features: visibleBlocks.map(block => ({ type: "Feature", id: block.id, properties: { kind: block.landUse }, geometry: { type: "Polygon", coordinates: [block.outline.map(([latitude, longitude]) => [longitude, latitude])] } })),
+  }), [visibleBlocks]);
+  const buildings = useMemo<MapFeatureCollection>(() => ({
+    type: "FeatureCollection",
+    features: zoom < 18 ? [] : visibleBlocks.flatMap(block => block.buildings.map((outline, index) => ({
+      type: "Feature" as const,
+      id: `${block.id}-building-${index}`,
+      properties: { kind: block.landUse },
+      geometry: { type: "Polygon" as const, coordinates: [outline.map(([latitude, longitude]) => [longitude, latitude])] },
+    }))),
+  }), [visibleBlocks, zoom]);
+  const parcelStyle = useMemo(() => (feature?: { properties?: { kind?: string } }) => ({
+    color: "#fffdf8",
+    weight: zoom >= 18 ? 1.5 : 1,
+    opacity: 0.95,
+    fillColor: feature?.properties?.kind === "commercial" ? "#e7e3d6" : feature?.properties?.kind === "industrial" ? "#dce3df" : "#e0e8df",
+    fillOpacity: zoom >= 18 ? 0.34 : 0.7,
+    lineJoin: "round" as const,
+    interactive: false,
+    renderer,
+  }), [zoom]);
+  const buildingStyle = useMemo(() => (feature?: { properties?: { kind?: string } }) => ({
+    color: "#fdfcf8",
+    weight: Math.min(4.07, zoom >= 20 ? 1.35 + (zoom - 20) * 0.34 : 0.9),
+    opacity: 0.98,
+    fillColor: feature?.properties?.kind === "commercial" ? "#cec9b9" : "#cbd8cc",
+    fillOpacity: 0.92,
+    lineJoin: "round" as const,
+    interactive: false,
+    renderer,
+  }), [zoom]);
   if (!visibleBlocks.length) return null;
   return <>
-    {visibleBlocks.map((block) => {
-      const fillColor = block.landUse === "commercial" ? "#e7e3d6" : block.landUse === "industrial" ? "#dce3df" : "#e0e8df";
-      return <Fragment key={block.id}>
-        <Polygon positions={block.outline} pathOptions={{ renderer, color: "#fffdf8", weight: zoom >= 18 ? 1.5 : 1, opacity: 0.95, fillColor, fillOpacity: zoom >= 18 ? 0.34 : 0.7, lineJoin: "round", interactive: false }} />
-        {zoom >= 18 && block.buildings.map((outline, index) => <Polygon key={`${block.id}-building-${index}`} positions={outline} pathOptions={{ renderer, color: "#fdfcf8", weight: Math.min(4.07, zoom >= 20 ? 1.35 + (zoom - 20) * 0.34 : 0.9), opacity: 0.98, fillColor: block.landUse === "commercial" ? "#cec9b9" : "#cbd8cc", fillOpacity: 0.92, lineJoin: "round", interactive: false }} />)}
-      </Fragment>;
-    })}
+    <MutableGeoJSON data={parcels} style={parcelStyle} />
+    {zoom >= 18 && <MutableGeoJSON data={buildings} style={buildingStyle} />}
   </>;
 }
+
+const MutableGeoJSON = memo(function MutableGeoJSON({ data, style }: {
+  data: MapFeatureCollection | RoadCollection | BuildingCollection;
+  style: (feature?: { properties?: Record<string, unknown> }) => Record<string, unknown>;
+}) {
+  const layerRef = useRef<LeafletGeoJSON | null>(null);
+  const initialData = useRef(data);
+  useEffect(() => {
+    const layer = layerRef.current;
+    if (!layer) return;
+    if (initialData.current !== data) {
+      layer.clearLayers();
+      layer.addData(data as never);
+      initialData.current = data;
+      layer.setStyle(style as never);
+    }
+  }, [data, style]);
+  return <GeoJSON ref={layerRef} data={data as never} style={style as never} interactive={false} />;
+});
 
 function CuratedRoadNetwork() {
   const map = useMap();
   const casingRenderer = useMemo(() => svg({ padding: 0.25 }), []);
   const roadRenderer = useMemo(() => svg({ padding: 0.25 }), []);
-  const [zoom, setZoom] = useState(map.getZoom());
+  const [view, setView] = useState(() => ({ zoom: map.getZoom(), bounds: map.getBounds().toBBoxString() }));
   useEffect(() => {
-    const update = () => setZoom(map.getZoom());
+    const update = () => setView({ zoom: map.getZoom(), bounds: map.getBounds().toBBoxString() });
     return subscribeAfterGesture(map, "zoomend moveend", update);
   }, [map]);
+  const zoom = view.zoom;
   const fontSize = Math.min(15, Math.max(9.5, 9.5 + (zoom - 15.5) * 0.48));
-  const labelPlacements = useMemo(() => chooseNonCollidingRoadLabels(tirkhaRoads.map((road, index) => ({
+  const candidates = useMemo(() => tirkhaRoads.map((road, index) => ({
     key: String(index),
     name: road.name ?? "",
     kind: road.kind,
     positions: road.points,
-  })), map, zoom), [map, zoom]);
+  })), []);
+  const [labelResult, setLabelResult] = useState<{ key: string; placements: Map<string, RoadLabelPlacement> } | null>(null);
+  const requestKey = `${view.zoom}:${view.bounds}`;
+  useEffect(() => {
+    let active = true;
+    const cancel = scheduleRoadLabelPlacement(candidates, map, zoom, placements => {
+      if (active) setLabelResult({ key: requestKey, placements });
+    });
+    return () => { active = false; cancel(); };
+  }, [candidates, map, requestKey, zoom]);
+  const labelPlacements = labelResult?.key === requestKey ? labelResult.placements : EMPTY_ROAD_LABEL_PLACEMENTS;
   return <>
     {tirkhaRoads.map((road, index) => <CuratedRoadSegment key={`road-${index}`} road={road} zoom={zoom} fontSize={fontSize} labelPlacement={labelPlacements.get(String(index))} casingRenderer={casingRenderer} roadRenderer={roadRenderer} />)}
   </>;
@@ -445,23 +632,31 @@ function DetailedBuildingFootprints() {
     const bounds = map.getBounds().pad(0.12);
     return data.features.filter((feature) => {
       const center = feature.properties?.center;
+      const featureBounds = feature.properties?.bounds;
+      if (featureBounds) {
+        const [south, west, north, east] = featureBounds;
+        const visibleBounds = bounds.getSouthWest();
+        const visibleNorthEast = bounds.getNorthEast();
+        return north >= visibleBounds.lat && south <= visibleNorthEast.lat
+          && east >= visibleBounds.lng && west <= visibleNorthEast.lng;
+      }
       return center ? bounds.contains([center[1], center[0]]) : false;
     });
   }, [data, map, view.region, view.signature, view.viewport, view.zoom]);
   const visibleCollection = useMemo(() => visible?.length
-    ? { type: "FeatureCollection", features: visible } as never
+    ? { type: "FeatureCollection", features: visible } as BuildingCollection
     : null, [visible]);
+  const footprintStyle = useMemo(() => (feature?: { properties?: Record<string, unknown> }) => {
+    const kind = String(feature?.properties?.kind ?? "");
+    const fillColor = kind === "apartments" || kind === "residential" ? "#cbd1c9" : kind === "commercial" ? "#d7d3c7" : "#dedbd1";
+    const footprintScale = view.zoom < 20 ? 1 : Math.min(4.23, 1.35 + (view.zoom - 20) * 0.36);
+    return { color: "#fffefb", weight: 0.65 * footprintScale, opacity: 0.95, fillColor, fillOpacity: 0.96, lineJoin: "round", renderer };
+  }, [renderer, view.zoom]);
 
   if (!visibleCollection) return null;
-  return <GeoJSON
+  return <MutableGeoJSON
     data={visibleCollection}
-    style={(feature) => {
-      const kind = String(feature?.properties?.kind ?? "");
-      const fillColor = kind === "apartments" || kind === "residential" ? "#cbd1c9" : kind === "commercial" ? "#d7d3c7" : "#dedbd1";
-      const footprintScale = view.zoom < 20 ? 1 : Math.min(4.23, 1.35 + (view.zoom - 20) * 0.36);
-      return { color: "#fffefb", weight: 0.65 * footprintScale, opacity: 0.95, fillColor, fillOpacity: 0.96, lineJoin: "round", renderer };
-    }}
-    interactive={false}
+    style={footprintStyle}
   />;
 }
 
@@ -536,63 +731,72 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
   const labelRenderer = useMemo(() => svg({ padding: 0.5 }), []);
   const readBounds = () => map.getBounds().pad(0.3).toBBoxString();
   const [boundsKey, setBoundsKey] = useState(readBounds);
-  const roadIndex = useMemo(() => createRoadSpatialIndex(data.features), [data.features]);
+  const [roadIndex, setRoadIndex] = useState<RoadSpatialIndex | null>(null);
+  useEffect(() => {
+    setRoadIndex(null);
+    return scheduleRoadSpatialIndex(data.features, setRoadIndex);
+  }, [data.features]);
   useEffect(() => { map.invalidateSize({ pan: false }); }, [map]);
   useEffect(() => {
     const update = () => setBoundsKey(readBounds());
     return subscribeAfterGesture(map, "zoomend moveend", update);
   }, [map]);
   const visibleData = useMemo(() => {
+    if (!roadIndex) return { ...data, features: [] };
     const [west, south, east, north] = boundsKey.split(",").map(Number);
     const features = roadsInBounds(roadIndex, { west, south, east, north });
     return { ...data, features };
   }, [boundsKey, data, roadIndex]);
   const zoom = map.getZoom();
-  const labelPlacements = useMemo(() => chooseNonCollidingRoadLabels(visibleData.features.flatMap((feature) => {
+  const labelCandidates = useMemo(() => visibleData.features.flatMap((feature) => {
     const name = feature.properties?.name || feature.properties?.ref;
     if (!name) return [];
     return [{
       key: roadFeatureKey(feature),
       name,
       kind: feature.properties?.class,
-      positions: orderedForScreenTextPath(feature.geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude] as [number, number]), map),
+      positions: feature.geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude] as [number, number]),
     }];
-  }), map, zoom), [map, visibleData.features, zoom]);
+  }), [visibleData.features]);
+  const labelRequestKey = `${boundsKey}:${zoom}`;
+  const [labelResult, setLabelResult] = useState<{ key: string; placements: Map<string, RoadLabelPlacement> } | null>(null);
+  useEffect(() => {
+    let active = true;
+    const cancel = scheduleRoadLabelPlacement(labelCandidates, map, zoom, placements => {
+      if (active) setLabelResult({ key: labelRequestKey, placements });
+    });
+    return () => { active = false; cancel(); };
+  }, [labelCandidates, labelRequestKey, map, zoom]);
+  const labelPlacements = labelResult?.key === labelRequestKey ? labelResult.placements : EMPTY_ROAD_LABEL_PLACEMENTS;
   const labeledRoads = useMemo(() => visibleData.features.filter((feature) => labelPlacements.has(roadFeatureKey(feature))), [labelPlacements, visibleData.features]);
+  const strokeScale = zoom < 19 ? 1 : Math.min(3.25, 1 + (zoom - 19) * 0.25);
+  const roadStyle = useMemo(() => (feature?: { properties?: Record<string, unknown> }) => {
+    const properties = feature?.properties as RoadProperties | undefined;
+    const type = properties?.class;
+    const baseWidth = type === "expressway" ? 3.3 : type === "arterial" ? 2.4 : type === "connector" ? 1.45 : 0.78;
+    return {
+      color: type === "expressway" ? "#3e716c" : type === "arterial" ? "#718f87" : type === "connector" ? "#aabbb2" : "#cbd5ce",
+      weight: baseWidth * strokeScale,
+      opacity: type === "local" ? 0.86 : 0.98,
+      lineCap: "round",
+      lineJoin: "round",
+      renderer,
+    };
+  }, [renderer, strokeScale]);
   // The bundled country road extract is sparse outside its original four-city
   // coverage. Keep the locally curated network visible in those views instead
   // of replacing it with an empty canvas when the extract finishes loading.
   if (visibleData.features.length < 12) {
-    const zoom = map.getZoom();
-    const scale = zoom < 19 ? 1 : Math.min(3.25, 1 + (zoom - 19) * 0.25);
-    return <><CuratedRoadNetwork />{visibleData.features.length > 0 && <GeoJSON
-      data={visibleData as never}
-      style={(feature) => {
-        const properties = feature?.properties as RoadProperties | undefined;
-        const type = properties?.class;
-        const baseWidth = type === "expressway" ? 3.3 : type === "arterial" ? 2.4 : type === "connector" ? 1.45 : 0.78;
-        return { color: type === "expressway" ? "#3e716c" : type === "arterial" ? "#718f87" : type === "connector" ? "#aabbb2" : "#cbd5ce", weight: baseWidth * scale, opacity: 0.96, lineCap: "round", lineJoin: "round", renderer };
-      }}
+    return <><CuratedRoadNetwork />{visibleData.features.length > 0 && <MutableGeoJSON
+      data={visibleData}
+      style={roadStyle}
     />}</>;
   }
   const fontSize = Math.min(15, Math.max(9.5, 9.5 + (zoom - 15.5) * 0.48));
-  const strokeScale = zoom < 19 ? 1 : Math.min(3.25, 1 + (zoom - 19) * 0.25);
   return <>
-    <GeoJSON
-      data={visibleData as never}
-      style={(feature) => {
-        const properties = feature?.properties as RoadProperties | undefined;
-        const type = properties?.class;
-        const baseWidth = type === "expressway" ? 3.3 : type === "arterial" ? 2.4 : type === "connector" ? 1.45 : 0.78;
-        return {
-          color: type === "expressway" ? "#3e716c" : type === "arterial" ? "#718f87" : type === "connector" ? "#aabbb2" : "#cbd5ce",
-          weight: baseWidth * strokeScale,
-          opacity: type === "local" ? 0.86 : 0.98,
-          lineCap: "round",
-          lineJoin: "round",
-          renderer,
-        };
-      }}
+    <MutableGeoJSON
+      data={visibleData}
+      style={roadStyle}
     />
     {labeledRoads.map((feature) => <RoadFeatureName key={roadFeatureKey(feature)} feature={feature} label={feature.properties?.name || feature.properties?.ref || ""} renderer={labelRenderer} fontSize={fontSize} placement={labelPlacements.get(roadFeatureKey(feature))} />)}
   </>;

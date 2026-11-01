@@ -45,7 +45,7 @@ test("pilot journey across every migration: signup → browse → landmark → b
     await db.query("update public.profiles set role='admin' where id=$1", [ids.admin]);
     assert.equal((await db.query("select verification_status from public.professional_profiles where profile_id=$1",[ids.professional])).rows[0].verification_status,"pending");
     category=(await db.query("select id from public.service_categories where slug='plumbing'")).rows[0].id;
-    await prepareVerifiedHero(ids.professional, "Lalitpur");
+    await prepareVerifiedHero(ids.professional, "Kathmandu Valley");
     await db.query("update public.professional_profiles set hourly_rate_paisa=12551 where profile_id=$1",[ids.professional]);
     await db.query("insert into public.professional_service_categories values($1,$2)",[ids.professional,category]);
   });
