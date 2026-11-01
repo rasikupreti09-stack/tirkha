@@ -35,6 +35,15 @@ export const tirkhaRoads: TirkhaRoad[] = [
   { name: "Bhaktapur heritage loop", kind: "local", points: [[27.673,85.428],[27.676,85.424],[27.680,85.426],[27.682,85.431],[27.679,85.435],[27.675,85.434],[27.673,85.428]] },
   { name: "Bhaktapur · Sallaghari", kind: "local", points: [[27.690,85.420],[27.687,85.424],[27.684,85.428],[27.681,85.433],[27.679,85.438]] },
   { name: "Bhaktapur neighborhood", kind: "local", points: [[27.668,85.424],[27.672,85.421],[27.676,85.420],[27.680,85.421],[27.684,85.421]] },
+  // Kirtipur municipality: historic ridge, Panga/Nagaun settlements and TU access.
+  { name: "Balkhu · Kirtipur Road", kind: "arterial", points: [[27.6864,85.3024],[27.683,85.296],[27.680,85.290],[27.6781,85.282],[27.6781,85.2769]] },
+  { name: "Kirtipur Ring Road · Layeku", kind: "connector", points: [[27.6862,85.2799],[27.688,85.276],[27.686,85.272],[27.682,85.270],[27.6799,85.271],[27.676,85.273],[27.673,85.276],[27.6712,85.279],[27.674,85.283],[27.6793,85.2865],[27.683,85.284],[27.6862,85.2799]] },
+  { name: "Panga · Lachhi Road", kind: "connector", points: [[27.679,85.278],[27.676,85.279],[27.6735,85.2795],[27.6712,85.279],[27.668,85.281],[27.6652,85.282]] },
+  { name: "Nagaun · Panga Dobato", kind: "local", points: [[27.679,85.276],[27.676,85.275],[27.6722,85.2743],[27.669,85.275],[27.666,85.277]] },
+  { name: "Tyangla Chowk · TU approach", kind: "connector", points: [[27.679,85.278],[27.681,85.281],[27.682,85.286],[27.68123,85.28963],[27.679,85.292],[27.677,85.294]] },
+  { name: "TU campus loop", kind: "local", points: [[27.678,85.282],[27.680,85.285],[27.684,85.287],[27.686,85.291],[27.683,85.294],[27.679,85.292],[27.678,85.282]] },
+  { name: "Kirtipur Bazaar · Khasibazar", kind: "local", points: [[27.682,85.270],[27.681,85.273],[27.6799,85.271],[27.678,85.274],[27.676,85.277]] },
+  { name: "Chobhar · Kirtipur south", kind: "arterial", points: [[27.6712,85.279],[27.668,85.280],[27.664,85.282],[27.659,85.2826],[27.655,85.284]] },
   // Pokhara city spine, lakeside and airport approach.
   { name: "Prithvi Chowk · Mahendrapul", kind: "arterial", points: [[28.197,83.981],[28.208,83.986],[28.218,83.989],[28.228,83.989],[28.237,83.987],[28.243,83.982]] },
   { name: "Lakeside Road", kind: "arterial", points: [[28.209,83.959],[28.213,83.963],[28.217,83.968],[28.220,83.973],[28.222,83.979],[28.224,83.984]] },
@@ -48,6 +57,7 @@ export const tirkhaRoads: TirkhaRoad[] = [
   { name: "Mahendra Highway · Hetauda", kind: "expressway", points: [[27.425,84.997],[27.429,85.008],[27.431,85.020],[27.4303,85.0322],[27.431,85.046],[27.434,85.058],[27.439,85.071]] },
   { name: "Mahendra Highway · Hetauda–Pathlaiya", kind: "arterial", points: [[27.214,85.003],[27.240,85.009],[27.270,85.014],[27.300,85.018],[27.330,85.020],[27.365,85.020],[27.400,85.023],[27.43075,85.03258]] },
   { name: "Buddha Chowk · Rapti Road", kind: "arterial", points: [[27.43075,85.03258],[27.4306,85.029],[27.4306,85.025],[27.4308,85.021],[27.4312,85.017]] },
+  { name: "Raktim Road · Hetauda market corridor", kind: "connector", points: [[27.426,85.025],[27.428,85.029],[27.43075,85.03258],[27.433,85.036],[27.436,85.039],[27.439,85.042]] },
   { name: "Hetauda Bus Park approach", kind: "connector", points: [[27.4298,85.0288],[27.43075,85.03258],[27.433,85.035],[27.436,85.038],[27.440,85.040]] },
   { name: "Hetauda market · Ward 10", kind: "local", points: [[27.426,85.025],[27.428,85.028],[27.43075,85.03258],[27.433,85.036],[27.436,85.039]] },
   { name: "Hupra Chaur · Forestry Campus", kind: "connector", points: [[27.43075,85.03258],[27.434,85.029],[27.438,85.026],[27.442,85.023],[27.446,85.021]] },
@@ -62,6 +72,8 @@ export const tirkhaRoads: TirkhaRoad[] = [
   { name: "Simara Chowk · central streets", kind: "local", points: [[27.161,84.973],[27.163,84.976],[27.1666,84.9786],[27.170,84.982],[27.174,84.983]] },
   { name: "Simara east-west neighborhood road", kind: "local", points: [[27.164,84.969],[27.164,84.977],[27.164,84.984],[27.164,84.990]] },
   { name: "Simara north-south neighborhood road", kind: "local", points: [[27.158,84.975],[27.163,84.975],[27.168,84.975],[27.173,84.975]] },
+  { name: "Jeetpur · Simara Chowk corridor", kind: "arterial", points: [[27.185,84.989],[27.181,84.987],[27.177,84.984],[27.173,84.982],[27.170,84.981],[27.1666,84.9786],[27.162,84.980]] },
+  { name: "Simara airport-side access lanes", kind: "local", points: [[27.160,84.979],[27.164,84.977],[27.168,84.978],[27.171,84.981],[27.174,84.985]] },
   { name: "Jeetpur bazaar connector", kind: "connector", points: [[27.1604,84.9766],[27.158,84.981],[27.155,84.986],[27.151,84.990],[27.147,84.994]] },
   { name: "Dumarwana road", kind: "arterial", points: [[27.159,84.980],[27.153,84.989],[27.147,84.998],[27.140,85.008],[27.13214,85.01904]] },
   { name: "Pathlaiya market approach", kind: "local", points: [[27.209,84.997],[27.214,85.003],[27.219,85.006],[27.224,85.010]] },
@@ -69,7 +81,7 @@ export const tirkhaRoads: TirkhaRoad[] = [
 
 export type TirkhaUrbanBlock = {
   id: string;
-  region: "Hetauda" | "Simara";
+  region: "Kirtipur" | "Hetauda" | "Simara";
   landUse: "commercial" | "residential" | "industrial";
   outline: [number, number][];
   buildings: [number, number][][];
@@ -159,21 +171,33 @@ function buildUrbanBlocks(config: {
 
 export const tirkhaUrbanBlocks: TirkhaUrbanBlock[] = [
   ...buildUrbanBlocks({
+    region: "Kirtipur",
+    bounds: { south: 27.652, north: 27.691, west: 85.258, east: 85.296 },
+    openZones: [
+      { south: 27.677, north: 27.689, west: 85.282, east: 85.296 },
+      { south: 27.654, north: 27.662, west: 85.279, east: 85.288 },
+    ],
+    rows: 13,
+    columns: 12,
+    rowWidths: [6, 8, 10, 12, 12, 12, 11, 12, 12, 12, 10, 8, 6],
+    commercialCenter: [27.67806, 85.27694],
+  }),
+  ...buildUrbanBlocks({
     region: "Hetauda",
-    bounds: { south: 27.416, north: 27.446, west: 85.015, east: 85.052 },
-    openZones: [{ south: 27.433, north: 27.438, west: 85.023, east: 85.030 }],
-    rows: 9,
-    columns: 10,
-    rowWidths: [5, 7, 9, 10, 10, 10, 9, 7, 5],
+    bounds: { south: 27.405, north: 27.455, west: 85.008, east: 85.060 },
+    openZones: [{ south: 27.433, north: 27.438, west: 85.023, east: 85.030 }, { south: 27.404, north: 27.415, west: 85.030, east: 85.046 }],
+    rows: 12,
+    columns: 13,
+    rowWidths: [6, 8, 10, 12, 13, 13, 13, 13, 12, 10, 8, 6],
     commercialCenter: [27.43075, 85.03258],
   }),
   ...buildUrbanBlocks({
     region: "Simara",
-    bounds: { south: 27.154, north: 27.179, west: 84.964, east: 84.993 },
-    openZones: [{ south: 27.1575, north: 27.1612, west: 84.973, east: 84.986 }],
-    rows: 8,
-    columns: 10,
-    rowWidths: [5, 7, 9, 10, 10, 9, 7, 5],
+    bounds: { south: 27.145, north: 27.194, west: 84.958, east: 85.004 },
+    openZones: [{ south: 27.1575, north: 27.1612, west: 84.973, east: 84.986 }, { south: 27.162, north: 27.168, west: 84.978, east: 84.986 }],
+    rows: 11,
+    columns: 12,
+    rowWidths: [5, 7, 9, 11, 12, 12, 12, 12, 11, 9, 7],
     commercialCenter: [27.1666, 84.9786],
   }),
 ];
@@ -190,6 +214,7 @@ export const tirkhaWaterways: LatLngExpression[][] = [
 
 export const tirkhaLandmarks: { name: string; point: [number, number]; kind: "district" | "landmark" | "service"; minZoom: number }[] = [
   { name: "KATHMANDU", point: [27.7172,85.324], kind: "district", minZoom: 10 },
+  { name: "KIRTIPUR", point: [27.67806,85.27694], kind: "district", minZoom: 10 },
   { name: "LALITPUR · PATAN", point: [27.674,85.322], kind: "district", minZoom: 10 },
   { name: "BHAKTAPUR", point: [27.676,85.432], kind: "district", minZoom: 10 },
   { name: "POKHARA", point: [28.217,83.985], kind: "district", minZoom: 10 },
@@ -275,6 +300,7 @@ export const tirkhaLandmarks: { name: string; point: [number, number]; kind: "di
   { name: "POTTERY SQUARE", point: [27.674,85.430], kind: "service", minZoom: 16 },
   { name: "CHYAMASINGH", point: [27.674,85.441], kind: "service", minZoom: 15 },
   { name: "BUDDHA CHOWK", point: [27.43075,85.03258], kind: "landmark", minZoom: 13 },
+  { name: "RAKTIM ROAD", point: [27.43075,85.03258], kind: "landmark", minZoom: 13 },
   { name: "HETAUDA BUS PARK", point: [27.43018,85.02882], kind: "service", minZoom: 13 },
   { name: "HETAUDA HOSPITAL", point: [27.43231,85.02772], kind: "service", minZoom: 14 },
   { name: "SANOPOKHARA CHOWK", point: [27.420,85.040], kind: "service", minZoom: 14 },
@@ -285,6 +311,7 @@ export const tirkhaLandmarks: { name: string; point: [number, number]; kind: "di
   { name: "RATOMATE MARKET", point: [27.431,85.046], kind: "service", minZoom: 15 },
   { name: "CHAU KITOL ROAD", point: [27.442,85.023], kind: "service", minZoom: 16 },
   { name: "SIMARA CHOWK", point: [27.1666,84.9786], kind: "landmark", minZoom: 13 },
+  { name: "JEETPUR · SIMARA CORRIDOR", point: [27.185,84.989], kind: "landmark", minZoom: 13 },
   { name: "SIMARA AIRPORT", point: [27.164201,84.980135], kind: "service", minZoom: 13 },
   { name: "PIPARA SIMARA", point: [27.162,84.975], kind: "service", minZoom: 15 },
   { name: "AIRPORT ROAD", point: [27.164,84.982], kind: "service", minZoom: 15 },
@@ -298,6 +325,21 @@ export const tirkhaLandmarks: { name: string; point: [number, number]; kind: "di
   { name: "RAPTI BRIDGE", point: [27.429,85.011], kind: "landmark", minZoom: 14 },
   { name: "RATOMATE", point: [27.431,85.046], kind: "service", minZoom: 14 },
   { name: "CHAUKITOL", point: [27.442,85.023], kind: "service", minZoom: 14 },
+  { name: "KIRTIPUR BAZAAR", point: [27.6799,85.2710], kind: "landmark", minZoom: 12 },
+  { name: "PANGA · LACHHI", point: [27.6712,85.2790], kind: "landmark", minZoom: 12 },
+  { name: "NAGAUN · PANGA DOBATO", point: [27.6722,85.2743], kind: "landmark", minZoom: 12 },
+  { name: "TYANGLA CHOWK", point: [27.681,85.287], kind: "landmark", minZoom: 12 },
+  { name: "NAGAUN POKHARI", point: [27.6742,85.2749], kind: "service", minZoom: 14 },
+  { name: "TYANGLAPOKHARI", point: [27.679,85.281], kind: "service", minZoom: 14 },
+  { name: "TRIBHUVAN UNIVERSITY", point: [27.68123,85.28963], kind: "landmark", minZoom: 12 },
+  { name: "BAGH BHAIRAB · LAYEKU", point: [27.6862,85.2799], kind: "landmark", minZoom: 12 },
+  { name: "UMA MAHESHWOR · KWACHO", point: [27.6858,85.2752], kind: "service", minZoom: 13 },
+  { name: "KHASIBAZAR · SAMAL", point: [27.6799,85.2710], kind: "service", minZoom: 13 },
+  { name: "BHAJANGAL", point: [27.6703,85.2841], kind: "service", minZoom: 13 },
+  { name: "CHILANCHO · NAYA BAZAR", point: [27.6793,85.2865], kind: "service", minZoom: 13 },
+  { name: "CHOBHAR", point: [27.6590,85.2826], kind: "service", minZoom: 13 },
+  { name: "GAMCHA · GODAM CHAUR", point: [27.6634,85.2591], kind: "service", minZoom: 14 },
+  { name: "DHUSI · BHATKYAPATI", point: [27.6652,85.2722], kind: "service", minZoom: 14 },
   { name: "KAMANE", point: [27.40379,85.03944], kind: "service", minZoom: 13 },
   { name: "DUMARWANA", point: [27.13214,85.01904], kind: "service", minZoom: 13 },
   { name: "HATTISAR", point: [27.137,85.015], kind: "service", minZoom: 14 },
@@ -321,6 +363,7 @@ export const tirkhaParks: LatLngExpression[][][] = [
 
 export const tirkhaCityViews = [
   { label: "Kathmandu", center: [27.7172,85.324] as [number,number], zoom: 14 },
+  { label: "Kirtipur", center: [27.67806,85.27694] as [number,number], zoom: 15 },
   { label: "Lalitpur", center: [27.674,85.322] as [number,number], zoom: 14 },
   { label: "Bhaktapur", center: [27.676,85.432] as [number,number], zoom: 14 },
   { label: "Pokhara", center: [28.217,83.985] as [number,number], zoom: 14 },
