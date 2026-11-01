@@ -9,9 +9,10 @@ export const catalogServiceSchema = z.object({
  keywords:z.array(z.string()), image:z.string().startsWith("/images/"), regions:z.array(z.string()),active:z.boolean(),sort_order:z.number().int(),
 });
 export type CatalogService=z.infer<typeof catalogServiceSchema>;
-export const REGIONS=["Kathmandu Valley","Kathmandu","Lalitpur","Bhaktapur","Pokhara","Hetauda","Simara"] as const;
+export const REGIONS=["Kathmandu Valley","Kathmandu","Lalitpur","Bhaktapur","Kirtipur","Pokhara","Hetauda","Simara"] as const;
 export function inRegion(service:CatalogService, region:string) {
- return region==="Kathmandu Valley" ? service.regions.some(r=>["Kathmandu","Lalitpur","Bhaktapur"].includes(r)) : service.regions.includes(region);
+ const valleyCities=["Kathmandu","Lalitpur","Bhaktapur","Kirtipur"];
+ return region==="Kathmandu Valley"||region==="Kirtipur" ? service.regions.some(r=>valleyCities.includes(r)) : service.regions.includes(region);
 }
 export function serviceTotal(service:CatalogService){const priced=applyCatalogPriceOverride(service);return priced.base_paisa+priced.visit_paisa;}
 export function catalogMoney(paisa:number){return "Rs. "+new Intl.NumberFormat("en-NP",{maximumFractionDigits:2}).format(paisa/100);}

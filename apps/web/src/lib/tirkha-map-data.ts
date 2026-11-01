@@ -184,20 +184,24 @@ export const tirkhaUrbanBlocks: TirkhaUrbanBlock[] = [
   }),
   ...buildUrbanBlocks({
     region: "Hetauda",
-    bounds: { south: 27.405, north: 27.455, west: 85.008, east: 85.060 },
-    openZones: [{ south: 27.433, north: 27.438, west: 85.023, east: 85.030 }, { south: 27.404, north: 27.415, west: 85.030, east: 85.046 }],
-    rows: 12,
-    columns: 13,
-    rowWidths: [6, 8, 10, 12, 13, 13, 13, 13, 12, 10, 8, 6],
+    bounds: { south: 27.402, north: 27.458, west: 85.005, east: 85.065 },
+    // Preserve Hupra Chaur as open green space; keep the Buddha Chowk,
+    // Raktim Road and bus-park corridors continuously covered by parcels.
+    openZones: [{ south: 27.433, north: 27.438, west: 85.023, east: 85.030 }],
+    rows: 14,
+    columns: 15,
+    rowWidths: [6, 8, 10, 12, 14, 15, 15, 15, 15, 15, 14, 12, 10, 8],
     commercialCenter: [27.43075, 85.03258],
   }),
   ...buildUrbanBlocks({
     region: "Simara",
-    bounds: { south: 27.145, north: 27.194, west: 84.958, east: 85.004 },
-    openZones: [{ south: 27.1575, north: 27.1612, west: 84.973, east: 84.986 }, { south: 27.162, north: 27.168, west: 84.978, east: 84.986 }],
-    rows: 11,
-    columns: 12,
-    rowWidths: [5, 7, 9, 11, 12, 12, 12, 12, 11, 9, 7],
+    bounds: { south: 27.143, north: 27.195, west: 84.956, east: 85.007 },
+    // Leave only the airport runway area open; residential and commercial
+    // parcels continue through Simara Chowk and the Jeetpur highway strip.
+    openZones: [{ south: 27.1575, north: 27.1612, west: 84.973, east: 84.986 }],
+    rows: 13,
+    columns: 14,
+    rowWidths: [5, 7, 9, 11, 13, 14, 14, 14, 14, 13, 11, 9, 7],
     commercialCenter: [27.1666, 84.9786],
   }),
 ];
@@ -363,9 +367,9 @@ export const tirkhaParks: LatLngExpression[][][] = [
 
 export const tirkhaCityViews = [
   { label: "Kathmandu", center: [27.7172,85.324] as [number,number], zoom: 14 },
-  { label: "Kirtipur", center: [27.67806,85.27694] as [number,number], zoom: 15 },
   { label: "Lalitpur", center: [27.674,85.322] as [number,number], zoom: 14 },
   { label: "Bhaktapur", center: [27.676,85.432] as [number,number], zoom: 14 },
+  { label: "Kirtipur", center: [27.67806,85.27694] as [number,number], zoom: 15 },
   { label: "Pokhara", center: [28.217,83.985] as [number,number], zoom: 14 },
   { label: "Hetauda", center: [27.4303,85.0322] as [number,number], zoom: 14 },
   { label: "Simara", center: [27.1666,84.9786] as [number,number], zoom: 14 },

@@ -56,6 +56,7 @@ const uiDictionary = {
   city: ["Kathmandu", "काठमाडौं"],
   lalitpur: ["Lalitpur", "ललितपुर"],
   bhaktapur: ["Bhaktapur", "भक्तपुर"],
+  kirtipur: ["Kirtipur", "कीर्तिपुर"],
   hetauda: ["Hetauda", "हेटौँडा"],
   simara: ["Simara", "सिमरा"],
   valleyHome: ["Our home. Just like yours.", "हाम्रो घर। तपाईंको जस्तै।"],
