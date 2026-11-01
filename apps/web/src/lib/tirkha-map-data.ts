@@ -281,6 +281,53 @@ export const tirkhaUrbanBlocks: TirkhaUrbanBlock[] = [
   }),
 ];
 
+type UrbanBounds = { south: number; west: number; north: number; east: number };
+const URBAN_INDEX_CELL_DEGREES = 0.02;
+const urbanBlockBounds = new Map<string, UrbanBounds>();
+const urbanBlockIndex = new Map<string, Set<TirkhaUrbanBlock>>();
+
+for (const block of tirkhaUrbanBlocks) {
+  const bounds = block.outline.reduce<UrbanBounds>((current, [latitude, longitude]) => ({
+    south: Math.min(current.south, latitude),
+    west: Math.min(current.west, longitude),
+    north: Math.max(current.north, latitude),
+    east: Math.max(current.east, longitude),
+  }), { south: Infinity, west: Infinity, north: -Infinity, east: -Infinity });
+  urbanBlockBounds.set(block.id, bounds);
+  const minRow = Math.floor(bounds.south / URBAN_INDEX_CELL_DEGREES);
+  const maxRow = Math.floor(bounds.north / URBAN_INDEX_CELL_DEGREES);
+  const minColumn = Math.floor(bounds.west / URBAN_INDEX_CELL_DEGREES);
+  const maxColumn = Math.floor(bounds.east / URBAN_INDEX_CELL_DEGREES);
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let column = minColumn; column <= maxColumn; column += 1) {
+      const key = `${row}:${column}`;
+      const cell = urbanBlockIndex.get(key) ?? new Set<TirkhaUrbanBlock>();
+      cell.add(block);
+      urbanBlockIndex.set(key, cell);
+    }
+  }
+}
+
+/** Return only parcel blocks intersecting the current map viewport. */
+export function getTirkhaUrbanBlocksInBounds(bounds: UrbanBounds): TirkhaUrbanBlock[] {
+  const candidates = new Set<TirkhaUrbanBlock>();
+  const minRow = Math.floor(bounds.south / URBAN_INDEX_CELL_DEGREES);
+  const maxRow = Math.floor(bounds.north / URBAN_INDEX_CELL_DEGREES);
+  const minColumn = Math.floor(bounds.west / URBAN_INDEX_CELL_DEGREES);
+  const maxColumn = Math.floor(bounds.east / URBAN_INDEX_CELL_DEGREES);
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let column = minColumn; column <= maxColumn; column += 1) {
+      for (const block of urbanBlockIndex.get(`${row}:${column}`) ?? []) candidates.add(block);
+    }
+  }
+  return [...candidates].filter((block) => {
+    const blockBounds = urbanBlockBounds.get(block.id);
+    return blockBounds !== undefined
+      && blockBounds.north >= bounds.south && blockBounds.south <= bounds.north
+      && blockBounds.east >= bounds.west && blockBounds.west <= bounds.east;
+  });
+}
+
 export const tirkhaWaterways: LatLngExpression[][] = [
   [[27.744,85.296],[27.738,85.300],[27.732,85.303],[27.726,85.305],[27.720,85.307],[27.714,85.307],[27.708,85.305],[27.702,85.302],[27.696,85.300]],
   [[27.727,85.356],[27.720,85.351],[27.713,85.347],[27.706,85.342],[27.699,85.337],[27.692,85.333],[27.685,85.328],[27.678,85.323],[27.670,85.320]],

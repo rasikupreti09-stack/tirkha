@@ -4,7 +4,7 @@ import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { canvas, DomEvent, svg, type Polyline as LeafletPolyline, type LatLngExpression } from "leaflet";
 import { CircleMarker, GeoJSON, Polygon, Polyline, Tooltip, useMap } from "react-leaflet";
 import { Crosshair, MapPin, MapPinned } from "lucide-react";
-import { tirkhaCityViews, tirkhaLandmarks, tirkhaParks, tirkhaRoads, tirkhaUrbanBlocks, tirkhaWaterways } from "@/lib/tirkha-map-data";
+import { getTirkhaUrbanBlocksInBounds, tirkhaCityViews, tirkhaLandmarks, tirkhaParks, tirkhaRoads, tirkhaWaterways } from "@/lib/tirkha-map-data";
 import { TirkhaMark } from "./tirkha-mark";
 
 type RoadProperties = { class?: "expressway" | "arterial" | "connector" | "local"; name?: string | null; ref?: string | null };
@@ -12,6 +12,8 @@ type RoadFeature = { type: "Feature"; id?: string; properties?: RoadProperties; 
 type RoadCollection = { type: "FeatureCollection"; features: RoadFeature[] };
 type RoadLabelCandidate = { key: string; name: string; kind: RoadProperties["class"]; positions: LatLngExpression[] };
 type RoadLabelPlacement = { startOffset: number; scale: number };
+type RoadBounds = { south: number; west: number; north: number; east: number };
+type RoadSpatialIndex = { cells: Map<string, Set<RoadFeature>>; bounds: Map<RoadFeature, RoadBounds>; broadFeatures: RoadFeature[] };
 type BuildingFeature = { type: "Feature"; id?: string; properties?: { kind?: string; center?: [number, number] }; geometry: { type: "Polygon"; coordinates: number[][][] } };
 type BuildingCollection = { type: "FeatureCollection"; features: BuildingFeature[] };
 const buildingTileCache = new Map<string, BuildingFeature[]>();
@@ -93,6 +95,59 @@ function mapBuildingTiles(map: ReturnType<typeof useMap>) {
     for (let lon = west; lon <= east; lon++) tiles.push(`${lat}_${lon}`);
   }
   return tiles;
+}
+
+const ROAD_INDEX_CELL_DEGREES = 0.1;
+function createRoadSpatialIndex(features: RoadFeature[]): RoadSpatialIndex {
+  const cells = new Map<string, Set<RoadFeature>>();
+  const boundsByFeature = new Map<RoadFeature, RoadBounds>();
+  const broadFeatures: RoadFeature[] = [];
+  for (const feature of features) {
+    const bounds = feature.geometry.coordinates.reduce<RoadBounds>((current, [longitude, latitude]) => ({
+      south: Math.min(current.south, latitude),
+      west: Math.min(current.west, longitude),
+      north: Math.max(current.north, latitude),
+      east: Math.max(current.east, longitude),
+    }), { south: Infinity, west: Infinity, north: -Infinity, east: -Infinity });
+    if (!Number.isFinite(bounds.south) || !Number.isFinite(bounds.west)) continue;
+    boundsByFeature.set(feature, bounds);
+    const minRow = Math.floor(bounds.south / ROAD_INDEX_CELL_DEGREES);
+    const maxRow = Math.floor(bounds.north / ROAD_INDEX_CELL_DEGREES);
+    const minColumn = Math.floor(bounds.west / ROAD_INDEX_CELL_DEGREES);
+    const maxColumn = Math.floor(bounds.east / ROAD_INDEX_CELL_DEGREES);
+    if ((maxRow - minRow + 1) * (maxColumn - minColumn + 1) > 64) {
+      broadFeatures.push(feature);
+      continue;
+    }
+    for (let row = minRow; row <= maxRow; row += 1) {
+      for (let column = minColumn; column <= maxColumn; column += 1) {
+        const key = `${row}:${column}`;
+        const cell = cells.get(key) ?? new Set<RoadFeature>();
+        cell.add(feature);
+        cells.set(key, cell);
+      }
+    }
+  }
+  return { cells, bounds: boundsByFeature, broadFeatures };
+}
+
+function roadsInBounds(index: RoadSpatialIndex, bounds: RoadBounds): RoadFeature[] {
+  const candidates = new Set(index.broadFeatures);
+  const minRow = Math.floor(bounds.south / ROAD_INDEX_CELL_DEGREES);
+  const maxRow = Math.floor(bounds.north / ROAD_INDEX_CELL_DEGREES);
+  const minColumn = Math.floor(bounds.west / ROAD_INDEX_CELL_DEGREES);
+  const maxColumn = Math.floor(bounds.east / ROAD_INDEX_CELL_DEGREES);
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let column = minColumn; column <= maxColumn; column += 1) {
+      for (const feature of index.cells.get(`${row}:${column}`) ?? []) candidates.add(feature);
+    }
+  }
+  return [...candidates].filter((feature) => {
+    const featureBounds = index.bounds.get(feature);
+    return featureBounds !== undefined
+      && featureBounds.north >= bounds.south && featureBounds.south <= bounds.north
+      && featureBounds.east >= bounds.west && featureBounds.west <= bounds.east;
+  });
 }
 
 function roadLabelZoom(kind: RoadProperties["class"]): number {
@@ -302,12 +357,7 @@ function CityBlockLayouts() {
   const visibleBlocks = useMemo(() => {
     if (zoom < 17.5) return [];
     const [west, south, east, north] = boundsKey.split(",").map(Number);
-    return tirkhaUrbanBlocks.filter((block) => {
-      const lats = block.outline.map(([latitude]) => latitude);
-      const lngs = block.outline.map(([, longitude]) => longitude);
-      return Math.max(...lats) >= south && Math.min(...lats) <= north
-        && Math.max(...lngs) >= west && Math.min(...lngs) <= east;
-    });
+    return getTirkhaUrbanBlocksInBounds({ south, west, north, east });
   }, [boundsKey, zoom]);
 
   if (!visibleBlocks.length) return null;
@@ -316,7 +366,7 @@ function CityBlockLayouts() {
       const fillColor = block.landUse === "commercial" ? "#e7e3d6" : block.landUse === "industrial" ? "#dce3df" : "#e0e8df";
       return <Fragment key={block.id}>
         <Polygon positions={block.outline} pathOptions={{ renderer, color: "#fffdf8", weight: zoom >= 18 ? 1.5 : 1, opacity: 0.95, fillColor, fillOpacity: zoom >= 18 ? 0.34 : 0.7, lineJoin: "round", interactive: false }} />
-        {zoom >= 19 && block.buildings.map((outline, index) => <Polygon key={`${block.id}-building-${index}`} positions={outline} pathOptions={{ renderer, color: "#fdfcf8", weight: Math.min(4.07, zoom >= 20 ? 1.35 + (zoom - 20) * 0.34 : 0.9), opacity: 0.98, fillColor: block.landUse === "commercial" ? "#cec9b9" : "#cbd8cc", fillOpacity: 0.92, lineJoin: "round", interactive: false }} />)}
+        {zoom >= 18 && block.buildings.map((outline, index) => <Polygon key={`${block.id}-building-${index}`} positions={outline} pathOptions={{ renderer, color: "#fdfcf8", weight: Math.min(4.07, zoom >= 20 ? 1.35 + (zoom - 20) * 0.34 : 0.9), opacity: 0.98, fillColor: block.landUse === "commercial" ? "#cec9b9" : "#cbd8cc", fillOpacity: 0.92, lineJoin: "round", interactive: false }} />)}
       </Fragment>;
     })}
   </>;
@@ -367,7 +417,7 @@ function DetailedBuildingFootprints() {
   const map = useMap();
   const readView = () => {
     const zoom = map.getZoom();
-    const region = footprintRegion(map.getCenter().lat, map.getCenter().lng);
+    const region = sourceFootprintRegion(map.getCenter().lat, map.getCenter().lng);
     const tiles = zoom >= 17.5 && region ? mapBuildingTiles(map) : [];
     return { zoom, region, tiles, signature: `${region}:${tiles.join(",")}`, viewport: map.getBounds().toBBoxString() };
   };
@@ -398,11 +448,13 @@ function DetailedBuildingFootprints() {
       return center ? bounds.contains([center[1], center[0]]) : false;
     });
   }, [data, map, view.region, view.signature, view.viewport, view.zoom]);
+  const visibleCollection = useMemo(() => visible?.length
+    ? { type: "FeatureCollection", features: visible } as never
+    : null, [visible]);
 
-  if (!visible?.length) return null;
+  if (!visibleCollection) return null;
   return <GeoJSON
-    key={view.signature}
-    data={{ type: "FeatureCollection", features: visible } as never}
+    data={visibleCollection}
     style={(feature) => {
       const kind = String(feature?.properties?.kind ?? "");
       const fillColor = kind === "apartments" || kind === "residential" ? "#cbd1c9" : kind === "commercial" ? "#d7d3c7" : "#dedbd1";
@@ -413,9 +465,10 @@ function DetailedBuildingFootprints() {
   />;
 }
 
-function footprintRegion(latitude: number, longitude: number): string | null {
-  // Hetauda and Simara have curated parcel artwork; Kirtipur reuses the
-  // adjoining Kathmandu/Lalitpur footprint packs where source tiles exist.
+function sourceFootprintRegion(latitude: number, longitude: number): string | null {
+  // Imported footprint packs are available only for these source datasets.
+  // CityBlockLayouts renders the generated local parcel/building artwork for
+  // Hetauda, Simara and every other curated cluster regardless of this result.
   if ((latitude >= 27.35 && latitude <= 27.49 && longitude >= 84.97 && longitude <= 85.12)
     || (latitude >= 27.12 && latitude <= 27.23 && longitude >= 84.94 && longitude <= 85.06)) return null;
   if (latitude >= 28.12) return "pokhara";
@@ -483,6 +536,7 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
   const labelRenderer = useMemo(() => svg({ padding: 0.5 }), []);
   const readBounds = () => map.getBounds().pad(0.3).toBBoxString();
   const [boundsKey, setBoundsKey] = useState(readBounds);
+  const roadIndex = useMemo(() => createRoadSpatialIndex(data.features), [data.features]);
   useEffect(() => { map.invalidateSize({ pan: false }); }, [map]);
   useEffect(() => {
     const update = () => setBoundsKey(readBounds());
@@ -490,18 +544,9 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
   }, [map]);
   const visibleData = useMemo(() => {
     const [west, south, east, north] = boundsKey.split(",").map(Number);
-    const features = data.features.filter(feature => {
-      const points = feature.geometry.coordinates;
-      if (!points.length) return false;
-      let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
-      for (const [longitude, latitude] of points) {
-        minLng = Math.min(minLng, longitude); minLat = Math.min(minLat, latitude);
-        maxLng = Math.max(maxLng, longitude); maxLat = Math.max(maxLat, latitude);
-      }
-      return maxLng >= west && minLng <= east && maxLat >= south && minLat <= north;
-    });
+    const features = roadsInBounds(roadIndex, { west, south, east, north });
     return { ...data, features };
-  }, [boundsKey, data]);
+  }, [boundsKey, data, roadIndex]);
   const zoom = map.getZoom();
   const labelPlacements = useMemo(() => chooseNonCollidingRoadLabels(visibleData.features.flatMap((feature) => {
     const name = feature.properties?.name || feature.properties?.ref;
@@ -521,7 +566,6 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
     const zoom = map.getZoom();
     const scale = zoom < 19 ? 1 : Math.min(3.25, 1 + (zoom - 19) * 0.25);
     return <><CuratedRoadNetwork />{visibleData.features.length > 0 && <GeoJSON
-      key={boundsKey}
       data={visibleData as never}
       style={(feature) => {
         const properties = feature?.properties as RoadProperties | undefined;
@@ -535,7 +579,6 @@ function DetailedRoadNetwork({ data }: { data: RoadCollection }) {
   const strokeScale = zoom < 19 ? 1 : Math.min(3.25, 1 + (zoom - 19) * 0.25);
   return <>
     <GeoJSON
-      key={boundsKey}
       data={visibleData as never}
       style={(feature) => {
         const properties = feature?.properties as RoadProperties | undefined;
