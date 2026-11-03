@@ -54,9 +54,9 @@ function roadLabelZoom(kind: RoadProperties["class"]): number {
   return 14;
 }
 
-function MapZoomCeiling() {
+function MapZoomCeiling({ maxZoom = 28 }: { maxZoom?: number }) {
   const map = useMap();
-  useEffect(() => { map.setMaxZoom(28); }, [map]);
+  useEffect(() => { map.setMaxZoom(maxZoom); }, [map, maxZoom]);
   return null;
 }
 
@@ -236,9 +236,9 @@ function SvgPathName({ pathRef, label, fontSize, placement = { startOffset: 50, 
 }
 
 /** Original Tirkha cartography rendered from geographic vector geometry, with no raster tile layer. */
-export const TirkhaMapArtwork = memo(function TirkhaMapArtwork({ excludeDistricts = false }: { excludeDistricts?: boolean }) {
+export const TirkhaMapArtwork = memo(function TirkhaMapArtwork({ excludeDistricts = false, maxZoom = 28 }: { excludeDistricts?: boolean; maxZoom?: number }) {
   return <>
-    <MapZoomCeiling />
+    <MapZoomCeiling maxZoom={maxZoom} />
     {tirkhaParks.map((park, index) => <Polygon key={`park-${index}`} positions={park} pathOptions={{ color: "#b8d3bf", weight: 1, fillColor: "#dcebdd", fillOpacity: 0.8, interactive: false }} />)}
     {tirkhaWaterways.map((line, index) => <Polyline key={`water-${index}`} positions={line} pathOptions={{ color: "#a9c9ce", weight: 8, opacity: 0.42, lineCap: "round", lineJoin: "round", interactive: false }} />)}
     {tirkhaWaterways.map((line, index) => <Polyline key={`water-core-${index}`} positions={line} pathOptions={{ color: "#8db8c0", weight: 2.4, opacity: 0.82, lineCap: "round", lineJoin: "round", interactive: false }} />)}
@@ -626,7 +626,7 @@ export function TirkhaMapRegionControl({ onRegionSelect, regions = tirkhaCityVie
     <div className="tirkha-region-pills">{regions.map((city) => <button key={city.label} type="button" onClick={(event) => {
       event.stopPropagation();
       if (onRegionSelect) onRegionSelect(city.label);
-      else map.flyToBounds([[city.bounds.south, city.bounds.west], [city.bounds.north, city.bounds.east]], { padding: [32, 32], maxZoom: city.zoom, duration: 0.85, easeLinearity: 0.25 });
+      else map.flyToBounds([[city.bounds.south, city.bounds.west], [city.bounds.north, city.bounds.east]], { padding: [32, 32], maxZoom: city.maxZoom, duration: 0.85, easeLinearity: 0.25 });
     }} aria-label={`Show ${city.label}`}>
       <span className="tirkha-region-dot" />{city.label}
     </button>)}</div>

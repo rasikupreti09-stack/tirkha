@@ -5,7 +5,7 @@ import { MapContainer, Marker, useMap, useMapEvents } from "react-leaflet";
 import { KATHMANDU_CENTER, REGIONS, type Coordinates, type MapPin } from "@tirkha/shared";
 import { TirkhaMapArtwork, TirkhaMapRegionControl, TirkhaMapSignature, TirkhaMapZoomControl } from "./tirkha-map-artwork";
 import { SpatialEngineErrorBoundary } from "./spatial-engine-error-boundary";
-import { tirkhaCityViews, tirkhaCoreCityViews } from "@/lib/tirkha-map-data";
+import { tirkhaCityViews } from "@/lib/tirkha-map-data";
 import { NEPAL_LEAFLET_BOUNDS } from "@/lib/districtBounds";
 
 type Props = { value: MapPin | null; onPick: (point: Coordinates) => void; disabled: boolean; height?: number; region?: typeof REGIONS[number]; regionFocusKey?: number; serviceAreaOnly?: boolean; onRegionChange?: (region: typeof REGIONS[number]) => void; focusPinOnChange?: boolean };
@@ -20,22 +20,23 @@ function toLeafletBounds(region: RegionView): MapBounds {
 function focusRegion(map: LeafletMap, region: RegionView) {
   map.flyToBounds(toLeafletBounds(region), {
     padding: [32, 32],
-    maxZoom: region.zoom,
+    maxZoom: region.maxZoom,
     duration: 0.85,
     easeLinearity: 0.25,
   });
 }
 
 /** Hard-clamps the camera and raises min zoom enough to keep its viewport inside Nepal. */
-function RegionCameraGuard({ bounds, minimumZoom = 7 }: { bounds: MapBounds; minimumZoom?: number }) {
+function RegionCameraGuard({ bounds, minimumZoom = 7, maximumZoom = 28 }: { bounds: MapBounds; minimumZoom?: number; maximumZoom?: number }) {
   const map = useMap();
   useEffect(() => {
     map.setMaxBounds(bounds);
     map.options.maxBoundsViscosity = 1;
+    map.setMaxZoom(maximumZoom);
 
     const constrainViewport = () => {
       const viewportMinZoom = map.getBoundsZoom(bounds, false);
-      const safeMinZoom = Math.min(28, Math.max(minimumZoom, viewportMinZoom));
+      const safeMinZoom = Math.min(maximumZoom, Math.max(minimumZoom, viewportMinZoom));
       map.setMinZoom(safeMinZoom);
       if (map.getZoom() < safeMinZoom) map.setZoom(safeMinZoom, { animate: false });
       map.panInsideBounds(bounds, { animate: false });
@@ -48,7 +49,7 @@ function RegionCameraGuard({ bounds, minimumZoom = 7 }: { bounds: MapBounds; min
       map.off("resize", constrainViewport);
       map.off("zoomend", constrainViewport);
     };
-  }, [bounds, map, minimumZoom]);
+  }, [bounds, map, maximumZoom, minimumZoom]);
   return null;
 }
 
@@ -97,11 +98,12 @@ export default function LocationMap(props: Props) {
     iconAnchor: [16, 32],
     html: '<svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><path d="M16 31C13.7 27.7 3 20.1 3 14A13 13 0 1 1 29 14C29 20.1 18.3 27.7 16 31Z" fill="#047857" stroke="#f8fafc" stroke-width="1.5"/><circle class="tirkha-pin-pulse" cx="16" cy="14" r="6" fill="none" stroke="#d1fae5" stroke-width="2"/><circle cx="16" cy="14" r="2.5" fill="#f8fafc" stroke="#1f2937" stroke-width="1"/></svg>',
   }), []);
-  const availableRegionViews = props.serviceAreaOnly ? tirkhaCoreCityViews : tirkhaCityViews;
+  const availableRegionViews = tirkhaCityViews;
   const regionView = availableRegionViews.find(view => view.label === props.region)
     ?? (props.region === "Kathmandu Valley" ? availableRegionViews[0] : undefined);
   const cameraBounds = useMemo(() => props.serviceAreaOnly && regionView ? toLeafletBounds(regionView) : NEPAL_LEAFLET_BOUNDS, [props.serviceAreaOnly, regionView]);
   const cameraMinimumZoom = props.serviceAreaOnly ? 0 : 7;
+  const cameraMaximumZoom = props.serviceAreaOnly && regionView ? regionView.maxZoom : 28;
   const center = props.value || (regionView ? { latitude: regionView.center[0], longitude: regionView.center[1] } : KATHMANDU_CENTER);
   const regionFocusSignature = `${props.region ?? ""}:${props.regionFocusKey ?? 0}:${mapRegionFocusKey}`;
   useEffect(() => {
@@ -126,9 +128,9 @@ export default function LocationMap(props: Props) {
   if (typeof window === "undefined") return <div className="h-[300px] w-full animate-pulse rounded-lg bg-slate-100" role="status">Loading map…</div>;
   return <>
     <div className="tirkha-map-frame">
-      <SpatialEngineErrorBoundary><MapContainer ref={mapRef} center={[center.latitude, center.longitude]} zoom={props.value && props.focusPinOnChange !== false ? 16 : regionView?.zoom ?? 12} minZoom={7} maxZoom={28} maxBounds={cameraBounds} maxBoundsViscosity={1} worldCopyJump={false} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={30} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom inertia inertiaDeceleration={2800} inertiaMaxSpeed={1800} easeLinearity={0.25} bounceAtZoomLimits={false} attributionControl={false} preferCanvas style={{ height: props.height ?? 300, width: "100%", zIndex: 0 }} className="tirkha-vector-map" aria-label="Choose your service location">
-        <RegionCameraGuard bounds={cameraBounds} minimumZoom={cameraMinimumZoom} />
-        <TirkhaMapArtwork excludeDistricts={props.serviceAreaOnly} />
+      <SpatialEngineErrorBoundary><MapContainer ref={mapRef} center={[center.latitude, center.longitude]} zoom={props.value && props.focusPinOnChange !== false ? 16 : regionView?.zoom ?? 12} minZoom={7} maxZoom={cameraMaximumZoom} maxBounds={cameraBounds} maxBoundsViscosity={1} worldCopyJump={false} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={30} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom inertia inertiaDeceleration={2800} inertiaMaxSpeed={1800} easeLinearity={0.25} bounceAtZoomLimits={false} attributionControl={false} preferCanvas style={{ height: props.height ?? 300, width: "100%", zIndex: 0 }} className="tirkha-vector-map" aria-label="Choose your service location">
+        <RegionCameraGuard bounds={cameraBounds} minimumZoom={cameraMinimumZoom} maximumZoom={cameraMaximumZoom} />
+        <TirkhaMapArtwork maxZoom={cameraMaximumZoom} />
         <TirkhaMapRegionControl regions={availableRegionViews} onRegionSelect={region => {
           setMapRegionFocusKey((current) => current + 1);
           props.onRegionChange?.(region as typeof REGIONS[number]);
@@ -136,7 +138,7 @@ export default function LocationMap(props: Props) {
         <TirkhaMapZoomControl onLocate={locateMe} locating={locating} pinningEnabled={pinningEnabled} onTogglePinning={() => setPinningEnabled(value => !value)} />
         <Pin value={props.value} onPick={props.onPick} onPinPlaced={disarmPinning} disabled={props.disabled} focusPinOnChange={props.focusPinOnChange} pinningEnabled={pinningEnabled} icon={pinIcon} />
       </MapContainer></SpatialEngineErrorBoundary>
-      <TirkhaMapSignature caption="Kathmandu Valley · Kirtipur · Pokhara · Hetauda · Simara" />
+      <TirkhaMapSignature caption="Kathmandu Valley · Pokhara · Hetauda · Simara · Chitwan · Jhapa · Sunsari" />
     </div>
     <p className="mt-2 px-1 text-xs text-slate-600">{pinningEnabled ? "Pin mode is on: tap or drag the pin to set your exact location. Turn it off to pan safely." : "Pin mode is off so you can pan the map. Tap the pin control to place or move your location."}</p>
     {locationError && <p role="status" className="px-2 pt-2 text-xs text-amber-800">{locationError}</p>}
