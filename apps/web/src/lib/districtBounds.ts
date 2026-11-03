@@ -11,10 +11,14 @@ export type DistrictBounds = { south: number; west: number; north: number; east:
 export type DistrictPoint = { latitude: number; longitude: number };
 
 export type DistrictDefinition = {
+  /** Stable routing key shared by the UI, worker protocol and PostGIS RPC. */
   key: DistrictKey;
   name: string;
+  description: string;
   /** Midpoint of the district bounding box; used only for initial camera focus. */
   center: DistrictPoint;
+  /** Initial overview zoom used by the district picker. */
+  zoom: 12;
   bounds: DistrictBounds;
 };
 
@@ -27,19 +31,25 @@ export const DISTRICTS: readonly DistrictDefinition[] = [
   {
     key: "chitwan",
     name: "Chitwan",
+    description: "Bharatpur, Ratnanagar and nearby towns",
     center: { latitude: 27.6177706875, longitude: 84.3576014411 },
+    zoom: 12,
     bounds: { south: 27.3550205807, west: 83.9186529938, north: 27.8805207943, east: 84.7965498883 },
   },
   {
     key: "jhapa",
     name: "Jhapa",
+    description: "Birtamod, Damak and the eastern corridor",
     center: { latitude: 26.5835578295, longitude: 87.9117197165 },
+    zoom: 12,
     bounds: { south: 26.3611635576, west: 87.6355827303, north: 26.8059521014, east: 88.1878567027 },
   },
   {
     key: "sunsari",
     name: "Sunsari",
+    description: "Dharan, Itahari and surrounding communities",
     center: { latitude: 26.6410162093, longitude: 87.1288586950 },
+    zoom: 12,
     bounds: { south: 26.4032533752, west: 86.9039041360, north: 26.8787790433, east: 87.3538132541 },
   },
 ] as const;

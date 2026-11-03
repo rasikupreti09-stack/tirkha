@@ -9,7 +9,7 @@ export const catalogServiceSchema = z.object({
  keywords:z.array(z.string()), image:z.string().startsWith("/images/"), regions:z.array(z.string()),active:z.boolean(),sort_order:z.number().int(),
 });
 export type CatalogService=z.infer<typeof catalogServiceSchema>;
-export const REGIONS=["Kathmandu Valley","Kathmandu","Lalitpur","Bhaktapur","Kirtipur","Pokhara","Hetauda","Simara"] as const;
+export const REGIONS=["Kathmandu Valley","Kathmandu","Lalitpur","Bhaktapur","Kirtipur","Pokhara","Hetauda","Simara","Chitwan","Jhapa","Sunsari"] as const;
 export function inRegion(service:CatalogService, region:string) {
  const valleyCities=["Kathmandu","Lalitpur","Bhaktapur","Kirtipur"];
  return region==="Kathmandu Valley"||region==="Kirtipur" ? service.regions.some(r=>valleyCities.includes(r)) : service.regions.includes(region);

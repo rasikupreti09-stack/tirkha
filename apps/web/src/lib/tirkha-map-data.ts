@@ -1,4 +1,5 @@
 import type { LatLngExpression } from "leaflet";
+import { DISTRICTS } from "@/lib/districtBounds";
 
 export type TirkhaRoad = {
   name?: string;
@@ -493,11 +494,19 @@ export const tirkhaParks: LatLngExpression[][][] = [
 ];
 
 export const tirkhaCityViews = [
-  { label: "Kathmandu", center: [27.7172,85.324] as [number,number], zoom: 14 },
-  { label: "Lalitpur", center: [27.674,85.322] as [number,number], zoom: 14 },
-  { label: "Bhaktapur", center: [27.676,85.432] as [number,number], zoom: 14 },
-  { label: "Kirtipur", center: [27.67806,85.27694] as [number,number], zoom: 15 },
-  { label: "Pokhara", center: [28.217,83.985] as [number,number], zoom: 14 },
-  { label: "Hetauda", center: [27.407,85.045] as [number,number], zoom: 12.5 },
-  { label: "Simara", center: [27.166,84.987] as [number,number], zoom: 12.5 },
+  { id: "kathmandu", label: "Kathmandu", subtitle: "The capital and its central neighborhoods", center: [27.7172,85.324] as [number,number], zoom: 14 },
+  { id: "lalitpur", label: "Lalitpur", subtitle: "Patan and the southern valley", center: [27.674,85.322] as [number,number], zoom: 14 },
+  { id: "bhaktapur", label: "Bhaktapur", subtitle: "Heritage streets and eastern valley", center: [27.676,85.432] as [number,number], zoom: 14 },
+  { id: "kirtipur", label: "Kirtipur", subtitle: "Historic hill town and TU campus", center: [27.67806,85.27694] as [number,number], zoom: 15 },
+  { id: "pokhara", label: "Pokhara", subtitle: "Lakeside and the city center", center: [28.217,83.985] as [number,number], zoom: 14 },
+  { id: "hetauda", label: "Hetauda", subtitle: "Buddha Chowk and Rapti Road", center: [27.407,85.045] as [number,number], zoom: 12.5 },
+  { id: "simara", label: "Simara", subtitle: "Simara Chowk and Jeetpur-Simara", center: [27.166,84.987] as [number,number], zoom: 12.5 },
+  ...DISTRICTS.map((district) => ({
+    id: district.key,
+    label: district.name,
+    subtitle: district.description,
+    center: [district.center.latitude, district.center.longitude] as [number,number],
+    zoom: district.zoom,
+    bounds: district.bounds,
+  })),
 ];
