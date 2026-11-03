@@ -4,6 +4,7 @@ import { memo, useEffect, useMemo, useState } from "react";
 import type { Coordinates } from "@tirkha/shared";
 import { MapTracker, type TrackedPoint } from "./map-tracker-loader";
 import { useAuth } from "./auth-provider";
+import { isFreshMapTimestamp, isNepalCoordinate } from "@/lib/map-safety";
 
 type HeroLocation = {
   professional_id: string;
@@ -36,7 +37,7 @@ export const HeroJobLocationMap = memo(function HeroJobLocationMap({
     }
     let active = true;
     const update = (row: HeroLocation | null) => {
-      if (!active || !row) return;
+      if (!active || !row || !isNepalCoordinate(row) || !isFreshMapTimestamp(row.updated_at, Date.now(), 5 * 60_000)) return;
       setHeroLocationStale(false);
       setHero(current => {
         if (current && Date.parse(row.updated_at) < Date.parse(current.updated_at)) return current;
@@ -55,6 +56,7 @@ export const HeroJobLocationMap = memo(function HeroJobLocationMap({
     })();
     const channel = client.channel(`hero-job-map:${professionalId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "hero_locations", filter: `professional_id=eq.${professionalId}` }, payload => {
+        if (payload.eventType === "DELETE") { setHero(null); return; }
         update((payload.new as HeroLocation | null) ?? null);
       })
       .subscribe();
@@ -69,7 +71,7 @@ export const HeroJobLocationMap = memo(function HeroJobLocationMap({
   }, [demo, hero]);
 
   const customerPoint = useMemo<TrackedPoint>(() => ({ id: "customer-destination", label: destinationLabel, kind: "customer", coordinates: destination }), [destination.latitude, destination.longitude, destinationLabel]);
-  const freshHero = hero && !heroLocationStale && Date.now() - Date.parse(hero.updated_at) <= 90_000 ? hero : null;
+  const freshHero = hero && !heroLocationStale && isNepalCoordinate(hero) && isFreshMapTimestamp(hero.updated_at) ? hero : null;
   const origin = useMemo(() => freshHero ? { latitude: freshHero.latitude, longitude: freshHero.longitude } : undefined, [freshHero?.latitude, freshHero?.longitude]);
   const points = useMemo<TrackedPoint[]>(() => [
     ...(freshHero ? [{ id: freshHero.professional_id, label: "Your live Hero location", kind: "hero" as const, coordinates: origin!, heading: freshHero.heading, updatedAt: freshHero.updated_at }] : []),

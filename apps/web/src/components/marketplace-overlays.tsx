@@ -7,6 +7,7 @@ import { buildDemoPaymentQrUrl, catalogMoney, catalogPriceLabel, codCommissionPa
 import { MarketplaceDialog } from "./marketplace-dialog";
 import { useMarketplace } from "./marketplace-provider";
 import { useLanguage } from "./language-provider";
+import { tirkhaCityViews } from "@/lib/tirkha-map-data";
 const LocationMap = dynamic(() => import("./location-map"), { ssr: false, loading: () => <div className="mk-map-loading">Loading Kathmandu map…</div> });
 const landmarks = [
  {name:"New Baneshwor",region:"Kathmandu" as const,latitude:27.6915,longitude:85.342},
@@ -21,6 +22,12 @@ const landmarks = [
  {name:"Simara Chowk",region:"Simara" as const,latitude:27.1666,longitude:84.9786},
  {name:"Simara Airport",region:"Simara" as const,latitude:27.15944,longitude:84.98000},
 ];
+const valleyBounds = { south: 27.625, west: 85.245, north: 27.755, east: 85.465 };
+function isPointInSelectedRegion(point: Coordinates, region: string) {
+ const bounds = region === "Kathmandu Valley" ? valleyBounds : tirkhaCityViews.find(view => view.label === region)?.bounds;
+ return !!bounds && point.latitude >= bounds.south && point.latitude <= bounds.north
+   && point.longitude >= bounds.west && point.longitude <= bounds.east;
+}
 function formatSchedule(value:string){
  const date=new Date(value);
  return Number.isNaN(date.valueOf())?value:new Intl.DateTimeFormat("en-NP",{dateStyle:"medium",timeStyle:"short",timeZone:"Asia/Kathmandu"}).format(date)+" NPT";
@@ -46,13 +53,13 @@ export function MarketplaceOverlays(){
    if(!navigator.geolocation){setFormError("This browser does not support location detection. Choose a landmark or place the pin.");return;}
    setGeoBusy(true);setFormError("");
    navigator.geolocation.getCurrentPosition(position=>{const point={latitude:position.coords.latitude,longitude:position.coords.longitude};
-     if(point.latitude<26||point.latitude>31||point.longitude<80||point.longitude>89){setFormError("That pin is outside Nepal. Select a Nepal landmark or move the pin.");setGeoBusy(false);return;}
+     if(!isPointInSelectedRegion(point,state.region)){setFormError(`Your current location is outside the selected ${state.region} service area. Choose a landmark or move the map pin inside the selected region.`);setGeoBusy(false);return;}
      setPin(point);setFormError("Pin saved. Add your street, tole and house details below.");setGeoBusy(false);
    },error=>{setFormError(error.code===1?"Location access was declined. Select a landmark or place the pin.":"Could not detect your location. Select a landmark or place the pin.");setGeoBusy(false);},{enableHighAccuracy:true,timeout:12000,maximumAge:60000});
  }
  function submitOrder(event:FormEvent){
    event.preventDefault();if(busy)return;setBusy(true);setFormError("");
-   try{place({address,pin,scheduled:new Date(scheduled+":00+05:45").toISOString(),payment_method:paymentMethod,payment_status:paymentMethod==="COD"?"cash_due":"simulated_pending",payment_reference:paymentReference});setStage("cart");setPaymentReference("");}
+   try{if(pin&&!isPointInSelectedRegion(pin,state.region))throw new Error(`The selected pin is outside the ${state.region} service area. Choose a location inside the selected region.`);place({address,pin,scheduled:new Date(scheduled+":00+05:45").toISOString(),payment_method:paymentMethod,payment_status:paymentMethod==="COD"?"cash_due":"simulated_pending",payment_reference:paymentReference});setStage("cart");setPaymentReference("");}
    catch(error){setFormError(error instanceof Error?error.message:"Could not save your demo booking.");}
    finally{setBusy(false);}
  }
@@ -80,7 +87,7 @@ export function MarketplaceOverlays(){
    <div className="mk-overlay-heading"><div><span className="mk-kicker">THE FINAL DETAILS</span><h2>Where should we meet you?</h2><p>Choose a service city and landmark, then add your street, tole and house details.</p></div></div>
    <label className="mk-field-label" htmlFor="mk-landmark">Popular landmarks</label><div className="mk-landmarks">{landmarks.map(item=><button type="button" key={item.name} className={address.startsWith(item.name)?"is-selected":""} onClick={()=>selectLandmark(item)}><MapPin size={14}/>{item.name}</button>)}</div>
    <div className="mk-map-tools"><span><MapPin size={15}/>{pin?pin.latitude.toFixed(5)+", "+pin.longitude.toFixed(5):"Tap the map to place your pin"}</span><button type="button" onClick={locate} disabled={geoBusy}><LocateFixed size={15}/>{geoBusy?"Finding you…":"Use my location"}</button></div>
-   <div className="mk-map-frame"><LocationMap region={state.region} onRegionChange={setRegion} value={pin?{...pin,resolved_address:address||null}:null} onPick={point=>{setPin(point);setFormError("Pin saved. Add the street, tole and house details below.");}} disabled={false}/></div>
+   <div className="mk-map-frame"><LocationMap region={state.region} serviceAreaOnly onRegionChange={region=>{setRegion(region);setPin(null);setAddress("");}} value={pin?{...pin,resolved_address:address||null}:null} onPick={point=>{setPin(point);setFormError("Pin saved. Add the street, tole and house details below.");}} disabled={false}/></div>
    <label className="mk-label">Full address<textarea required minLength={5} maxLength={500} value={address} onChange={e=>setAddress(e.target.value)} placeholder="House number, street/tole, landmark, ward and city" rows={3}/></label>
    <label className="mk-label">Appointment time (Nepal Time)<input required type="datetime-local" value={scheduled} onChange={e=>setScheduled(e.target.value)} min={nepalInputFromDate(new Date(Date.now()+3600000))}/></label>
    {formError&&<p className="mk-form-error" role="alert">{formError}</p>}

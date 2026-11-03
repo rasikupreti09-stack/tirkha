@@ -636,15 +636,21 @@ async function query(query: SpatialViewportQuery): Promise<SpatialViewportResult
   const tiles = query.zoom >= 17.5 ? makeTiles(bounds, region) : [];
   const selectedBuildings: SpatialBuildingFeature[] = [];
   const seen = new Set<SpatialBuildingFeature>();
-  if (region) for (const tile of tiles) {
-    const collection = await loadTile(region, tile).catch(() => []);
-    for (const feature of collection) {
-      const box = feature.properties?.bounds;
-      if (!box || !intersects({ south: box[0], west: box[1], north: box[2], east: box[3] }, bounds) || seen.has(feature)) continue;
-      seen.add(feature);
-      const bytes = buildingSize(feature);
-      if (featureCount >= MAX_FEATURES || estimatedBytes + bytes > MAX_ACTIVE_BYTES) { truncated = true; break; }
-      selectedBuildings.push(feature); featureCount++; estimatedBytes += bytes;
+  if (region) for (let offset = 0; offset < tiles.length; offset += 4) {
+    // Keep tile retrieval parallel enough for responsive detail loading while
+    // bounding network concurrency on low-memory phones and free-tier hosting.
+    const batch = tiles.slice(offset, offset + 4);
+    const collections = await Promise.all(batch.map(tile => loadTile(region, tile).catch(() => [])));
+    for (const collection of collections) {
+      for (const feature of collection) {
+        const box = feature.properties?.bounds;
+        if (!box || !intersects({ south: box[0], west: box[1], north: box[2], east: box[3] }, bounds) || seen.has(feature)) continue;
+        seen.add(feature);
+        const bytes = buildingSize(feature);
+        if (featureCount >= MAX_FEATURES || estimatedBytes + bytes > MAX_ACTIVE_BYTES) { truncated = true; break; }
+        selectedBuildings.push(feature); featureCount++; estimatedBytes += bytes;
+      }
+      if (truncated) break;
     }
     if (truncated) break;
   }

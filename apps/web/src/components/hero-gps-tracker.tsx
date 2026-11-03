@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./auth-provider";
+import { isCoordinateInOperationalRegion } from "@/lib/map-safety";
+import type { HeroOperationalZone } from "@tirkha/shared";
 
 type BatteryManagerLike = { level: number; addEventListener?: (type: "levelchange", listener: () => void) => void; removeEventListener?: (type: "levelchange", listener: () => void) => void };
 type LocationSnapshot = { latitude: number; longitude: number; heading: number | null; speed: number | null; timestamp: number };
@@ -17,7 +19,7 @@ function distanceMeters(a: LocationSnapshot, b: LocationSnapshot) {
 }
 
 /** Publishes a verified Hero's active location while this authenticated work screen is open. */
-export function HeroGpsTracker({ enabled }: { enabled: boolean }) {
+export function HeroGpsTracker({ enabled, operationalZone }: { enabled: boolean; operationalZone: HeroOperationalZone | null }) {
   const { client, session } = useAuth();
   const [status, setStatus] = useState("");
   const positionRef = useRef<LocationSnapshot | null>(null);
@@ -76,6 +78,11 @@ export function HeroGpsTracker({ enabled }: { enabled: boolean }) {
 
     const watchId = navigator.geolocation.watchPosition(position => {
       const { latitude, longitude, heading, speed } = position.coords;
+      if (!isCoordinateInOperationalRegion({ latitude, longitude }, operationalZone)) {
+        positionRef.current = null;
+        if (active) setStatus(`GPS is outside your registered ${operationalZone ?? "service"} area; location sharing is paused.`);
+        return;
+      }
       positionRef.current = {
         latitude, longitude,
         heading: heading != null && Number.isFinite(heading) && heading >= 0 ? heading % 360 : null,
@@ -104,7 +111,7 @@ export function HeroGpsTracker({ enabled }: { enabled: boolean }) {
       if (battery && updateBattery) battery.removeEventListener?.("levelchange", updateBattery);
       void client.removeChannel(bookingsChannel);
     };
-  }, [client, enabled, session]);
+  }, [client, enabled, operationalZone, session]);
 
   return enabled ? <p className="mt-3 text-xs text-muted-foreground" role="status">{status || "Allow GPS access to share your Hero location every few seconds."}</p> : null;
 }

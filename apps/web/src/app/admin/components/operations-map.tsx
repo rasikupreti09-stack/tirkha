@@ -5,6 +5,8 @@ import { MapContainer, Marker, Tooltip, useMap } from "react-leaflet";
 import type { BookingStatus } from "@tirkha/shared";
 import { TirkhaMapArtwork, TirkhaMapRegionControl, TirkhaMapSignature, TirkhaMapZoomControl } from "@/components/tirkha-map-artwork";
 import { SpatialEngineErrorBoundary } from "@/components/spatial-engine-error-boundary";
+import { NEPAL_LEAFLET_BOUNDS } from "@/lib/districtBounds";
+import { isFreshMapTimestamp, isNepalCoordinate } from "@/lib/map-safety";
 
 type HeroLocation = {
   professional_id: string; latitude: number; longitude: number; heading: number | null;
@@ -52,30 +54,37 @@ function SelectedHeroFocus({ location }: { location: HeroLocation | null }) {
   }, [location, map]);
   return null;
 }
-function relativePing(value: string | null) {
+function relativePing(value: string | null, now = Date.now()) {
   if (!value) return "No location ping";
-  const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 1000));
+  if (!Number.isFinite(Date.parse(value))) return "Invalid location timestamp";
+  const seconds = Math.max(0, Math.floor((now - Date.parse(value)) / 1000));
   return seconds < 60 ? `${seconds}s ago` : `${Math.floor(seconds / 60)}m ago`;
 }
 
 export function OperationsMap({ heroes, locations, jobs }: { heroes: Hero[]; locations: HeroLocation[]; jobs: OperationsJob[] }) {
   const mapRef = useRef<LeafletMap | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [clock, setClock] = useState(() => Date.now());
   const selectHero = useCallback((id: string) => setSelectedId(id), []);
-  const locationById = useMemo(() => new Map(locations.map(row => [row.professional_id, row])), [locations]);
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 10_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const validLocations = useMemo(() => locations.filter(row => isNepalCoordinate(row)), [locations]);
+  const locationById = useMemo(() => new Map(validLocations.map(row => [row.professional_id, row])), [validLocations]);
   const jobByHero = useMemo(() => new Map(jobs.filter(job => job.professional_id).map(job => [job.professional_id!, job])), [jobs]);
   const selectedLocation = selectedId ? locationById.get(selectedId) ?? null : null;
   const selectedJob = selectedId ? jobByHero.get(selectedId) : null;
-  const liveLocations = locations.filter(location => Date.now() - Date.parse(location.updated_at) <= 90_000);
+  const liveLocations = validLocations.filter(location => isFreshMapTimestamp(location.updated_at, clock));
   if (typeof window === "undefined") return <div className="grid min-h-[480px] place-items-center rounded-xl border bg-muted text-sm text-muted-foreground" role="status">Loading Valley fleet map…</div>;
   return <div className="grid min-h-[480px] overflow-hidden rounded-xl border bg-card lg:grid-cols-[minmax(0,1fr)_320px]">
     <div className="tirkha-map-frame relative min-h-[420px]">
-      <SpatialEngineErrorBoundary><MapContainer ref={mapRef} center={VALLEY_CENTER} zoom={12} minZoom={6} maxZoom={28} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={30} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom inertia inertiaDeceleration={2800} inertiaMaxSpeed={1800} easeLinearity={0.25} bounceAtZoomLimits={false} attributionControl={false} preferCanvas className="tirkha-vector-map !h-full !min-h-[420px] !w-full" aria-label="Live Hero fleet map across Tirkha service regions">
+      <SpatialEngineErrorBoundary><MapContainer ref={mapRef} center={VALLEY_CENTER} zoom={12} minZoom={6} maxZoom={28} maxBounds={NEPAL_LEAFLET_BOUNDS} maxBoundsViscosity={1} worldCopyJump={false} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={30} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom inertia inertiaDeceleration={2800} inertiaMaxSpeed={1800} easeLinearity={0.25} bounceAtZoomLimits={false} attributionControl={false} preferCanvas className="tirkha-vector-map !h-full !min-h-[420px] !w-full" aria-label="Live Hero fleet map across Tirkha service regions">
         <TirkhaMapArtwork />
         <TirkhaMapRegionControl />
         <TirkhaMapZoomControl recenterPoints={selectedLocation ? [[selectedLocation.latitude, selectedLocation.longitude]] : [VALLEY_CENTER]} />
         <SelectedHeroFocus location={selectedLocation} />
-        {liveLocations.map(location => <FleetMarker key={location.professional_id} location={location} stale={Date.now() - Date.parse(location.updated_at) > 90_000} name={heroes.find(hero => hero.id === location.professional_id)?.name || "Hero"} onSelect={selectHero} />)}
+        {liveLocations.map(location => <FleetMarker key={location.professional_id} location={location} stale={!isFreshMapTimestamp(location.updated_at, clock)} name={heroes.find(hero => hero.id === location.professional_id)?.name || "Hero"} onSelect={selectHero} />)}
       </MapContainer></SpatialEngineErrorBoundary>
       <TirkhaMapSignature caption="Kathmandu Valley fleet" />
     </div>
@@ -84,12 +93,12 @@ export function OperationsMap({ heroes, locations, jobs }: { heroes: Hero[]; loc
       <ul className="min-h-0 flex-1 divide-y overflow-y-auto">
         {heroes.map(hero => {
           const location = locationById.get(hero.id);
-          const online = !!location && Date.now() - Date.parse(location.updated_at) <= 90_000;
+          const online = !!location && isFreshMapTimestamp(location.updated_at, clock);
           const label = !online ? "Offline" : location.status === "en_route" ? "En Route" : location.status === "on_service" ? "On Service" : "Online (Idle)";
           return <li key={hero.id} className="flex items-center gap-2 pr-3">
             <button type="button" onClick={() => setSelectedId(hero.id)} className={`min-w-0 flex-1 p-3 text-left hover:bg-muted ${selectedId === hero.id ? "bg-muted" : ""}`}>
               <span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{hero.name}</span><span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${online ? "bg-emerald-100 text-emerald-900" : "bg-slate-100 text-slate-600"}`}>{label}</span></span>
-              {location && <span className="mt-1 block text-xs text-muted-foreground">Last ping {relativePing(location.updated_at)}</span>}
+              {location && <span className="mt-1 block text-xs text-muted-foreground">Last ping {relativePing(location.updated_at, clock)}</span>}
             </button>
             {hero.phone && <a href={`tel:${hero.phone}`} aria-label={`Call ${hero.name}`} className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border text-emerald-800 hover:bg-emerald-50"><span aria-hidden="true">☎</span></a>}
           </li>;

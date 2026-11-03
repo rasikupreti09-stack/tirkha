@@ -4,6 +4,7 @@ import { Activity, MapPin, Radio, ShieldCheck } from "lucide-react";
 import type { WorkflowBooking } from "@tirkha/shared";
 import { MapTracker, type TrackedPoint } from "./map-tracker-loader";
 import { useAuth } from "./auth-provider";
+import { isFreshMapTimestamp, isNepalCoordinate } from "@/lib/map-safety";
 
 type HeroLocation = {
   professional_id: string; latitude: number; longitude: number; heading: number | null;
@@ -30,6 +31,7 @@ export function CustomerTrackingMap({ booking }: { booking: WorkflowBooking }) {
   const { client } = useAuth();
   const [hero, setHero] = useState<HeroLocation | null>(null);
   const [channelState, setChannelState] = useState<ChannelState>("connecting");
+  const [clock, setClock] = useState(() => Date.now());
   const enabled = !!client && !!booking.professional_id && activeStatuses.includes(booking.status);
 
   useEffect(() => {
@@ -40,7 +42,7 @@ export function CustomerTrackingMap({ booking }: { booking: WorkflowBooking }) {
     }
     let active = true;
     const updateIfNewer = (row: HeroLocation | null) => {
-      if (!row || !active) return;
+      if (!row || !active || !isNepalCoordinate(row) || !isFreshMapTimestamp(row.updated_at, Date.now(), 5 * 60_000)) return;
       setHero(current => !current || Date.parse(row.updated_at) >= Date.parse(current.updated_at) ? row : current);
     };
     void client.from("hero_locations")
@@ -49,6 +51,11 @@ export function CustomerTrackingMap({ booking }: { booking: WorkflowBooking }) {
       .then(result => { if (!result.error) updateIfNewer(result.data as HeroLocation | null); });
     const channel = client.channel(`hero-tracking:${booking.professional_id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "hero_locations", filter: `professional_id=eq.${booking.professional_id}` }, payload => {
+        if (payload.eventType === "DELETE") {
+          setHero(null);
+          setChannelState("reconnecting");
+          return;
+        }
         updateIfNewer((payload.new as HeroLocation | null) ?? null);
       })
       .subscribe(status => {
@@ -58,11 +65,17 @@ export function CustomerTrackingMap({ booking }: { booking: WorkflowBooking }) {
     return () => { active = false; void client.removeChannel(channel); };
   }, [booking.professional_id, booking.status, client]);
 
+  useEffect(() => {
+    if (!hero) return;
+    const interval = window.setInterval(() => setClock(Date.now()), 10_000);
+    return () => window.clearInterval(interval);
+  }, [hero]);
+
   const destination = useMemo(() => booking.latitude != null && booking.longitude != null
     ? { latitude: booking.latitude, longitude: booking.longitude } : null, [booking.latitude, booking.longitude]);
-  if (!enabled || !destination) return null;
+  if (!enabled || !destination || !isNepalCoordinate(destination)) return null;
 
-  const freshHero = hero && Date.now() - Date.parse(hero.updated_at) <= 90_000 ? hero : null;
+  const freshHero = hero && isFreshMapTimestamp(hero.updated_at, clock) && isNepalCoordinate(hero) ? hero : null;
   const origin = freshHero ? { latitude: freshHero.latitude, longitude: freshHero.longitude } : undefined;
   const points: TrackedPoint[] = [
     ...(freshHero ? [{ id: freshHero.professional_id, label: "Your Hero", kind: "hero" as const, coordinates: origin!, heading: freshHero.heading, updatedAt: freshHero.updated_at }] : []),

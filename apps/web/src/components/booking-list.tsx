@@ -42,7 +42,7 @@ function BookingRecords({ account, professional }: { account: Account; professio
   ];
   return <main className="mx-auto min-h-screen max-w-4xl px-4 py-8 sm:px-6">
     <Link href="/dashboard" className="underline">← Dashboard</Link>
-    {professional && <HeroGpsTracker enabled={verified} />}
+    {professional && <HeroGpsTracker enabled={verified} operationalZone={account.professional?.operational_zone ?? null} />}
     <div className="mt-8 flex flex-wrap items-center justify-between gap-4"><h1 className="text-3xl font-semibold">{professional ? "Professional jobs" : "My bookings"}</h1>
       {!professional && <Button asChild><Link href="/book">Request a service</Link></Button>}
     </div>

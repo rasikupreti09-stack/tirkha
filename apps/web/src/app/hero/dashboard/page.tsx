@@ -13,6 +13,7 @@ import { BookingChatDrawer } from "@/components/booking-chat-drawer";
 import { BookingCall } from "@/components/booking-call";
 import { HeroRouteGuard } from "@/components/hero-route-guard";
 import { Button } from "@/components/ui/button";
+import { isCoordinateInOperationalRegion, isFreshMapTimestamp } from "@/lib/map-safety";
 
 const tradeLabels: Record<HeroTrade, string> = { PLUMBING: "🚰 Plumber (प्लम्बर)", ELECTRICAL: "⚡ Electrician (इलेक्ट्रीशियन)", APPLIANCE_TECHNICIAN: "🔌 Appliance Repair (उपकरण मर्मत)", BEAUTICIAN: "✨ Beautician (सौन्दर्य सेवा)", PAINTER: "🎨 Painter (पेन्टर)", CLEANER: "🧹 Cleaner / Maid (सरसफाई)", HANDYMAN: "🛠️ General Handyman / Repair (सामान्य मर्मत)" };
 const zoneLabels: Record<HeroOperationalZone, string> = { "Kathmandu Valley": "Kathmandu Valley", Pokhara: "Pokhara", Hetauda: "Hetauda", Simara: "Simara" };
@@ -23,10 +24,17 @@ const demoJobsKey = "tirkha.demo-hero-jobs.v1";
 const demoAvailabilityKey = "tirkha.demo-hero-online.v1";
 function readDemoArray<T>(key: string): T[] { try { const value: unknown = JSON.parse(localStorage.getItem(key) ?? "[]"); return Array.isArray(value) ? value as T[] : []; } catch { return []; } }
 
-function getCurrentCoordinates() {
+function getCurrentCoordinates(operationalZone: HeroOperationalZone | null) {
   return new Promise<{ latitude: number; longitude: number }>((resolve, reject) => {
     if (!navigator.geolocation) { reject(new Error("This browser does not support GPS.")); return; }
-    navigator.geolocation.getCurrentPosition(position => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }), () => reject(new Error("Location permission is needed to go online.")), { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 });
+    navigator.geolocation.getCurrentPosition(position => {
+      const point = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+      if (!isCoordinateInOperationalRegion(point, operationalZone)) {
+        reject(new Error(`Your GPS must be inside your registered ${operationalZone ?? "service"} area to go online.`));
+        return;
+      }
+      resolve(point);
+    }, () => reject(new Error("Location permission is needed to go online.")), { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 });
   });
 }
 
@@ -48,6 +56,7 @@ function HeroDashboardContent() {
   const [demoEarnings, setDemoEarnings] = useState<CompletedTransaction[]>([]);
   const [selectedMapJobId, setSelectedMapJobId] = useState<string | null>(null);
   const refreshRef = useRef<() => Promise<void>>(async () => undefined);
+  const lastLocationPingRef = useRef<string | null>(null);
   const heroId = session?.user.id;
   const jobDestinations = useMemo(() => new Map(jobs
     .filter(job => job.latitude != null && job.longitude != null)
@@ -70,14 +79,19 @@ function HeroDashboardContent() {
     if (!client || !heroId) { setLoadingData(false); return; }
     const [profileResult, locationResult, activeResult, categoryResult] = await Promise.all([
       client.from("professional_profiles").select("verification_status,suspended_at,operational_zone,trade_code,trade_category").eq("profile_id", heroId).maybeSingle(),
-      client.from("hero_locations").select("updated_at").eq("professional_id", heroId).maybeSingle(),
+      client.from("hero_locations").select("updated_at,latitude,longitude").eq("professional_id", heroId).maybeSingle(),
       client.from("bookings").select("*").eq("professional_id", heroId).in("status", ["requested", "accepted", "on_the_way", "in_progress"]).order("scheduled_at", { ascending: true }),
       client.from("service_categories").select("id,name"),
     ]);
     if (profileResult.error) { setError("Could not load Hero verification. Ensure migration 21 is applied."); setLoadingData(false); return; }
     setDemoProfile(false);
-    setAccess(profileResult.data as HeroAccess | null);
-    setOnline(!!locationResult.data && Date.now() - Date.parse(locationResult.data.updated_at) < 90_000);
+    const verifiedAccess = profileResult.data as HeroAccess | null;
+    setAccess(verifiedAccess);
+    const locationUpdatedAt = locationResult.data?.updated_at ?? null;
+    const validLocation = !!locationResult.data && isCoordinateInOperationalRegion(locationResult.data, verifiedAccess?.operational_zone)
+      && isFreshMapTimestamp(locationUpdatedAt);
+    lastLocationPingRef.current = validLocation ? locationUpdatedAt : null;
+    setOnline(validLocation);
     if (activeResult.error) setError("Could not load your active work list."); else setJobs((activeResult.data ?? []) as WorkBooking[]);
     if (!categoryResult.error) setCategories(new Map((categoryResult.data ?? []).map(row => [row.id, row.name])));
     setLoadingData(false);
@@ -86,6 +100,16 @@ function HeroDashboardContent() {
   useEffect(() => { refreshRef.current = refresh; }, [refresh]);
   useEffect(() => { if (!loading && !session) router.replace("/login?next=%2Fhero%2Fdashboard"); }, [loading, session, router]);
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    if (!online || demoProfile) return;
+    const checkFreshness = () => {
+      if (!isFreshMapTimestamp(lastLocationPingRef.current)) setOnline(false);
+    };
+    const timer = window.setInterval(checkFreshness, 10_000);
+    const onVisible = () => { if (document.visibilityState === "visible") checkFreshness(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
+  }, [demoProfile, online]);
   useEffect(() => {
     if (!client || !heroId || session?.user.user_metadata.demo_auth === true) return;
     let refreshTimer: number | undefined;
@@ -97,13 +121,17 @@ function HeroDashboardContent() {
       .on("postgres_changes", { event: "*", schema: "public", table: "bookings", filter: `professional_id=eq.${heroId}` }, scheduleRefresh)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "professional_profiles", filter: `profile_id=eq.${heroId}` }, scheduleRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "hero_locations", filter: `professional_id=eq.${heroId}` }, payload => {
-        const location = payload.new as { updated_at?: string };
-        const recentlyOnline = payload.eventType !== "DELETE" && !!location.updated_at && Date.now() - Date.parse(location.updated_at) < 90_000;
+        const location = payload.new as { updated_at?: string; latitude?: number; longitude?: number };
+        const updatedAt = location.updated_at;
+        const recentlyOnline = payload.eventType !== "DELETE" && !!updatedAt
+          && isFreshMapTimestamp(updatedAt)
+          && isCoordinateInOperationalRegion(location, access?.operational_zone);
+        lastLocationPingRef.current = recentlyOnline ? updatedAt : null;
         setOnline(current => current === recentlyOnline ? current : recentlyOnline);
       })
       .subscribe();
     return () => { if (refreshTimer !== undefined) window.clearTimeout(refreshTimer); void client.removeChannel(channel); };
-  }, [client, heroId, session?.user.user_metadata.demo_auth]);
+  }, [access?.operational_zone, client, heroId, session?.user.user_metadata.demo_auth]);
 
   async function toggleAvailability() {
     if (busy) return;
@@ -118,11 +146,13 @@ function HeroDashboardContent() {
       if (online) {
         const { error: rpcError } = await client.rpc("set_hero_availability", { p_online: false });
         if (rpcError) throw rpcError;
+        lastLocationPingRef.current = null;
         setOnline(false);
       } else {
-        const coordinates = await getCurrentCoordinates();
+        const coordinates = await getCurrentCoordinates(access?.operational_zone ?? null);
         const { error: rpcError } = await client.rpc("set_hero_availability", { p_online: true, p_latitude: coordinates.latitude, p_longitude: coordinates.longitude });
         if (rpcError) throw rpcError;
+        lastLocationPingRef.current = new Date().toISOString();
         setOnline(true);
       }
       await refresh();
@@ -168,7 +198,7 @@ function HeroDashboardContent() {
     {demoProfile && <p role="status" className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">Demo Hero workspace: requests, availability, job status and earnings below are simulated and saved only in this browser. They do not dispatch a real provider or create financial records.</p>}
     {error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
     <section className="grid gap-4 sm:grid-cols-3"><Stat icon={<Activity/>} label="Availability" value={online ? "Online" : "Offline"}/><Stat icon={<BriefcaseBusiness/>} label="Active work" value={String(jobs.length)}/><Stat icon={<MapPin/>} label="Service zone" value={access.operational_zone ? zoneLabels[access.operational_zone] : "Not set"}/></section>
-    <HeroGpsTracker enabled={online && !demoProfile}/>
+    <HeroGpsTracker enabled={online && !demoProfile} operationalZone={access?.operational_zone ?? null}/>
     <HeroDispatchInbox demo={demoProfile} trade={access.trade_category ?? access.trade_code} onAccepted={acceptDemoJob}/>
     {demoProfile && <section className="grid gap-3 rounded-xl border bg-white p-5 sm:grid-cols-3"><div><small className="text-slate-500">Demo gross receipts</small><strong className="mt-1 block text-xl">{catalogMoney(Math.round(demoEarnings.reduce((sum, row) => sum + row.gross_amount, 0) * 100))}</strong></div><div><small className="text-slate-500">Demo commission · 12.5%</small><strong className="mt-1 block text-xl">{catalogMoney(Math.round(demoEarnings.reduce((sum, row) => sum + row.company_income, 0) * 100))}</strong></div><div><small className="text-slate-500">Demo net earnings</small><strong className="mt-1 block text-xl text-emerald-800">{catalogMoney(Math.round(demoEarnings.reduce((sum, row) => sum + row.hero_payout, 0) * 100))}</strong></div></section>}
     <section className="space-y-3"><div><h2 className="text-xl font-semibold">My active jobs</h2><p className="text-sm text-slate-600">Written estimates can be submitted only after the job is marked in progress and physically inspected.</p></div>{jobs.length === 0 ? <div className="rounded-xl border bg-white p-6 text-sm text-slate-600">No assigned active jobs yet. Keep availability online to see nearby eligible requests.</div> : jobs.map(job => <article key={job.id} className="grid gap-4 rounded-xl border bg-white p-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,.8fr)]"><div><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold uppercase">{job.status.replaceAll("_", " ")}</span><h3 className="mt-3 font-semibold">{categories.get(job.category_id) ?? "Service"}</h3><p className="mt-1 text-sm text-slate-600">{job.service_address}</p><HeroCustomerContact bookingId={job.id} demo={demoProfile}/><HeroBookingCommunication job={job} userId={heroId ?? ""} demo={demoProfile}/><div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/60 p-3"><p className="font-semibold text-slate-900">Estimated price: Rs. 650–1,000</p><p className="mt-1 text-xs text-slate-600">Indicative inspection and minor-work range only. Final labour and materials must be confirmed on site with customer approval.</p></div><p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{job.job_details}</p><p className="mt-3 text-xs text-slate-500">Scheduled {new Date(job.scheduled_at).toLocaleString()}</p>{job.status === "in_progress" && !demoProfile && <QuoteForm bookingId={job.id}/>}</div>{job.status === "in_progress" ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5"><h4 className="flex items-center gap-2 font-semibold"><ReceiptText size={18}/>{demoProfile ? "Demo inspection stage" : "On-site written quote"}</h4><p className="mt-2 text-sm text-emerald-950">{demoProfile ? "Advance this sample job to completion to see a simulated receipt in your demo earnings." : "Inspect the work in person, then submit labour and materials as separate NPR amounts. The customer must review the written scope before any extra work starts."}</p></div> : <div className="rounded-xl bg-slate-50 p-5 text-sm text-slate-600">{job.status === "accepted" ? "Mark the job in progress from My Bookings after reaching the customer and beginning the inspection." : "Use the booking workflow to update the current job status."}<Link className="mt-3 block font-medium text-emerald-800 underline" href="/jobs">Open Job Board / Bookings</Link></div>}{jobDestinations.has(job.id) && <div className="lg:col-span-2">{job.id !== visibleMapJobId ? <Button variant="outline" type="button" aria-pressed={false} onClick={() => setSelectedMapJobId(job.id)}>Show live map for this job</Button> : <><p className="mb-2 text-sm font-medium">Live map · {job.service_address}</p><HeroJobLocationMap professionalId={heroId ?? ""} destination={jobDestinations.get(job.id)!} destinationLabel={job.service_address} demo={demoProfile}/></>}</div>}{demoProfile && job.status !== "in_progress" && <div className="lg:col-span-2"><Button type="button" onClick={() => advanceDemoJob(job)}>{job.status === "accepted" ? "Simulate Hero on the way" : job.status === "on_the_way" ? "Start demo inspection" : "Advance demo job"}</Button></div>}{demoProfile && job.status === "in_progress" && <div className="lg:col-span-2"><Button type="button" onClick={() => advanceDemoJob(job)}>Complete demo job</Button></div>}</article>)}</section>

@@ -11,6 +11,15 @@ import { NEPAL_LEAFLET_BOUNDS } from "@/lib/districtBounds";
 type Props = { value: MapPin | null; onPick: (point: Coordinates) => void; disabled: boolean; height?: number; region?: typeof REGIONS[number]; regionFocusKey?: number; serviceAreaOnly?: boolean; onRegionChange?: (region: typeof REGIONS[number]) => void; focusPinOnChange?: boolean };
 type RegionView = (typeof tirkhaCityViews)[number];
 type MapBounds = [[number, number], [number, number]];
+const valleyView: RegionView = {
+  id: "kathmandu-valley",
+  label: "Kathmandu Valley",
+  subtitle: "Kathmandu, Lalitpur, Bhaktapur and Kirtipur",
+  center: [27.69, 85.35],
+  zoom: 11.5,
+  maxZoom: 28,
+  bounds: { south: 27.625, west: 85.245, north: 27.755, east: 85.465 },
+};
 
 function toLeafletBounds(region: RegionView): MapBounds {
   const bounds = region.bounds;
@@ -53,19 +62,21 @@ function RegionCameraGuard({ bounds, minimumZoom = 7, maximumZoom = 28 }: { boun
   return null;
 }
 
-const Pin = memo(function Pin({ value, onPick, onPinPlaced, disabled, pinningEnabled, focusPinOnChange, icon }: Pick<Props, "value" | "onPick" | "disabled" | "focusPinOnChange"> & { onPinPlaced: () => void; pinningEnabled: boolean; icon: ReturnType<typeof divIcon> }) {
+const Pin = memo(function Pin({ value, onPick, onPinPlaced, disabled, pinningEnabled, focusPinOnChange, icon, allowedBounds }: Pick<Props, "value" | "onPick" | "disabled" | "focusPinOnChange"> & { onPinPlaced: () => void; pinningEnabled: boolean; icon: ReturnType<typeof divIcon>; allowedBounds?: MapBounds }) {
   const markerRef = useRef<LeafletMarker | null>(null);
   const pickRef = useRef(onPick);
   const clickEnabledRef = useRef(pinningEnabled && !disabled);
   pickRef.current = onPick;
   clickEnabledRef.current = pinningEnabled && !disabled;
   const onMapClick = useCallback((event: { latlng: { lat: number; lng: number } }) => {
-    if (clickEnabledRef.current) {
+    const insideAllowedBounds = !allowedBounds || (event.latlng.lat >= allowedBounds[0][0] && event.latlng.lat <= allowedBounds[1][0]
+      && event.latlng.lng >= allowedBounds[0][1] && event.latlng.lng <= allowedBounds[1][1]);
+    if (clickEnabledRef.current && insideAllowedBounds) {
       clickEnabledRef.current = false;
       onPinPlaced();
       requestAnimationFrame(() => pickRef.current({ latitude: event.latlng.lat, longitude: event.latlng.lng }));
     }
-  }, [onPinPlaced]);
+  }, [allowedBounds, onPinPlaced]);
   const map = useMapEvents({ click: onMapClick });
   useEffect(() => {
     if (!value || focusPinOnChange === false) return;
@@ -76,6 +87,12 @@ const Pin = memo(function Pin({ value, onPick, onPinPlaced, disabled, pinningEna
     dragend(event) {
       if (disabled) return;
       const point = (event.target as LeafletMarker).getLatLng();
+      const insideAllowedBounds = !allowedBounds || (point.lat >= allowedBounds[0][0] && point.lat <= allowedBounds[1][0]
+        && point.lng >= allowedBounds[0][1] && point.lng <= allowedBounds[1][1]);
+      if (!insideAllowedBounds) {
+        if (value) markerRef.current?.setLatLng([value.latitude, value.longitude]);
+        return;
+      }
       clickEnabledRef.current = false;
       onPinPlaced();
       requestAnimationFrame(() => {
@@ -100,8 +117,9 @@ export default function LocationMap(props: Props) {
   }), []);
   const availableRegionViews = tirkhaCityViews;
   const regionView = availableRegionViews.find(view => view.label === props.region)
-    ?? (props.region === "Kathmandu Valley" ? availableRegionViews[0] : undefined);
+    ?? (props.region === "Kathmandu Valley" ? valleyView : undefined);
   const cameraBounds = useMemo(() => props.serviceAreaOnly && regionView ? toLeafletBounds(regionView) : NEPAL_LEAFLET_BOUNDS, [props.serviceAreaOnly, regionView]);
+  const pinBounds = props.serviceAreaOnly && regionView ? toLeafletBounds(regionView) : undefined;
   const cameraMinimumZoom = props.serviceAreaOnly ? 0 : 7;
   const cameraMaximumZoom = props.serviceAreaOnly && regionView ? regionView.maxZoom : 28;
   const center = props.value || (regionView ? { latitude: regionView.center[0], longitude: regionView.center[1] } : KATHMANDU_CENTER);
@@ -120,6 +138,12 @@ export default function LocationMap(props: Props) {
     setLocating(true); setLocationError("");
     navigator.geolocation.getCurrentPosition(position => {
       const point = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+      if (props.serviceAreaOnly && pinBounds && (point.latitude < pinBounds[0][0] || point.latitude > pinBounds[1][0]
+        || point.longitude < pinBounds[0][1] || point.longitude > pinBounds[1][1])) {
+        setLocationError("Your current location is outside the selected Tirkha service region. Choose a region to place the pin there.");
+        setLocating(false);
+        return;
+      }
       props.onPick(point);
       mapRef.current?.flyTo([point.latitude, point.longitude], Math.max(16, mapRef.current.getZoom()), { animate: true, duration: 0.75 });
       setLocating(false);
@@ -136,7 +160,7 @@ export default function LocationMap(props: Props) {
           props.onRegionChange?.(region as typeof REGIONS[number]);
         }} />
         <TirkhaMapZoomControl onLocate={locateMe} locating={locating} pinningEnabled={pinningEnabled} onTogglePinning={() => setPinningEnabled(value => !value)} />
-        <Pin value={props.value} onPick={props.onPick} onPinPlaced={disarmPinning} disabled={props.disabled} focusPinOnChange={props.focusPinOnChange} pinningEnabled={pinningEnabled} icon={pinIcon} />
+        <Pin value={props.value} onPick={props.onPick} onPinPlaced={disarmPinning} disabled={props.disabled} focusPinOnChange={props.focusPinOnChange} pinningEnabled={pinningEnabled} icon={pinIcon} allowedBounds={pinBounds} />
       </MapContainer></SpatialEngineErrorBoundary>
       <TirkhaMapSignature caption="Kathmandu · Lalitpur · Bhaktapur · Kirtipur · Pokhara · Hetauda · Simara · Chitwan · Jhapa · Sunsari" />
     </div>

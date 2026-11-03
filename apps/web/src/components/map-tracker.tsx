@@ -7,6 +7,7 @@ import type { Coordinates } from "@tirkha/shared";
 import { useAuth } from "./auth-provider";
 import { TirkhaMapArtwork, TirkhaMapSignature, TirkhaMapZoomControl } from "./tirkha-map-artwork";
 import { SpatialEngineErrorBoundary } from "./spatial-engine-error-boundary";
+import { getTrackingBounds, isNepalCoordinate } from "@/lib/map-safety";
 
 export type TrackedPoint = { id: string; label: string; kind: "hero" | "customer"; coordinates: Coordinates; updatedAt?: string; heading?: number | null };
 function pointIcon(kind: TrackedPoint["kind"], heading = 0) {
@@ -42,17 +43,32 @@ const TrackedMapMarker = memo(function TrackedMapMarker({ point }: { point: Trac
   && previous.point.heading === next.point.heading
   && previous.point.updatedAt === next.point.updatedAt);
 function decodePolyline(encoded: string): [number, number][] {
-  const points: [number, number][] = []; let index = 0; let lat = 0; let lng = 0;
+  if (!encoded || encoded.length > 1_000_000) return [];
+  const points: [number, number][] = [];
+  let index = 0, latitude = 0, longitude = 0;
+  const readDelta = (): number | null => {
+    let result = 0, factor = 1, groups = 0;
+    while (index < encoded.length && groups < 7) {
+      const value = encoded.charCodeAt(index++) - 63;
+      if (value < 0 || value > 63) return null;
+      result += (value & 0x1f) * factor;
+      groups++;
+      if (value < 0x20) return result % 2 ? -((result + 1) / 2) : result / 2;
+      factor *= 32;
+    }
+    return null;
+  };
   while (index < encoded.length) {
-    let result = 0; let shift = 0; let byte: number;
-    do { byte = encoded.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20 && index < encoded.length);
-    lat += result & 1 ? ~(result >> 1) : result >> 1;
-    result = 0; shift = 0;
-    do { byte = encoded.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20 && index < encoded.length);
-    lng += result & 1 ? ~(result >> 1) : result >> 1;
-    points.push([lat / 1e5, lng / 1e5]);
+    const latitudeDelta = readDelta();
+    const longitudeDelta = latitudeDelta === null ? null : readDelta();
+    if (latitudeDelta === null || longitudeDelta === null || points.length >= 100_000) return [];
+    latitude += latitudeDelta;
+    longitude += longitudeDelta;
+    const point: [number, number] = [latitude / 1e5, longitude / 1e5];
+    if (!isNepalCoordinate({ latitude: point[0], longitude: point[1] })) return [];
+    points.push(point);
   }
-  return points;
+  return points.length >= 2 ? points : [];
 }
 function FitPoints({ points }: { points: TrackedPoint[] }) {
   const map = useMap();
@@ -65,6 +81,27 @@ function FitPoints({ points }: { points: TrackedPoint[] }) {
     map.fitBounds(points.map(p => [p.coordinates.latitude, p.coordinates.longitude]), { padding: [52, 52], maxZoom: 16, animate: true, duration: 0.7 });
     fittedKey.current = fitKey;
   }, [fitKey, map, points]);
+  return null;
+}
+function TrackingBoundsGuard({ bounds }: { bounds: [[number, number], [number, number]] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setMaxBounds(bounds);
+    map.options.maxBoundsViscosity = 1;
+    const constrain = () => {
+      const minimum = Math.min(28, Math.max(9, map.getBoundsZoom(bounds, false)));
+      map.setMinZoom(minimum);
+      if (map.getZoom() < minimum) map.setZoom(minimum, { animate: false });
+      map.panInsideBounds(bounds, { animate: false });
+    };
+    constrain();
+    map.on("resize", constrain);
+    map.on("zoomend", constrain);
+    return () => {
+      map.off("resize", constrain);
+      map.off("zoomend", constrain);
+    };
+  }, [bounds, map]);
   return null;
 }
 function haversineKm(a: Coordinates, b: Coordinates) {
@@ -84,12 +121,16 @@ export const MapTracker = memo(function MapTracker({ points, origin, destination
   const [routeMessage, setRouteMessage] = useState("Approximate city estimate · traffic-aware routing when available");
   const lastRouteRequest = useRef<{ origin: Coordinates; destination: Coordinates; requestedAt: number } | null>(null);
   useEffect(() => {
-    if (!origin || !destination || !session?.access_token) return;
+    if (!isNepalCoordinate(origin) || !isNepalCoordinate(destination) || !session?.access_token) return;
     const previous = lastRouteRequest.current;
     const now = Date.now();
     if (previous && now - previous.requestedAt < 60_000
       && haversineKm(previous.origin, origin) < 0.25
       && haversineKm(previous.destination, destination) < 0.05) return;
+    setPath([]);
+    setEta(null);
+    setRoadDistanceKm(null);
+    setRouteMessage("Calculating an updated road route…");
     let active = true;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
@@ -102,7 +143,12 @@ export const MapTracker = memo(function MapTracker({ points, origin, destination
         .then(async response => { const result = await response.json(); if (!response.ok) throw new Error(result.error || "Route unavailable"); return result as { encodedPolyline: string; durationSeconds: number; distanceMeters?: number }; })
         .then(result => {
           if (!active) return;
-          setPath(decodePolyline(result.encodedPolyline));
+          const decoded = decodePolyline(result.encodedPolyline);
+          if (decoded.length < 2 || !Number.isFinite(result.durationSeconds) || result.durationSeconds < 0
+            || (result.distanceMeters != null && (!Number.isFinite(result.distanceMeters) || result.distanceMeters < 0))) {
+            throw new Error("Route response is invalid");
+          }
+          setPath(decoded);
           setEta(Math.max(1, Math.round(result.durationSeconds / 60)));
           if (result.distanceMeters != null) setRoadDistanceKm(result.distanceMeters / 1000);
           setRouteMessage("Traffic-aware road route");
@@ -111,23 +157,32 @@ export const MapTracker = memo(function MapTracker({ points, origin, destination
     }, 350);
     return () => { active = false; controller.abort(); window.clearTimeout(timer); };
   }, [origin?.latitude, origin?.longitude, destination?.latitude, destination?.longitude, session?.access_token]);
-  const directDistanceKm = origin && destination ? haversineKm(origin, destination) : null;
+  const safeOrigin = isNepalCoordinate(origin) ? origin : undefined;
+  const safeDestination = isNepalCoordinate(destination) ? destination : undefined;
+  const safePoints = points.filter(point => isNepalCoordinate(point.coordinates));
+  const trackingBounds = useMemo(() => getTrackingBounds([
+    ...safePoints.map(point => point.coordinates),
+    ...(safeOrigin ? [safeOrigin] : []),
+    ...(safeDestination ? [safeDestination] : []),
+  ]), [safeOrigin?.latitude, safeOrigin?.longitude, safeDestination?.latitude, safeDestination?.longitude, safePoints.map(point => `${point.id}:${point.coordinates.latitude}:${point.coordinates.longitude}`).join("|")]);
+  const directDistanceKm = safeOrigin && safeDestination ? haversineKm(safeOrigin, safeDestination) : null;
   const displayDistanceKm = roadDistanceKm ?? (directDistanceKm == null ? null : directDistanceKm * 1.3);
   const displayEta = eta ?? (displayDistanceKm == null ? null : Math.max(1, Math.ceil(displayDistanceKm / 15 * 60)));
-  const heroPoint = points.find(point => point.kind === "hero");
-  const view = useMemo(() => destination ? [destination.latitude, destination.longitude] as [number, number] : origin ? [origin.latitude, origin.longitude] as [number, number] : [27.7172, 85.324] as [number, number], [destination, origin]);
-  const target = navigationTarget ?? destination;
+  const heroPoint = safePoints.find(point => point.kind === "hero");
+  const view = safeDestination ? [safeDestination.latitude, safeDestination.longitude] as [number, number] : safeOrigin ? [safeOrigin.latitude, safeOrigin.longitude] as [number, number] : [27.7172, 85.324] as [number, number];
+  const target = isNepalCoordinate(navigationTarget) ? navigationTarget : safeDestination;
   const navUrl = target ? typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent)
     ? `https://maps.apple.com/?daddr=${target.latitude},${target.longitude}&dirflg=d`
     : `https://www.google.com/maps/dir/?api=1&destination=${target.latitude},${target.longitude}&travelmode=driving` : "";
   if (typeof window === "undefined") return <div className="h-[360px] animate-pulse rounded-xl bg-muted" role="status">Loading live map…</div>;
   return <section className="tirkha-map-surface">
     <div className="tirkha-map-frame tirkha-live-map-canvas">
-      <SpatialEngineErrorBoundary><MapContainer ref={mapRef} center={view} zoom={16} minZoom={6} maxZoom={28} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={30} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom inertia inertiaDeceleration={2800} inertiaMaxSpeed={1800} easeLinearity={0.25} bounceAtZoomLimits={false} attributionControl={false} preferCanvas className="tirkha-vector-map !h-full !w-full" aria-label="Live service map">
+      <SpatialEngineErrorBoundary><MapContainer ref={mapRef} center={view} zoom={16} minZoom={9} maxZoom={28} maxBounds={trackingBounds} maxBoundsViscosity={1} worldCopyJump={false} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={30} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom inertia inertiaDeceleration={2800} inertiaMaxSpeed={1800} easeLinearity={0.25} bounceAtZoomLimits={false} attributionControl={false} preferCanvas className="tirkha-vector-map !h-full !w-full" aria-label="Live service map">
+      <TrackingBoundsGuard bounds={trackingBounds} />
       <TirkhaMapArtwork />
-      <TirkhaMapZoomControl recenterPoints={points.map(point => [point.coordinates.latitude, point.coordinates.longitude])} />
-      <FitPoints points={points} />
-      {points.map(point => <TrackedMapMarker key={point.id} point={point} />)}
+      <TirkhaMapZoomControl recenterPoints={safePoints.map(point => [point.coordinates.latitude, point.coordinates.longitude])} />
+      <FitPoints points={safePoints} />
+      {safePoints.map(point => <TrackedMapMarker key={point.id} point={point} />)}
       {path.length > 0 && <><Polyline positions={path} pathOptions={{ color: "#ffffff", weight: 10, opacity: 0.9, lineCap: "round", lineJoin: "round" }} /><Polyline positions={path} pathOptions={{ color: "#047857", weight: 5, opacity: 0.96, lineCap: "round", lineJoin: "round" }} /></>}
       </MapContainer></SpatialEngineErrorBoundary>
       <div className="tirkha-map-live-chip"><span className={`tirkha-live-indicator ${live ? "is-live" : ""}`} /><span><strong>{live ? "HERO IS LIVE" : heroPoint ? "LAST GPS LOCATION" : "WAITING FOR HERO"}</strong><small>{heroPoint?.updatedAt ? `Updated ${new Date(heroPoint.updatedAt).toLocaleTimeString()}` : "Live updates appear here"}</small></span></div>
