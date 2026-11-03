@@ -76,7 +76,13 @@ export function MarketplaceProvider({children}:{children:ReactNode}){
    const service=services.find(s=>s.id===id&&s.active);if(!service)return;if(!canBookService(service)){setNotice(catalogStatus==="loading"?"Checking service availability. Please wait.":catalogStatus==="error"?"Service availability could not be verified. Retry before booking.":`${service.title} is not bookable in ${state.region} yet.`);return;}
    setState(s=>{const line=s.cart.find(l=>l.id===id);return {...s,cart:line?s.cart.map(l=>l.id===id?{...l,quantity:Math.min(10,l.quantity+1)}:l):[...s.cart,{id,quantity:1}]};});
    setNotice(service.title+" added to your cart");
-   if(checkout){setDetail(null);checkoutAfterLogin.current=true;if(!state.session)try{sessionStorage.setItem(checkoutAfterLoginKey,"1");}catch{/* The return marker is best-effort; the cart itself remains persisted. */}setModal(state.session?"cart":"auth");}
+   // Every successful service selection ends in the cart drawer. Checkout
+   // authentication is requested only when the customer continues to address.
+   // This lets guests inspect pricing and keep building a cart without a login wall.
+   setDetail(null);
+   checkoutAfterLogin.current=false;
+   if(checkout)try{sessionStorage.removeItem(checkoutAfterLoginKey);}catch{/* Session storage is optional. */}
+   setModal("cart");
  }
  function open(next:Modal){checkoutAfterLogin.current=false;setModal(next);}
  function requireCheckoutAuth(){checkoutAfterLogin.current=true;try{sessionStorage.setItem(checkoutAfterLoginKey,"1");}catch{/* The return marker is best-effort; the cart itself remains persisted. */}setModal("auth");}

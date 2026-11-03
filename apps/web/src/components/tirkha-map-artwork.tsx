@@ -621,9 +621,15 @@ function RoadFeatureName({ feature, label, renderer, fontSize, placement }: { fe
 export function TirkhaMapRegionControl({ onRegionSelect, regions = tirkhaCityViews }: { onRegionSelect?: (region: string) => void; regions?: readonly (typeof tirkhaCityViews)[number][] } = {}) {
   const map = useMap();
   const controlRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (controlRef.current) DomEvent.disableClickPropagation(controlRef.current); }, []);
+  useEffect(() => {
+    const element = controlRef.current;
+    if (!element) return;
+    DomEvent.disableClickPropagation(element);
+    DomEvent.disableScrollPropagation(element);
+  }, []);
   return <div ref={controlRef} className="leaflet-top leaflet-right tirkha-region-control" aria-label="Choose map region">
     <div className="tirkha-region-pills">{regions.map((city) => <button key={city.label} type="button" onClick={(event) => {
+      event.preventDefault();
       event.stopPropagation();
       if (onRegionSelect) onRegionSelect(city.label);
       else map.flyToBounds([[city.bounds.south, city.bounds.west], [city.bounds.north, city.bounds.east]], { padding: [32, 32], maxZoom: city.maxZoom, duration: 0.85, easeLinearity: 0.25 });
@@ -643,18 +649,24 @@ export function TirkhaMapZoomControl({ recenterPoints, onLocate, locating = fals
 }) {
   const map = useMap();
   const controlRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (controlRef.current) DomEvent.disableClickPropagation(controlRef.current); }, []);
+  useEffect(() => {
+    const element = controlRef.current;
+    if (!element) return;
+    DomEvent.disableClickPropagation(element);
+    DomEvent.disableScrollPropagation(element);
+  }, []);
   return <div ref={controlRef} className="leaflet-top leaflet-left tirkha-zoom-control" aria-label="Map zoom controls">
     <div className="tirkha-zoom-stack">
-      <button type="button" aria-label="Zoom in" title="Zoom in" onClick={(event) => { event.stopPropagation(); map.zoomIn(0.5, { animate: true }); }}>+</button>
-      <button type="button" aria-label="Zoom out" title="Zoom out" onClick={(event) => { event.stopPropagation(); map.zoomOut(0.5, { animate: true }); }}>−</button>
+      <button type="button" aria-label="Zoom in" title="Zoom in" onClick={(event) => { event.preventDefault(); event.stopPropagation(); map.zoomIn(0.5, { animate: true }); }}>+</button>
+      <button type="button" aria-label="Zoom out" title="Zoom out" onClick={(event) => { event.preventDefault(); event.stopPropagation(); map.zoomOut(0.5, { animate: true }); }}>−</button>
       {recenterPoints && <button type="button" aria-label="Re-center map" title="Re-center map" onClick={(event) => {
+        event.preventDefault();
         event.stopPropagation();
         if (recenterPoints.length > 1) map.fitBounds(recenterPoints, { padding: [52, 52], maxZoom: 16, animate: true, duration: 0.65 });
         else if (recenterPoints[0]) map.flyTo(recenterPoints[0], Math.max(16, map.getZoom()), { animate: true, duration: 0.65 });
       }}><Crosshair size={18} aria-hidden="true" /></button>}
-      {onLocate && <button type="button" aria-label="My Location" title={locating ? "Finding your location…" : "My Location"} disabled={locating} onClick={(event) => { event.stopPropagation(); onLocate(); }}><Crosshair size={18} aria-hidden="true" /></button>}
-      {onTogglePinning && <button className={pinningEnabled ? "is-pinning" : ""} type="button" aria-label={pinningEnabled ? "Disable location pin mode" : "Enable location pin mode"} aria-pressed={pinningEnabled} title={pinningEnabled ? "Pin mode on · tap the map to place your pin" : "Pin mode off · safe to pan the map"} onClick={(event) => { event.stopPropagation(); onTogglePinning(); }}>{pinningEnabled ? <MapPinned size={18} aria-hidden="true" /> : <MapPin size={18} aria-hidden="true" />}</button>}
+      {onLocate && <button type="button" aria-label="My Location" title={locating ? "Finding your location…" : "My Location"} disabled={locating} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onLocate(); }}><Crosshair size={18} aria-hidden="true" /></button>}
+      {onTogglePinning && <button className={pinningEnabled ? "is-pinning" : ""} type="button" aria-label={pinningEnabled ? "Disable location pin mode" : "Enable location pin mode"} aria-pressed={pinningEnabled} title={pinningEnabled ? "Pin mode on · tap the map to place your pin" : "Pin mode off · safe to pan the map"} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onTogglePinning(); }}>{pinningEnabled ? <MapPinned size={18} aria-hidden="true" /> : <MapPin size={18} aria-hidden="true" />}</button>}
     </div>
   </div>;
 }

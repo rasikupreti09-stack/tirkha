@@ -36,7 +36,11 @@ html { scroll-behavior: smooth; }
 .leaflet-tooltip.tirkha-label-detail-5 { font-size: 15.5px; padding: 7px 12px; border-color: #6d9880; box-shadow: 0 5px 14px #0f172a40; }
 .leaflet-tooltip.tirkha-place-label::before,
 .leaflet-tooltip.tirkha-city-label::before { display: none; }
-.tirkha-region-control { z-index: 650; margin: 12px 12px 0 0; }
+.tirkha-region-control { z-index: 650; margin: 12px 12px 0 0; pointer-events: auto !important; }
+.tirkha-region-control > .tirkha-region-pills,
+.tirkha-zoom-control > .tirkha-zoom-stack { pointer-events: auto; }
+.tirkha-region-control button,
+.tirkha-zoom-control button { position: relative; z-index: 1; pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .tirkha-region-pills { display: flex; flex-wrap: wrap; gap: 5px; max-width: min(480px, calc(100vw - 90px)); }
 .tirkha-region-pills button { display: inline-flex; min-height: 34px; align-items: center; gap: 6px; border: 1px solid #e1e8df; border-radius: 999px; padding: 0 10px; background: #fffffff2; color: #435950; box-shadow: 0 3px 12px #153b2914; cursor: pointer; font: 650 10px/1 Arial, sans-serif; backdrop-filter: blur(12px); }
 .tirkha-region-pills button:hover { border-color: #89ba9f; background: #f2fbf5; color: #14634f; }
@@ -49,7 +53,7 @@ html { scroll-behavior: smooth; }
 .tirkha-map-signature small { color: #718179; font-size: 9px; }
 .tirkha-map-signature a { color: #7b8982; font-size: 7px; text-decoration: underline; text-underline-offset: 2px; }
 .tirkha-road-inline-label { fill: #21463b; stroke: #fffffff0; stroke-width: 5px; stroke-linecap: round; stroke-linejoin: round; paint-order: stroke fill; font-family: Arial, sans-serif; font-weight: 850; letter-spacing: .035em; pointer-events: none; user-select: none; text-rendering: geometricPrecision; transition: font-size 100ms linear; }
-.tirkha-zoom-control { z-index: 700; margin: 12px 0 0 12px; }
+.tirkha-zoom-control { z-index: 700; margin: 12px 0 0 12px; pointer-events: auto !important; }
 .tirkha-zoom-stack { display: grid; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; box-shadow: 0 4px 16px #0f172a2b; }
 .tirkha-zoom-stack button { display: grid; width: 44px; height: 44px; place-items: center; border: 0; background: #fff; color: #1f2937; cursor: pointer; font: 600 27px/1 Arial, sans-serif; touch-action: manipulation; transition: background-color .16s ease, color .16s ease; }
 .tirkha-zoom-stack button + button { border-top: 1px solid #e2e8f0; }
