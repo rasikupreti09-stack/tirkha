@@ -1,7 +1,9 @@
 node_modules/
+.pnpm-store/
 .next/
 .next-verification/
 .expo/
+.expo-cache/
 out/
 dist/
 *.tsbuildinfo

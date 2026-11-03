@@ -42,14 +42,24 @@ test("phone OTP SDK flow verifies a six-digit code, persists a session, and prot
   const mock=await startMockSupabase(0);t.after(()=>mock.close());
   const create=()=>createClient(mock.url,MOCK_ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
   const customer=create(),professional=create(),outsider=create();
-  for(const [sdk,phone] of [[customer,mock.customer.phone],[professional,mock.professional.phone],[outsider,"+9779600000099"]]) {
-    const sent=await sdk.auth.signInWithOtp({phone,options:{shouldCreateUser:true,data:{full_name:"Phone Customer"}}});
+  for(const [sdk,phone,metadata] of [[customer,mock.customer.phone,{full_name:"Phone Customer"}],[professional,mock.professional.phone,{full_name:"Phone Professional"}],[outsider,"+9779600000099",{full_name:"Phone Customer"}]]) {
+    const sent=await sdk.auth.signInWithOtp({phone,options:{shouldCreateUser:true,data:metadata}});
     assert.equal(sent.error,null);
     const wrong=await sdk.auth.verifyOtp({phone,token:"000000",type:"sms"});assert.equal(wrong.error.code,"otp_expired");
     const verified=await sdk.auth.verifyOtp({phone,token:"123456",type:"sms"});assert.equal(verified.error,null);assert.ok(verified.data.session);
     const replay=await sdk.auth.verifyOtp({phone,token:"123456",type:"sms"});assert.equal(replay.error.code,"otp_expired");
     const own=await sdk.from("profiles").select("*").eq("id",verified.data.user.id).single();assert.equal(own.data.phone,phone);
   }
+  const hero=create();
+  const heroPhone="+9779612345678";
+  assert.equal((await hero.auth.signInWithOtp({phone:heroPhone,options:{shouldCreateUser:true,data:{full_name:"New Phone Hero",requested_role:"professional",trade_category:"PLUMBING"}}})).error,null);
+  const heroVerified=await hero.auth.verifyOtp({phone:heroPhone,token:"123456",type:"sms"});
+  assert.equal(heroVerified.error,null);
+  const heroProfile=await hero.from("profiles").select("role").eq("id",heroVerified.data.user.id).single();
+  assert.equal(heroProfile.data.role,"professional");
+  const heroTrade=await hero.from("professional_profiles").select("trade_category,verification_status").eq("profile_id",heroVerified.data.user.id).single();
+  assert.equal(heroTrade.data.trade_category,"PLUMBING");
+  assert.equal(heroTrade.data.verification_status,"pending");
   const category=(await customer.from("service_categories").select("*").eq("slug","plumbing").single()).data.id;
   const booking=await customer.rpc("create_diagnostic_booking_request",{p_request_id:randomUUID(),p_category_id:category,p_professional_id:mock.professional.id,p_service_address:"Kathmandu, Baneshwor",p_job_details:"Fix the leaking tap",p_scheduled_at:new Date(Date.now()+86400000).toISOString(),p_duration_minutes:60,p_map_region_key:"Kathmandu",p_service_offering_id:"sink-leak"}).single();
   assert.equal(booking.error,null);

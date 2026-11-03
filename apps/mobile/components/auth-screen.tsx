@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Link } from "expo-router";
-import { createPhoneAuth, phoneAuthError } from "@tirkha/shared";
+import { createPhoneAuth, HERO_TRADES, phoneAuthError, type HeroTrade } from "@tirkha/shared";
 import { useAuth } from "../providers/auth-provider";
 
 export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
@@ -11,6 +11,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
   const [token, setToken] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<"customer" | "professional">("customer");
+  const [trade, setTrade] = useState<HeroTrade>("PLUMBING");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -23,7 +24,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
     try {
       const auth = createPhoneAuth(client);
       const result = verify ? await auth.verifyPhoneOtp(phone, token)
-        : await auth.signInWithPhone(phone, signup ? { full_name: name, role } : undefined);
+        : await auth.signInWithPhone(phone, signup ? { full_name: name, role, ...(role === "professional" ? { trade_category: trade } : {}) } : undefined);
       if (result.error) throw result.error;
       if (!verify) { setSent(true); setToken(""); setCooldown(60); }
     } catch (failure) { setError(phoneAuthError(failure)); }
@@ -37,9 +38,16 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
         <Text accessibilityRole="header" className="mb-4 text-2xl font-semibold text-primary">Tirkha · {signup ? "Create account" : "Sign in"}</Text>
         <Text className="mb-4 text-muted-foreground">Use your Nepal mobile number. Email is optional.</Text>
         {(error || sessionError) && <Text accessibilityRole="alert" className="mb-4 text-foreground">{error || sessionError}</Text>}
-        {process.env.EXPO_PUBLIC_TIRKHA_LOCAL_MOCK === "1" && <Text className="mb-4 text-foreground">Local demo only: code 123456. No SMS is sent.</Text>}
+        {process.env.EXPO_PUBLIC_TIRKHA_LOCAL_MOCK === "1" && <Text className="mb-4 text-muted-foreground">Local mock mode disables live push, realtime and online payments. Phone verification uses the Supabase endpoint configured for this build.</Text>}
         {signup && !sent && <><Text className="text-foreground">Full name</Text><TextInput accessibilityLabel="Full name" className={inputClass} value={name} onChangeText={setName} maxLength={100} autoComplete="name" editable={!busy} />
           {(["customer", "professional"] as const).map(value => <Pressable key={value} disabled={busy} accessibilityRole="radio" accessibilityState={{ checked: role === value }} onPress={() => setRole(value)} className="mb-3 min-h-12 rounded-md border border-border p-3"><Text className="text-primary">{role === value ? "● " : "○ "}{value === "customer" ? "Customer" : "Professional (verification required)"}</Text></Pressable>)}</>}
+        {signup && role === "professional" && <View className="mb-3">
+          <Text className="mb-2 font-medium text-foreground">Your main service trade</Text>
+          {HERO_TRADES.map(value => <Pressable key={value} disabled={busy} accessibilityRole="radio" accessibilityState={{ checked: trade === value }} onPress={() => setTrade(value)} className={trade === value ? "mb-2 min-h-12 justify-center rounded-md border border-primary bg-primary/10 p-3" : "mb-2 min-h-12 justify-center rounded-md border border-border bg-card p-3"}>
+            <Text className="text-foreground">{trade === value ? "● " : "○ "}{value.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase())}</Text>
+          </Pressable>)}
+          <Text className="text-xs text-muted-foreground">Your Hero profile remains pending until the required verification is completed.</Text>
+        </View>}
         <Text className="text-foreground">Mobile number (+977)</Text><TextInput accessibilityLabel="Mobile number +977" className={inputClass} value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoComplete="tel" maxLength={14} editable={!busy && !sent} />
         {sent && <><Text accessibilityLiveRegion="polite" className="mb-2 text-foreground">Enter the SMS code for {phone}.</Text><TextInput accessibilityLabel="Six-digit SMS code" className={inputClass} keyboardType="number-pad" autoComplete="sms-otp" textContentType="oneTimeCode" value={token} onChangeText={v => setToken(v.replace(/\D/g, ""))} maxLength={6} editable={!busy} /></>}
         <Pressable accessibilityRole="button" disabled={busy || !client || (!sent && cooldown > 0)} onPress={() => void submit()} className="min-h-12 items-center justify-center rounded-md bg-primary p-3"><Text className="font-semibold text-primary-foreground">{busy ? "Please wait…" : sent ? "Verify and continue" : cooldown ? `Wait ${cooldown}s` : "Send SMS code"}</Text></Pressable>

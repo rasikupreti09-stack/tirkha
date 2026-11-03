@@ -34,7 +34,7 @@ export async function startMockSupabase(port = 54321) {
     if (!email.includes("@") || password.length < 8) throw fail("Use a valid email and password of at least eight characters.");
     if (users.has(email)) throw fail("User already exists",422,"user_already_exists");
     const id = randomUUID(), salt = randomUUID();
-    const metadata = {full_name: String(input.data?.full_name || "Local user"),requested_role: input.data?.requested_role === "professional" ? "professional" : "customer"};
+    const metadata = {full_name: String(input.data?.full_name || "Local user"),requested_role: input.data?.requested_role === "professional" ? "professional" : "customer",...(typeof input.data?.trade_category === "string" ? {trade_category: input.data.trade_category} : {})};
     const user = { id,email,aud:"authenticated",role:"authenticated",app_metadata:{provider:"email",providers:["email"]},user_metadata:metadata,created_at:new Date().toISOString(),email_confirmed_at:new Date().toISOString(),salt,hash:scryptSync(password,salt,32) };
     await fixture.admin(); await db.query("insert into auth.users(id,raw_user_meta_data) values($1,$2)",[id,metadata]); const row = (await db.query("select phone from public.profiles where id=$1",[id])).rows[0];
     user.phone=row.phone; user.phone_confirmed_at=new Date().toISOString();
@@ -85,7 +85,7 @@ export async function startMockSupabase(port = 54321) {
           if(!challenge || Date.now()-challenge.sent>300000 || ++challenge.attempts>5 || input.token!=="123456" || input.type!=="sms") throw fail("Invalid or expired code",400,"otp_expired");
           let found=[...users.values()].find(u=>u.phone===phone);
           if(!found) {
-            const id=randomUUID(), metadata={full_name:String(challenge.metadata.full_name || "Local user"),requested_role:challenge.metadata.requested_role==="professional"?"professional":"customer"};
+            const id=randomUUID(), metadata={full_name:String(challenge.metadata.full_name || "Local user"),requested_role:challenge.metadata.requested_role==="professional"?"professional":"customer",...(typeof challenge.metadata.trade_category === "string" ? {trade_category: challenge.metadata.trade_category} : {})};
             await fixture.admin();
             await db.query("insert into auth.users(id,raw_user_meta_data,phone,phone_confirmed_at) values($1,$2,$3,now())",[id,metadata,phone]);
             found={id,phone,aud:"authenticated",role:"authenticated",app_metadata:{provider:"phone",providers:["phone"]},user_metadata:metadata,created_at:new Date().toISOString(),phone_confirmed_at:new Date().toISOString()};

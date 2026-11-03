@@ -16,6 +16,9 @@ test("phone helpers validate inputs and allow signup roles without admin escalat
   assert.deepEqual(calls[1].options.data,{full_name:"Test Customer",requested_role:"customer"});
   await auth.verifyPhoneOtp("+9779800000001","123456");
   assert.equal(calls[2].type,"sms");
+  await assert.rejects(auth.signInWithPhone("+9779800000002",{full_name:"Test Hero",role:"professional"}));
+  await auth.signInWithPhone("+9779800000002",{full_name:"Test Hero",role:"professional",trade_category:"PLUMBING"});
+  assert.deepEqual(calls[3].options.data,{full_name:"Test Hero",requested_role:"professional",trade_category:"PLUMBING"});
   for(const phone of ["9800000001","+919800000001","+977980000000","+9779800000001;123"]) assert.equal(phoneSchema.safeParse(phone).success,false);
   for(const code of ["12345","1234567","abcdef"]) assert.equal(phoneOtpSchema.safeParse(code).success,false);
   await assert.rejects(auth.signInWithPhone("+9779800000001",{full_name:"Test Admin",role:"admin"}));
