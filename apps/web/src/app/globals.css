@@ -4,6 +4,9 @@
 @import "@tirkha/shared/theme.css";
 @import "../components/marketplace.css";
 
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
 .leaflet-tooltip.tirkha-landmark-label { border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 6px; background: #f8fafc; color: #0f172a; box-shadow: 0 2px 8px #0f172a22; font: 600 10px/1.2 Arial, sans-serif; }
 .leaflet-marker-icon.tirkha-smooth-marker,
 .leaflet-marker-icon.tirkha-fleet-marker { transition: transform 0.8s linear; will-change: transform; }

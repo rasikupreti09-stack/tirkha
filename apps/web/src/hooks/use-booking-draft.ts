@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   bookingRequestSchema, diagnosticBookingPrefillSchema, DIAGNOSTIC_PREFILL_STORAGE_KEY, DURATION_OPTIONS, formatNpr, locationPreferenceSchema, locationToAddress, nepalDateTimeToIso,
   defaultNepalSchedule, estimateLabourPaisa, bookingErrorMessage, LOCATION_STORAGE_KEY,
-  PROFESSIONAL_PAGE_SIZE, REGIONS, isServiceBookableInRegion, type CatalogService, type ServiceCategory, type PublicProfessional, type WorkflowBooking, type LocationPreference, type MapPin,
+  PROFESSIONAL_PAGE_SIZE, REGIONS, type CatalogService, type ServiceCategory, type PublicProfessional, type WorkflowBooking, type LocationPreference, type MapPin,
 } from "@tirkha/shared";
 import { loadCategories, loadProfessionals } from "../lib/discovery";
 import { createBooking } from "../lib/bookings";
@@ -31,7 +31,7 @@ function diagnosticJobDetails(prefill: ReturnType<typeof diagnosticBookingPrefil
   ].filter(Boolean).join("\n").slice(0, 2000);
 }
 export function useBookingDraft(initialSlug = "", inspectionOnly = false) {
-  const { state: marketplaceState, services: catalogServices, setRegion } = useMarketplace();
+  const { state: marketplaceState, services: catalogServices, setRegion, canBookService, catalogStatus, refreshRegionalCatalog } = useMarketplace();
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [categoryId, setCategoryId] = useState("");
   const [serviceOfferingId, setServiceOfferingId] = useState("");
@@ -58,7 +58,7 @@ export function useBookingDraft(initialSlug = "", inspectionOnly = false) {
   const selectedCategory = categories.find((item) => item.id === categoryId);
   const offerings: CatalogService[] = catalogServices.filter((item) => item.active && item.category_slug === selectedCategory?.slug);
   const selectedOffering = offerings.find((item) => item.id === serviceOfferingId);
-  const offeringAvailable = Boolean(selectedOffering && isServiceBookableInRegion(selectedOffering, marketplaceState.region));
+  const offeringAvailable = Boolean(selectedOffering && canBookService(selectedOffering));
   const choices = professionals.category === categoryId ? professionals.items : [];
   const selectedProfessional = choices.find((item) => item.profile_id === professionalId);
   let estimate: number | null = null;
@@ -78,10 +78,10 @@ export function useBookingDraft(initialSlug = "", inspectionOnly = false) {
   }, [initialSlug, dataAttempt]);
   useEffect(() => {
     if (!offerings.length) { setServiceOfferingId(""); return; }
-    setServiceOfferingId(current => offerings.some(item => item.id === current && isServiceBookableInRegion(item, marketplaceState.region))
+    setServiceOfferingId(current => offerings.some(item => item.id === current && canBookService(item))
       ? current
-      : (offerings.find(item => isServiceBookableInRegion(item, marketplaceState.region)) ?? offerings[0]).id);
-  }, [categoryId, marketplaceState.region, catalogServices]);
+      : (offerings.find(item => canBookService(item)) ?? offerings[0]).id);
+  }, [categoryId, marketplaceState.region, catalogServices, catalogStatus]);
   useEffect(() => {
     if (previousRegion.current === marketplaceState.region) return;
     previousRegion.current = marketplaceState.region;
@@ -191,6 +191,7 @@ Inspection request: no AI price or repair approval. Require an on-site inspectio
   }
   return {
     categories, categoryId, serviceOfferingId, offerings, selectedOffering, offeringAvailable, professionalId, choices, loading, mapRegion: marketplaceState.region, regions: REGIONS, setMapRegion: setRegion, proLoading, hasMore,
+    catalogStatus, refreshRegionalCatalog, canBookService,
     dataError, error, location, savedLocation, schedule, duration, details, busy, created,
     estimate, estimateError, selectedProfessional,
     setPin(pin: MapPin | null) {

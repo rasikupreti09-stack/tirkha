@@ -34,7 +34,6 @@ const uiDictionary = {
   endOfListings: ["You have reached the end of the listings.", "सूचीको अन्त्यमा पुग्नुभयो।"],
   checkBackSoon: ["Check back soon or explore another service.", "केही समयपछि फेरि हेर्नुहोस् वा अर्को सेवा छान्नुहोस्।"],
   page: ["Page", "पृष्ठ"],
-  myBookings: ["My demo bookings", "मेरा डेमो बुकिङहरू"],
   signIn: ["Sign in", "साइन इन"],
   signOut: ["Sign out", "साइन आउट"],
   tagline: ["Your home, effortlessly managed.", "घरको झन्झट सधैंलाई बिदा।"],
@@ -66,6 +65,10 @@ const uiDictionary = {
   comingSoonIn: ["Coming soon in", "चाँडै उपलब्ध हुँदैछ"],
   pausedIn: ["Temporarily unavailable in", "हाललाई उपलब्ध छैन"],
   bookingUnavailable: ["This service is not available for booking in the selected area yet.", "छानिएको क्षेत्रमा यो सेवा बुकिङका लागि अझै उपलब्ध छैन।"],
+  checkingAvailability: ["Checking availability", "उपलब्धता जाँच हुँदैछ"],
+  availabilityUnverified: ["Availability unverified", "उपलब्धता पुष्टि हुन सकेन"],
+  availabilityError: ["We could not verify service availability for this region.", "यो क्षेत्रमा सेवाको उपलब्धता पुष्टि गर्न सकिएन।"],
+  retry: ["Retry", "फेरि प्रयास गर्नुहोस्"],
   valleyHome: ["Our home. Just like yours.", "हाम्रो घर। तपाईंको जस्तै।"],
   localHeroTeam: ["Local Tirkha Hero team", "स्थानीय Tirkha Hero टोली"],
   discoveryEyebrow: ["GOOD HELP STARTS HERE", "राम्रो सहयोगको सुरुवात यहीँबाट"],
@@ -173,6 +176,17 @@ const pricingNotes: Record<string, string> = {
 
 export function translateUi(key: UiTranslationKey, language: UiLanguage): string {
   return uiDictionary[key][language === "np" ? 1 : 0];
+}
+
+const regionTranslationKeys: Record<string, UiTranslationKey> = {
+  "Kathmandu Valley": "valley", Kathmandu: "city", Lalitpur: "lalitpur", Bhaktapur: "bhaktapur",
+  Kirtipur: "kirtipur", Pokhara: "pokhara", Hetauda: "hetauda", Simara: "simara", Chitwan: "chitwan",
+  Jhapa: "jhapa", Sunsari: "sunsari",
+};
+
+export function translateRegionName(region: string, language: UiLanguage): string {
+  const key = regionTranslationKeys[region];
+  return key ? translateUi(key, language) : region;
 }
 
 export function translateCatalogLabel(value: string, language: UiLanguage): string {

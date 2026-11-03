@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { DIAGNOSTIC_PREFILL_STORAGE_KEY, diagnosticBookingPrefillSchema, DURATION_OPTIONS, NEPAL_AREA_SUGGESTIONS, formatNpr, hourlyRateLabel, formatBookingDate, isServiceBookableInRegion } from "@tirkha/shared";
+import { DIAGNOSTIC_PREFILL_STORAGE_KEY, diagnosticBookingPrefillSchema, DURATION_OPTIONS, NEPAL_AREA_SUGGESTIONS, formatNpr, hourlyRateLabel, formatBookingDate, translateRegionName, translateUi } from "@tirkha/shared";
 import { useBookingDraft } from "@/hooks/use-booking-draft";
 import { useAuth } from "./auth-provider";
 import { useMarketplace } from "./marketplace-provider";
@@ -13,6 +13,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { PaymentCheckout } from "./payment-checkout";
 import { LocationPicker } from "./location-picker";
+import { useLanguage } from "./language-provider";
 
 export function BookingForm() {
   const params = useSearchParams();
@@ -28,7 +29,7 @@ export function BookingForm() {
  * already-local marketplace flow instead of attempting a Supabase booking write. */
 function DemoBookingHandoff({ slug }: { slug: string }) {
   const router = useRouter();
-  const { ready, state, services, add, addDiagnostic } = useMarketplace();
+  const { ready, state, services, add, addDiagnostic, canBookService } = useMarketplace();
   const initiated = useRef(false);
   const [message, setMessage] = useState("Preparing your demo checkout…");
   useEffect(() => {
@@ -43,13 +44,13 @@ function DemoBookingHandoff({ slug }: { slug: string }) {
     } catch { /* Continue using the selected catalog service without a draft. */ }
     const serviceSlug = prefill?.category_slug || slug;
     const service = services.find(item => item.active && item.id === prefill?.service_offering_id)
-      ?? services.find(item => item.active && item.category_slug === serviceSlug && isServiceBookableInRegion(item,state.region));
+      ?? services.find(item => item.active && item.category_slug === serviceSlug && canBookService(item));
     if (!service) {
       initiated.current = true;
       setMessage("This demo request could not be matched to a catalog service. Browse the catalog and choose a service to continue.");
       return;
     }
-    if (!isServiceBookableInRegion(service,state.region)) {
+    if (!canBookService(service)) {
       initiated.current = true;
       setMessage(`${service.title} is coming soon in ${state.region}. Return to the catalog to choose an available service or another region.`);
       return;
@@ -60,11 +61,12 @@ function DemoBookingHandoff({ slug }: { slug: string }) {
       try { sessionStorage.removeItem(DIAGNOSTIC_PREFILL_STORAGE_KEY); } catch { /* The saved cart remains usable. */ }
     } else add(service.id, true);
     router.replace("/");
-  }, [ready, state.session, services, slug, add, addDiagnostic, router]);
+  }, [ready, state.session, services, slug, add, addDiagnostic, router, canBookService]);
   return <main className="mx-auto grid min-h-[60vh] max-w-xl place-items-center px-6 py-12"><section className="w-full rounded-2xl border bg-white p-7"><p className="text-xs font-semibold uppercase tracking-widest text-emerald-800">Tirkha demo checkout</p><h1 className="mt-3 text-2xl font-semibold">Continue your service request</h1><p className="mt-3 text-sm text-slate-600" role="status">{message}</p>{initiated.current && <Link className="mt-5 inline-flex min-h-11 items-center rounded-md bg-slate-900 px-4 font-medium text-white" href="/">Browse services</Link>}<p className="mt-4 text-xs text-slate-500">Demo requests stay in this browser and do not create a live dispatch. The address step includes the interactive pin map.</p></section></main>;
 }
 function BookingFields({ slug, inspectionOnly }: { slug: string; inspectionOnly: boolean }) {
   const form = useBookingDraft(slug, inspectionOnly);
+  const {language}=useLanguage();
   const selectStyle = "h-11 w-full rounded-md border border-border bg-background px-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
   if (form.created) return <main className="mx-auto max-w-2xl px-4 py-10">
     <h1 className="text-3xl font-semibold">Booking requested</h1>
@@ -80,6 +82,8 @@ function BookingFields({ slug, inspectionOnly }: { slug: string; inspectionOnly:
     <p className="mt-3 text-muted-foreground">{inspectionOnly ? "A professional will inspect the reported issue and provide a written quote for your approval. No repair price is set in this request." : "Choose your service, preferred time, and landmark. All times are Nepal time (UTC+05:45)."}</p>
     {form.loading && <p className="mt-4" role="status">Loading services…</p>}
     {form.dataError && <div role="alert" className="mt-4 rounded-lg border p-4"><p>{form.dataError}</p><Button className="mt-3" variant="outline" onClick={form.retryData}>Retry loading</Button></div>}
+    {form.catalogStatus==="loading"&&<p className="mt-4 text-sm text-slate-600" role="status">{translateUi("checkingAvailability",language)}</p>}
+    {form.catalogStatus==="error"&&<div role="alert" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"><p>{translateUi("availabilityError",language)}</p><Button className="mt-3" type="button" variant="outline" onClick={form.refreshRegionalCatalog}>{translateUi("retry",language)}</Button></div>}
     <form noValidate onSubmit={(event) => { event.preventDefault(); void form.submit(); }} className="mt-6">
       <fieldset disabled={form.busy || form.loading} className="space-y-6">
         <div className="space-y-2"><Label htmlFor="booking-category">Service category</Label>
@@ -89,9 +93,9 @@ function BookingFields({ slug, inspectionOnly }: { slug: string; inspectionOnly:
         </div>
         <div className="space-y-2"><Label htmlFor="booking-offering">Specific service</Label>
           <select id="booking-offering" value={form.serviceOfferingId} onChange={event=>form.setServiceOfferingId(event.target.value)} className={selectStyle} required>
-              <option value="">Select a service</option>{form.offerings.map(service=><option key={service.id} value={service.id}>{service.title}{isServiceBookableInRegion(service,form.mapRegion)?"":` — ${service.availability_status==="paused"?"Temporarily unavailable":"Coming soon"} in ${form.mapRegion}`}</option>)}
+              <option value="">Select a service</option>{form.offerings.map(service=><option key={service.id} value={service.id}>{service.title}{form.canBookService(service)?"":` — ${translateUi(form.catalogStatus==="loading"?"checkingAvailability":form.catalogStatus==="error"?"availabilityUnverified":service.availability_status==="paused"?"pausedIn":"comingSoonIn",language)} ${form.catalogStatus==="error"||form.catalogStatus==="loading"?"":translateRegionName(form.mapRegion,language)}`}</option>)}
           </select>
-          {form.selectedOffering&&!form.offeringAvailable&&<p role="status" className="text-sm text-amber-800">{form.selectedOffering.title} is not bookable in {form.mapRegion} yet. Choose another service or select a supported region.</p>}
+          {form.selectedOffering&&!form.offeringAvailable&&<p role="status" className="text-sm text-amber-800">{translateUi("bookingUnavailable",language)}</p>}
         </div>
         <div className="space-y-2"><Label htmlFor="booking-professional">Professional</Label>
           <select id="booking-professional" value={form.professionalId} onChange={(event) => form.setProfessionalId(event.target.value)} className={selectStyle} disabled={!form.categoryId || form.proLoading}>
@@ -109,7 +113,7 @@ function BookingFields({ slug, inspectionOnly }: { slug: string; inspectionOnly:
         <div className="space-y-2"><Label htmlFor="booking-duration">{inspectionOnly ? "Appointment duration window" : "Estimated duration"}</Label><select id="booking-duration" value={form.duration} onChange={(event) => form.setDuration(Number(event.target.value))} className={selectStyle}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</select></div>
         <section className="space-y-4 rounded-lg border bg-card p-5" aria-labelledby="address-heading">
           <h2 id="address-heading" className="text-lg font-semibold">Service location</h2>
-          <div className="space-y-2"><Label htmlFor="booking-region">Service region</Label><select id="booking-region" value={form.mapRegion} onChange={event=>form.setMapRegion(event.target.value as typeof form.mapRegion)} className={selectStyle}>{form.regions.map(region=><option key={region} value={region}>{region}</option>)}</select><p className="text-xs text-muted-foreground">Booking availability is checked for this region before your request is saved.</p></div>
+          <div className="space-y-2"><Label htmlFor="booking-region">Service region</Label><select id="booking-region" value={form.mapRegion} onChange={event=>form.setMapRegion(event.target.value as typeof form.mapRegion)} className={selectStyle}>{form.regions.map(region=><option key={region} value={region}>{translateRegionName(region,language)}</option>)}</select><p className="text-xs text-muted-foreground">Booking availability is checked for this region before your request is saved.</p></div>
           <LocationPicker value={form.location.map_pin ?? null} onChange={form.setPin} region={form.mapRegion} onRegionChange={form.setMapRegion} disabled={form.busy || form.loading} />
           {form.savedLocation && <Button type="button" variant="outline" className="h-auto min-h-11 whitespace-normal text-left" onClick={form.useSavedLocation}>Use saved location: {form.savedLocation.municipality}, {form.savedLocation.landmark}</Button>}
           <div className="space-y-2"><Label htmlFor="booking-city">Municipality or area</Label><Input id="booking-city" list="booking-municipalities" value={form.location.municipality} onChange={(event) => form.setLocation({ ...form.location, municipality: event.target.value })} maxLength={100} />
