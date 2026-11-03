@@ -10,6 +10,18 @@ export type DistrictLodTier = "macro" | "municipal" | "building";
 export type DistrictBounds = { south: number; west: number; north: number; east: number };
 export type DistrictPoint = { latitude: number; longitude: number };
 
+/** Nepal-wide camera safety envelope; a navigation guard, not a legal border polygon. */
+export const NEPAL_BOUNDS: DistrictBounds = {
+  south: 26.33,
+  west: 80.05,
+  north: 30.45,
+  east: 88.20,
+};
+export const NEPAL_LEAFLET_BOUNDS: [[number, number], [number, number]] = [
+  [NEPAL_BOUNDS.south, NEPAL_BOUNDS.west],
+  [NEPAL_BOUNDS.north, NEPAL_BOUNDS.east],
+];
+
 export type DistrictDefinition = {
   /** Stable routing key shared by the UI, worker protocol and PostGIS RPC. */
   key: DistrictKey;

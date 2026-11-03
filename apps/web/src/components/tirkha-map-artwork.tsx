@@ -303,6 +303,7 @@ function SpatialArtworkData() {
     {fallbackDistrict && <TileLayer
       key={`district-fallback-${fallbackDistrict}`}
       url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+      noWrap
       maxNativeZoom={19}
       maxZoom={28}
       updateWhenZooming={false}
@@ -615,7 +616,11 @@ export function TirkhaMapRegionControl({ onRegionSelect }: { onRegionSelect?: (r
   const controlRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (controlRef.current) DomEvent.disableClickPropagation(controlRef.current); }, []);
   return <div ref={controlRef} className="leaflet-top leaflet-right tirkha-region-control" aria-label="Choose map region">
-    <div className="tirkha-region-pills">{tirkhaCityViews.map((city) => <button key={city.label} type="button" onClick={(event) => { event.stopPropagation(); map.flyTo(city.center, city.zoom, { duration: 0.8, easeLinearity: 0.25 }); onRegionSelect?.(city.label); }} aria-label={`Show ${city.label}`}>
+    <div className="tirkha-region-pills">{tirkhaCityViews.map((city) => <button key={city.label} type="button" onClick={(event) => {
+      event.stopPropagation();
+      if (onRegionSelect) onRegionSelect(city.label);
+      else map.flyToBounds([[city.bounds.south, city.bounds.west], [city.bounds.north, city.bounds.east]], { padding: [32, 32], maxZoom: city.zoom, duration: 0.85, easeLinearity: 0.25 });
+    }} aria-label={`Show ${city.label}`}>
       <span className="tirkha-region-dot" />{city.label}
     </button>)}</div>
   </div>;

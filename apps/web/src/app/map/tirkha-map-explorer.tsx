@@ -14,14 +14,15 @@ const regions: { name: typeof REGIONS[number]; caption: string }[] = tirkhaCityV
 export default function TirkhaMapExplorer() {
   const [selected, setSelected] = useState<Coordinates | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<typeof REGIONS[number]>("Kathmandu");
+  const [regionFocusKey, setRegionFocusKey] = useState(0);
   return <section className="tirkha-map-explorer" aria-label="Explore the Tirkha city map">
     <div className="tirkha-map-explorer-canvas">
-      <LocationMap height={580} region={selectedRegion} onRegionChange={region => setSelectedRegion(region as typeof REGIONS[number])} value={selected ? { ...selected, resolved_address: null } : null} onPick={setSelected} disabled={false} focusPinOnChange={false} />
+      <LocationMap height={580} region={selectedRegion} regionFocusKey={regionFocusKey} onRegionChange={region => { setSelectedRegion(region as typeof REGIONS[number]); setRegionFocusKey(key => key + 1); setSelected(null); }} value={selected ? { ...selected, resolved_address: null } : null} onPick={setSelected} disabled={false} focusPinOnChange={false} />
     </div>
     <aside className="tirkha-map-explorer-panel">
       <div><span className="tirkha-map-panel-overline">TEN SERVICE REGIONS. ONE LOCAL MAP.</span><h2>Where should we<br />meet you?</h2><p>Choose a service region, then zoom in to explore mapped streets and neighborhoods. Enable pin mode to choose a home or entrance.</p></div>
       <div className="tirkha-map-city-list" aria-label="Map regions">
-        {regions.map((region, index) => <button type="button" key={region.name} aria-pressed={selectedRegion === region.name} onClick={() => { setSelectedRegion(region.name); setSelected(null); }}>
+        {regions.map((region, index) => <button type="button" key={region.name} aria-pressed={selectedRegion === region.name} onClick={() => { setSelectedRegion(region.name); setRegionFocusKey(key => key + 1); setSelected(null); }}>
           <span className="tirkha-map-city-number">0{index + 1}</span><span className="tirkha-map-city-copy"><strong>{region.name}</strong><small>{region.caption}</small></span><span className="tirkha-map-city-arrow" aria-hidden="true">↗</span>
         </button>)}
       </div>
