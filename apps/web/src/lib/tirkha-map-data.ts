@@ -493,7 +493,7 @@ export const tirkhaParks: LatLngExpression[][][] = [
   [[[28.222,83.981],[28.224,83.981],[28.224,83.984],[28.222,83.984]]],
 ];
 
-export const tirkhaCityViews = [
+export const tirkhaCoreCityViews = [
   { id: "kathmandu", label: "Kathmandu", subtitle: "The capital and its central neighborhoods", center: [27.7172,85.324] as [number,number], zoom: 14, bounds: { south: 27.665, west: 85.285, north: 27.755, east: 85.365 } },
   { id: "lalitpur", label: "Lalitpur", subtitle: "Patan and the southern valley", center: [27.674,85.322] as [number,number], zoom: 14, bounds: { south: 27.625, west: 85.285, north: 27.705, east: 85.355 } },
   { id: "bhaktapur", label: "Bhaktapur", subtitle: "Heritage streets and eastern valley", center: [27.676,85.432] as [number,number], zoom: 14, bounds: { south: 27.645, west: 85.405, north: 27.715, east: 85.465 } },
@@ -501,6 +501,10 @@ export const tirkhaCityViews = [
   { id: "pokhara", label: "Pokhara", subtitle: "Lakeside and the city center", center: [28.217,83.985] as [number,number], zoom: 14, bounds: { south: 28.175, west: 83.940, north: 28.255, east: 84.035 } },
   { id: "hetauda", label: "Hetauda", subtitle: "Buddha Chowk and Rapti Road", center: [27.407,85.045] as [number,number], zoom: 12.5, bounds: { south: 27.350, west: 84.970, north: 27.500, east: 85.120 } },
   { id: "simara", label: "Simara", subtitle: "Simara Chowk and Jeetpur-Simara", center: [27.166,84.987] as [number,number], zoom: 12.5, bounds: { south: 27.120, west: 84.910, north: 27.240, east: 85.080 } },
+];
+
+export const tirkhaCityViews = [
+  ...tirkhaCoreCityViews,
   ...DISTRICTS.map((district) => ({
     id: district.key,
     label: district.name,

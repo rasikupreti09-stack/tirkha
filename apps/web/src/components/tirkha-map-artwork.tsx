@@ -236,19 +236,19 @@ function SvgPathName({ pathRef, label, fontSize, placement = { startOffset: 50, 
 }
 
 /** Original Tirkha cartography rendered from geographic vector geometry, with no raster tile layer. */
-export const TirkhaMapArtwork = memo(function TirkhaMapArtwork() {
+export const TirkhaMapArtwork = memo(function TirkhaMapArtwork({ excludeDistricts = false }: { excludeDistricts?: boolean }) {
   return <>
     <MapZoomCeiling />
     {tirkhaParks.map((park, index) => <Polygon key={`park-${index}`} positions={park} pathOptions={{ color: "#b8d3bf", weight: 1, fillColor: "#dcebdd", fillOpacity: 0.8, interactive: false }} />)}
     {tirkhaWaterways.map((line, index) => <Polyline key={`water-${index}`} positions={line} pathOptions={{ color: "#a9c9ce", weight: 8, opacity: 0.42, lineCap: "round", lineJoin: "round", interactive: false }} />)}
     {tirkhaWaterways.map((line, index) => <Polyline key={`water-core-${index}`} positions={line} pathOptions={{ color: "#8db8c0", weight: 2.4, opacity: 0.82, lineCap: "round", lineJoin: "round", interactive: false }} />)}
     <CityBlockLayouts />
-    <SpatialArtworkData />
+    <SpatialArtworkData excludeDistricts={excludeDistricts} />
     <CuratedLandmarkLabels />
   </>;
 });
 
-function SpatialArtworkData() {
+function SpatialArtworkData({ excludeDistricts }: { excludeDistricts: boolean }) {
   const map = useMap();
   const [view, setView] = useState<{ key: string; zoom: number; data: SpatialViewportResult } | null>(null);
   const [fallbackDistrict, setFallbackDistrict] = useState<DistrictKey | null>(null);
@@ -278,6 +278,11 @@ function SpatialArtworkData() {
         ...(supabaseUrl && supabaseAnonKey ? { supabase: { url: supabaseUrl, anonKey: supabaseAnonKey } } : {}),
       };
       const district = isDistrictKey(query.region) ? query.region : null;
+      if (excludeDistricts && district) {
+        setView(null);
+        setFallbackDistrict(null);
+        return;
+      }
       // Keep newly added districts legible while their PostGIS feature packs are
       // empty. Once a roads layer is returned by the worker, Tirkha's vectors
       // become the complete map renderer for that district.
@@ -297,10 +302,10 @@ function SpatialArtworkData() {
     queryViewport();
     const unsubscribe = subscribeAfterGesture(map, "zoomend moveend", queryViewport);
     return () => { active = false; sequence++; unsubscribe(); engine?.release(); engine = null; };
-  }, [map]);
+  }, [excludeDistricts, map]);
 
   return <>
-    {fallbackDistrict && <TileLayer
+    {fallbackDistrict && !excludeDistricts && <TileLayer
       key={`district-fallback-${fallbackDistrict}`}
       url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       noWrap
@@ -314,7 +319,9 @@ function SpatialArtworkData() {
     {view ? <>
     {view.data.roads.features.length >= 12 ? <DetailedRoadNetwork data={view.data.roads} placements={view.data.labels} /> : <CuratedRoadNetwork />}
     <DetailedBuildingFootprints data={view.data.buildings} zoom={view.zoom} />
-    <RegionalSpatialFeatures features={view.data.regionalFeatures} />
+    <RegionalSpatialFeatures features={excludeDistricts
+      ? view.data.regionalFeatures.filter((feature) => !isDistrictKey(feature.properties.district.toLowerCase()))
+      : view.data.regionalFeatures} />
     </> : <CuratedRoadNetwork />}
   </>;
 }
@@ -611,12 +618,12 @@ function RoadFeatureName({ feature, label, renderer, fontSize, placement }: { fe
   </>;
 }
 
-export function TirkhaMapRegionControl({ onRegionSelect }: { onRegionSelect?: (region: string) => void } = {}) {
+export function TirkhaMapRegionControl({ onRegionSelect, regions = tirkhaCityViews }: { onRegionSelect?: (region: string) => void; regions?: readonly (typeof tirkhaCityViews)[number][] } = {}) {
   const map = useMap();
   const controlRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (controlRef.current) DomEvent.disableClickPropagation(controlRef.current); }, []);
   return <div ref={controlRef} className="leaflet-top leaflet-right tirkha-region-control" aria-label="Choose map region">
-    <div className="tirkha-region-pills">{tirkhaCityViews.map((city) => <button key={city.label} type="button" onClick={(event) => {
+    <div className="tirkha-region-pills">{regions.map((city) => <button key={city.label} type="button" onClick={(event) => {
       event.stopPropagation();
       if (onRegionSelect) onRegionSelect(city.label);
       else map.flyToBounds([[city.bounds.south, city.bounds.west], [city.bounds.north, city.bounds.east]], { padding: [32, 32], maxZoom: city.zoom, duration: 0.85, easeLinearity: 0.25 });
