@@ -68,9 +68,9 @@
 .tirkha-map-page-intro h1 em { color: #377561; font-weight: 400; }
 .tirkha-map-page-intro > p:last-child { max-width: 520px; margin: 14px 0 0; color: #6a7a71; font-size: 13px; line-height: 1.7; }
 .tirkha-map-explorer { display: grid; max-width: 1480px; min-height: 580px; grid-template-columns: minmax(0, 1fr) 340px; margin: 0 auto; overflow: hidden; border: 1px solid #dce5dc; border-radius: 23px; background: #fff; box-shadow: 0 24px 70px #19372b12; }
-.tirkha-map-explorer-canvas { min-width: 0; border-right: 1px solid #e4eae3; }
-.tirkha-map-explorer-canvas .tirkha-map-frame { height: 100%; min-height: 580px; border-radius: 0; }
-.tirkha-map-explorer-canvas .leaflet-container { min-height: 580px; }
+.tirkha-map-explorer-canvas { position: relative; min-width: 0; min-height: min(78vh, 900px); border-right: 1px solid #e4eae3; }
+.tirkha-map-explorer-canvas .tirkha-map-frame { position: absolute; inset: 0; height: auto; min-height: 0; border-radius: 0; }
+.tirkha-map-explorer-canvas .leaflet-container { height: 100% !important; min-height: 0; }
 .tirkha-map-explorer-panel { display: flex; flex-direction: column; padding: 27px 23px 22px; }
 .tirkha-map-explorer-panel h2 { margin: 0; color: #203a30; font-family: Georgia, "Times New Roman", serif; font-size: 30px; font-weight: 500; letter-spacing: -.04em; line-height: 1.06; }
 .tirkha-map-explorer-panel > div:first-child > p { margin: 11px 0 0; color: #75847c; font-size: 12px; line-height: 1.65; }
@@ -99,7 +99,7 @@
   .tirkha-map-page { padding: 17px 14px 20px; }
   .tirkha-map-page-intro { margin: 38px auto 22px; }
   .tirkha-map-explorer { display: flex; flex-direction: column; }
-  .tirkha-map-explorer-canvas { order: 1; border-right: 0; border-bottom: 1px solid #e4eae3; }
+  .tirkha-map-explorer-canvas { order: 1; min-height: 0; border-right: 0; border-bottom: 1px solid #e4eae3; }
   .tirkha-map-explorer-canvas .tirkha-map-frame,
   .tirkha-map-explorer-canvas .leaflet-container { height: min(66vh, 540px) !important; min-height: 390px; }
   .tirkha-map-explorer-panel { order: 2; padding: 22px 18px 18px; }

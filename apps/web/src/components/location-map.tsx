@@ -138,7 +138,7 @@ export default function LocationMap(props: Props) {
         <TirkhaMapZoomControl onLocate={locateMe} locating={locating} pinningEnabled={pinningEnabled} onTogglePinning={() => setPinningEnabled(value => !value)} />
         <Pin value={props.value} onPick={props.onPick} onPinPlaced={disarmPinning} disabled={props.disabled} focusPinOnChange={props.focusPinOnChange} pinningEnabled={pinningEnabled} icon={pinIcon} />
       </MapContainer></SpatialEngineErrorBoundary>
-      <TirkhaMapSignature caption="Kathmandu Valley · Pokhara · Hetauda · Simara · Chitwan · Jhapa · Sunsari" />
+      <TirkhaMapSignature caption="Kathmandu · Lalitpur · Bhaktapur · Kirtipur · Pokhara · Hetauda · Simara · Chitwan · Jhapa · Sunsari" />
     </div>
     <p className="mt-2 px-1 text-xs text-slate-600">{pinningEnabled ? "Pin mode is on: tap or drag the pin to set your exact location. Turn it off to pan safely." : "Pin mode is off so you can pan the map. Tap the pin control to place or move your location."}</p>
     {locationError && <p role="status" className="px-2 pt-2 text-xs text-amber-800">{locationError}</p>}
