@@ -6,6 +6,7 @@ import { Clock3, Navigation } from "lucide-react";
 import type { Coordinates } from "@tirkha/shared";
 import { useAuth } from "./auth-provider";
 import { TirkhaMapArtwork, TirkhaMapSignature, TirkhaMapZoomControl } from "./tirkha-map-artwork";
+import { SpatialEngineErrorBoundary } from "./spatial-engine-error-boundary";
 
 export type TrackedPoint = { id: string; label: string; kind: "hero" | "customer"; coordinates: Coordinates; updatedAt?: string; heading?: number | null };
 function pointIcon(kind: TrackedPoint["kind"], heading = 0) {
@@ -122,13 +123,13 @@ export const MapTracker = memo(function MapTracker({ points, origin, destination
   if (typeof window === "undefined") return <div className="h-[360px] animate-pulse rounded-xl bg-muted" role="status">Loading live map…</div>;
   return <section className="tirkha-map-surface">
     <div className="tirkha-map-frame tirkha-live-map-canvas">
-      <MapContainer ref={mapRef} center={view} zoom={16} minZoom={6} maxZoom={28} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={30} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} preferCanvas className="tirkha-vector-map !h-full !w-full" aria-label="Live service map">
+      <SpatialEngineErrorBoundary><MapContainer ref={mapRef} center={view} zoom={16} minZoom={6} maxZoom={28} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={30} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom inertia inertiaDeceleration={2800} inertiaMaxSpeed={1800} easeLinearity={0.25} bounceAtZoomLimits={false} attributionControl={false} preferCanvas className="tirkha-vector-map !h-full !w-full" aria-label="Live service map">
       <TirkhaMapArtwork />
       <TirkhaMapZoomControl recenterPoints={points.map(point => [point.coordinates.latitude, point.coordinates.longitude])} />
       <FitPoints points={points} />
       {points.map(point => <TrackedMapMarker key={point.id} point={point} />)}
       {path.length > 0 && <><Polyline positions={path} pathOptions={{ color: "#ffffff", weight: 10, opacity: 0.9, lineCap: "round", lineJoin: "round" }} /><Polyline positions={path} pathOptions={{ color: "#047857", weight: 5, opacity: 0.96, lineCap: "round", lineJoin: "round" }} /></>}
-      </MapContainer>
+      </MapContainer></SpatialEngineErrorBoundary>
       <div className="tirkha-map-live-chip"><span className={`tirkha-live-indicator ${live ? "is-live" : ""}`} /><span><strong>{live ? "HERO IS LIVE" : heroPoint ? "LAST GPS LOCATION" : "WAITING FOR HERO"}</strong><small>{heroPoint?.updatedAt ? `Updated ${new Date(heroPoint.updatedAt).toLocaleTimeString()}` : "Live updates appear here"}</small></span></div>
       <TirkhaMapSignature caption="Live across our service cities" />
     </div>

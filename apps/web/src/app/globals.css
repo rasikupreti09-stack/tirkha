@@ -10,8 +10,8 @@
 .tirkha-pin-pulse { transform-box: fill-box; transform-origin: center; animation: tirkha-pin-pulse 1.8s ease-out infinite; }
 @keyframes tirkha-pin-pulse { 0% { opacity: .9; transform: scale(.7); } 75%, 100% { opacity: 0; transform: scale(1.8); } }
 @media (prefers-reduced-motion: reduce) { .tirkha-pin-pulse { animation: none; } }
-.tirkha-map-frame { position: relative; overflow: hidden; border-radius: inherit; touch-action: none; overscroll-behavior: contain; -webkit-tap-highlight-color: transparent; }
-.tirkha-vector-map.leaflet-container { background: #f3f5ef; color: #20372f; font-family: inherit; touch-action: none !important; overscroll-behavior: contain; -webkit-tap-highlight-color: transparent; user-select: none; }
+.tirkha-map-frame { position: relative; overflow: hidden; border-radius: inherit; touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+.tirkha-vector-map.leaflet-container { background: #f3f5ef; color: #20372f; font-family: inherit; touch-action: none !important; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
 .tirkha-vector-map button { touch-action: manipulation; }
 .tirkha-vector-map .leaflet-pane { z-index: 200; }
 .tirkha-vector-map .leaflet-map-pane,

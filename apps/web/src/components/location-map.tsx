@@ -4,6 +4,7 @@ import { divIcon, type Map as LeafletMap, type Marker as LeafletMarker } from "l
 import { MapContainer, Marker, useMapEvents } from "react-leaflet";
 import { KATHMANDU_CENTER, REGIONS, type Coordinates, type MapPin } from "@tirkha/shared";
 import { TirkhaMapArtwork, TirkhaMapRegionControl, TirkhaMapSignature, TirkhaMapZoomControl } from "./tirkha-map-artwork";
+import { SpatialEngineErrorBoundary } from "./spatial-engine-error-boundary";
 import { tirkhaCityViews } from "@/lib/tirkha-map-data";
 
 type Props = { value: MapPin | null; onPick: (point: Coordinates) => void; disabled: boolean; height?: number; region?: typeof REGIONS[number]; onRegionChange?: (region: typeof REGIONS[number]) => void; focusPinOnChange?: boolean };
@@ -76,12 +77,12 @@ export default function LocationMap(props: Props) {
   if (typeof window === "undefined") return <div className="h-[300px] w-full animate-pulse rounded-lg bg-slate-100" role="status">Loading map…</div>;
   return <>
     <div className="tirkha-map-frame">
-      <MapContainer ref={mapRef} center={[center.latitude, center.longitude]} zoom={props.value && props.focusPinOnChange !== false ? 16 : regionView?.zoom ?? 12} minZoom={6} maxZoom={28} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={30} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} preferCanvas style={{ height: props.height ?? 300, width: "100%", zIndex: 0 }} className="tirkha-vector-map" aria-label="Choose your service location">
+      <SpatialEngineErrorBoundary><MapContainer ref={mapRef} center={[center.latitude, center.longitude]} zoom={props.value && props.focusPinOnChange !== false ? 16 : regionView?.zoom ?? 12} minZoom={6} maxZoom={28} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={30} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom inertia inertiaDeceleration={2800} inertiaMaxSpeed={1800} easeLinearity={0.25} bounceAtZoomLimits={false} attributionControl={false} preferCanvas style={{ height: props.height ?? 300, width: "100%", zIndex: 0 }} className="tirkha-vector-map" aria-label="Choose your service location">
         <TirkhaMapArtwork />
         <TirkhaMapRegionControl onRegionSelect={region => props.onRegionChange?.(region as typeof REGIONS[number])} />
         <TirkhaMapZoomControl onLocate={locateMe} locating={locating} pinningEnabled={pinningEnabled} onTogglePinning={() => setPinningEnabled(value => !value)} />
         <Pin value={props.value} onPick={props.onPick} onPinPlaced={disarmPinning} disabled={props.disabled} focusPinOnChange={props.focusPinOnChange} pinningEnabled={pinningEnabled} icon={pinIcon} />
-      </MapContainer>
+      </MapContainer></SpatialEngineErrorBoundary>
       <TirkhaMapSignature caption="Kathmandu Valley · Kirtipur · Pokhara · Hetauda · Simara" />
     </div>
     <p className="mt-2 px-1 text-xs text-slate-600">{pinningEnabled ? "Pin mode is on: tap or drag the pin to set your exact location. Turn it off to pan safely." : "Pin mode is off so you can pan the map. Tap the pin control to place or move your location."}</p>

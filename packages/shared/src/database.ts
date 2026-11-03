@@ -30,6 +30,8 @@ export type Database = {
       professional_presence: Table<{ professional_id: string; latitude: number; longitude: number; heading: number | null; updated_at: string }, never, never>;
       hero_locations: Table<{ professional_id: string; latitude: number; longitude: number; heading: number | null; speed_mps: number | null; battery_level: number | null; active_booking_id: string | null; status: "online_idle" | "en_route" | "on_service"; updated_at: string }, never, never>;
       hero_dispatch_notifications: Table<{ id: string; booking_id: string; professional_id: string; trade_category: HeroTrade | null; status: "new" | "seen" | "accepted" | "expired"; service_name: string; diagnostic_summary: string | null; diagnostic_severity: string | null; diagnostic_urgency: "routine" | "soon" | "urgent" | null; suggested_parts: string[]; service_address: string; latitude: number | null; longitude: number | null; distance_meters: number | null; scheduled_at: string; created_at: string }, never, never>;
+      spatial_districts: Table<{ district_key: "chitwan" | "jhapa" | "sunsari"; district_name: string; center: unknown; bbox: unknown; boundary: unknown | null; dataset_version: string | null; pending_boundary: unknown | null; pending_version: string | null; enabled: boolean; updated_at: string }, never, never>;
+      spatial_features: Table<{ feature_id: string; district_key: "chitwan" | "jhapa" | "sunsari"; lod_tier: "macro" | "municipal" | "building"; feature_kind: string; source_id: string; dataset_version: string; properties: Record<string, unknown>; geom: unknown; created_at: string }, never, never>;
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -37,6 +39,11 @@ export type Database = {
       submit_hero_registration: { Args: { p_full_name: string; p_phone: string; p_trade_code: "PLUMBING" | "ELECTRICAL" | "APPLIANCE_TECHNICIAN" | "BEAUTICIAN" | "PAINTER" | "CLEANER" | "HANDYMAN"; p_operational_zone: "Kathmandu Valley" | "Pokhara" | "Hetauda" | "Simara"; p_document_path: string }; Returns: VerificationStatus };
       admin_set_hero_status: { Args: { p_profile_id: string; p_status: "verified" | "rejected" | "suspended" }; Returns: undefined };
       hero_zone_matches_booking: { Args: { p_professional_id: string; p_address: string }; Returns: boolean };
+      spatial_lod_for_zoom: { Args: { p_zoom: number }; Returns: "macro" | "municipal" | "building" | null };
+      register_spatial_district_boundary: { Args: { p_district_key: "chitwan" | "jhapa" | "sunsari"; p_boundary_geojson: Record<string, unknown>; p_dataset_version: string }; Returns: undefined };
+      ingest_spatial_feature_batch: { Args: { p_district_key: "chitwan" | "jhapa" | "sunsari"; p_lod_tier: "macro" | "municipal" | "building"; p_dataset_version: string; p_feature_collection: Record<string, unknown> }; Returns: number };
+      publish_spatial_district_dataset: { Args: { p_district_key: "chitwan" | "jhapa" | "sunsari"; p_dataset_version: string }; Returns: number };
+      get_spatial_features_for_viewport: { Args: { p_district_key: "chitwan" | "jhapa" | "sunsari"; p_west: number; p_south: number; p_east: number; p_north: number; p_zoom: number; p_limit?: number }; Returns: { feature_id: string; district_key: string; lod_tier: "macro" | "municipal" | "building"; feature_kind: string; properties: Record<string, unknown>; geometry: Record<string, unknown> }[] };
       submit_professional_job_quote: { Args: { p_booking_id: string; p_labor_paisa: number; p_materials_paisa: number; p_materials_breakdown: string; p_scope: string }; Returns: ProfessionalJobQuote };
       set_hero_availability: { Args: { p_online: boolean; p_latitude?: number | null; p_longitude?: number | null }; Returns: undefined };
       hero_wallet_summary: { Args: Record<PropertyKey, never>; Returns: { gross_paisa: number; commission_paisa: number; net_paisa: number; cod_commission_receivable_paisa: number }[] };
@@ -67,7 +74,7 @@ export type Database = {
         Returns: PublicProfessional[];
       };
     };
-    Enums: { user_role: UserRole; verification_status: VerificationStatus; booking_status: BookingStatus };
+    Enums: { user_role: UserRole; verification_status: VerificationStatus; booking_status: BookingStatus; spatial_lod_tier: "macro" | "municipal" | "building" };
     CompositeTypes: { [_ in never]: never };
   };
 };

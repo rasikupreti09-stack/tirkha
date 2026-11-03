@@ -4,6 +4,7 @@ import { divIcon, type Map as LeafletMap, type Marker as LeafletMarker } from "l
 import { MapContainer, Marker, Tooltip, useMap } from "react-leaflet";
 import type { BookingStatus } from "@tirkha/shared";
 import { TirkhaMapArtwork, TirkhaMapRegionControl, TirkhaMapSignature, TirkhaMapZoomControl } from "@/components/tirkha-map-artwork";
+import { SpatialEngineErrorBoundary } from "@/components/spatial-engine-error-boundary";
 
 type HeroLocation = {
   professional_id: string; latitude: number; longitude: number; heading: number | null;
@@ -69,13 +70,13 @@ export function OperationsMap({ heroes, locations, jobs }: { heroes: Hero[]; loc
   if (typeof window === "undefined") return <div className="grid min-h-[480px] place-items-center rounded-xl border bg-muted text-sm text-muted-foreground" role="status">Loading Valley fleet map…</div>;
   return <div className="grid min-h-[480px] overflow-hidden rounded-xl border bg-card lg:grid-cols-[minmax(0,1fr)_320px]">
     <div className="tirkha-map-frame relative min-h-[420px]">
-      <MapContainer ref={mapRef} center={VALLEY_CENTER} zoom={12} minZoom={6} maxZoom={28} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={30} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom attributionControl={false} preferCanvas className="tirkha-vector-map !h-full !min-h-[420px] !w-full" aria-label="Live Hero fleet map across Tirkha service regions">
+      <SpatialEngineErrorBoundary><MapContainer ref={mapRef} center={VALLEY_CENTER} zoom={12} minZoom={6} maxZoom={28} zoomControl={false} zoomSnap={0.25} zoomDelta={0.5} wheelPxPerZoomLevel={30} zoomAnimation touchZoom doubleClickZoom scrollWheelZoom inertia inertiaDeceleration={2800} inertiaMaxSpeed={1800} easeLinearity={0.25} bounceAtZoomLimits={false} attributionControl={false} preferCanvas className="tirkha-vector-map !h-full !min-h-[420px] !w-full" aria-label="Live Hero fleet map across Tirkha service regions">
         <TirkhaMapArtwork />
         <TirkhaMapRegionControl />
         <TirkhaMapZoomControl recenterPoints={selectedLocation ? [[selectedLocation.latitude, selectedLocation.longitude]] : [VALLEY_CENTER]} />
         <SelectedHeroFocus location={selectedLocation} />
         {liveLocations.map(location => <FleetMarker key={location.professional_id} location={location} stale={Date.now() - Date.parse(location.updated_at) > 90_000} name={heroes.find(hero => hero.id === location.professional_id)?.name || "Hero"} onSelect={selectHero} />)}
-      </MapContainer>
+      </MapContainer></SpatialEngineErrorBoundary>
       <TirkhaMapSignature caption="Kathmandu Valley fleet" />
     </div>
     <aside className="flex max-h-[560px] flex-col border-t lg:border-l lg:border-t-0">

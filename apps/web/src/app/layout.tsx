@@ -4,6 +4,7 @@ import { AuthProvider } from "@/components/auth-provider";
 import { MarketplaceProvider } from "@/components/marketplace-provider";
 import { LanguageProvider } from "@/components/language-provider";
 import { LaunchSplash } from "@/components/launch-splash";
+import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import type { Viewport } from "next";
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#17382f" };
 export const metadata: Metadata = {
@@ -15,5 +16,5 @@ export const metadata: Metadata = {
   icons: { icon: "/tirkha-mark.svg?v=2", apple: "/apple-touch-icon.png?v=2" },
 };
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body><AuthProvider><LanguageProvider><MarketplaceProvider><LaunchSplash />{children}</MarketplaceProvider></LanguageProvider></AuthProvider></body></html>;
+  return <html lang="en"><body><AuthProvider><LanguageProvider><MarketplaceProvider><ServiceWorkerRegistration /><LaunchSplash />{children}</MarketplaceProvider></LanguageProvider></AuthProvider></body></html>;
 }

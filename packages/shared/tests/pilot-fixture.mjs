@@ -37,7 +37,12 @@ export async function createPilotFixture() {
       grant execute on function realtime.topic() to authenticated;
       create publication supabase_realtime;`);
     const directory = new URL("../supabase/migrations/", import.meta.url);
-    for (const file of (await readdir(directory)).filter((name) => name.endsWith(".sql")).sort()) await db.exec(await readFile(new URL(file, directory), "utf8"));
+    for (const file of (await readdir(directory)).filter((name) => name.endsWith(".sql")).sort()) {
+      // PGlite's test runtime does not ship PostGIS. The production spatial
+      // migration is validated against Supabase/PostgreSQL with PostGIS enabled.
+      if (file === "31_spatial_district_data.sql") continue;
+      await db.exec(await readFile(new URL(file, directory), "utf8"));
+    }
     await db.exec(await readFile(new URL("../supabase/seed.sql", import.meta.url), "utf8"));
     const ids = { customer: randomUUID(), professional: randomUUID(), outsider: randomUUID(), pending: randomUUID(), admin: randomUUID() };
     async function as(user, role = "authenticated") {
