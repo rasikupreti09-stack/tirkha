@@ -1,4 +1,4 @@
-import { categorySlugSchema, serviceCategorySchema, publicProfessionalSchema, PROFESSIONAL_PAGE_SIZE } from "@tirkha/shared";
+import { categorySlugSchema, serviceCategorySchema, publicProfessionalSchema, regionalCatalogRowSchema, PROFESSIONAL_PAGE_SIZE, type RegionalCatalogRow } from "@tirkha/shared";
 import { getSupabase } from "./supabase";
 
 export async function loadCategories() {
@@ -18,4 +18,9 @@ export async function loadProfessionals(slug: string, offset: number) {
   });
   if (error) throw error;
   return publicProfessionalSchema.array().parse(data);
+}
+export async function loadRegionalCatalog(mapRegionKey: string): Promise<RegionalCatalogRow[]> {
+  const { data, error } = await getSupabase().rpc("get_regional_service_catalog", { p_map_region_key: mapRegionKey });
+  if (error) throw error;
+  return regionalCatalogRowSchema.array().parse(data);
 }

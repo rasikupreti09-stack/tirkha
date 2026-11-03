@@ -1,6 +1,6 @@
 import { Link, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View, type TextInputProps } from "react-native";
-import { DURATION_OPTIONS, formatBookingDate, formatNpr, hourlyRateLabel, tokens } from "@tirkha/shared";
+import { DURATION_OPTIONS, REGIONS, formatBookingDate, formatNpr, hourlyRateLabel, tokens } from "@tirkha/shared";
 import { AccountGate } from "../../components/account-gate";
 import { PaymentCheckout } from "../../components/payment-checkout";
 import { useBookingDraft } from "../../hooks/use-booking-draft";
@@ -9,8 +9,8 @@ import { LocationPicker } from "../../components/location-picker";
 function Field({ label, ...props }: TextInputProps & { label: string }) {
   return <View className="mb-4"><Text className="mb-2 font-medium text-foreground">{label}</Text><TextInput accessibilityLabel={label} placeholderTextColor={tokens.colors["muted-foreground"]} className="min-h-12 rounded-md border border-border bg-card px-3 py-3 text-foreground" {...props} /></View>;
 }
-function Choice({ label, selected, onPress }: { label: string; selected?: boolean; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} className={selected ? "mb-2 min-h-12 justify-center rounded-md bg-primary p-3" : "mb-2 min-h-12 justify-center rounded-md border border-border p-3"}><Text className={selected ? "text-primary-foreground" : "text-foreground"}>{label}</Text></Pressable>;
+function Choice({ label, selected, disabled, onPress }: { label: string; selected?: boolean; disabled?: boolean; onPress: () => void }) {
+  return <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled} onPress={onPress} className={selected ? "mb-2 min-h-12 justify-center rounded-md bg-primary p-3" : "mb-2 min-h-12 justify-center rounded-md border border-border p-3"}><Text className={selected ? "text-primary-foreground" : "text-foreground"}>{label}</Text></Pressable>;
 }
 export default function Book() {
   const { category } = useLocalSearchParams<{ category?: string }>();
@@ -28,9 +28,14 @@ function BookingFields({ slug }: { slug: string }) {
   return <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView className="flex-1 bg-background" keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, paddingBottom: 48 }}>
     <Link href="/(app)/dashboard" className="mb-6 py-3 text-primary underline">← Dashboard</Link>
     <Text accessibilityRole="header" className="mb-6 text-3xl font-semibold text-primary">Request a service</Text>
+    <Text className="mb-3 font-semibold text-foreground">Service city</Text>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4 max-h-14" contentContainerStyle={{ gap: 8 }}>
+      {REGIONS.map((region) => <Pressable key={region} accessibilityRole="button" accessibilityState={{ selected: draft.region === region }} onPress={() => draft.setRegion(region)} className={draft.region === region ? "min-h-11 justify-center rounded-full bg-primary px-4" : "min-h-11 justify-center rounded-full border border-border bg-card px-4"}><Text className={draft.region === region ? "font-medium text-primary-foreground" : "font-medium text-foreground"}>{region}</Text></Pressable>)}
+    </ScrollView>
     {draft.loading && <ActivityIndicator color={tokens.colors.primary} accessibilityLabel="Loading services" />}
     <Text className="mb-3 font-semibold text-foreground">Service category</Text>
     {draft.categories.map((item) => <Choice key={item.id} label={item.name} selected={draft.categoryId === item.id} onPress={() => draft.changeCategory(item.id)} />)}
+    {draft.categoryId && <><Text className="mb-3 mt-4 font-semibold text-foreground">Specific service</Text>{draft.catalogLoading ? <ActivityIndicator color={tokens.colors.primary} accessibilityLabel="Checking services in selected city" /> : draft.categoryOfferings.map((row) => <Choice key={row.service.id} label={`${row.service.title} · ${row.availability_status === "available" ? formatNpr(row.service.base_paisa + row.service.visit_paisa) : row.availability_status === "paused" ? "Paused here" : `Coming soon in ${draft.region}`}`} selected={draft.offeringId === row.service.id} disabled={row.availability_status !== "available"} onPress={() => draft.setOfferingId(row.service.id)} />)}{!draft.catalogLoading && draft.categoryOfferings.length === 0 && <Text className="mb-3 text-muted-foreground">No services are listed for this category in {draft.region} yet.</Text>}</>}
     <Text className="mb-3 mt-6 font-semibold text-foreground">Professional</Text>
     <Choice label="Unassigned request · quote pending" selected={!draft.professionalId} onPress={() => draft.setProfessionalId("")} />
     {draft.choices.map((item) => <Choice key={item.profile_id} label={`${item.full_name || "Verified professional"} · ${hourlyRateLabel(item.hourly_rate_paisa)}`} selected={draft.professionalId === item.profile_id} onPress={() => draft.setProfessionalId(item.profile_id)} />)}
@@ -43,7 +48,7 @@ function BookingFields({ slug }: { slug: string }) {
     <Text className="mb-3 font-semibold text-foreground">Estimated duration</Text>
     <View className="flex-row flex-wrap gap-2">{DURATION_OPTIONS.map((minutes) => <Choice key={minutes} label={`${minutes} min`} selected={draft.duration === minutes} onPress={() => draft.setDuration(minutes)} />)}</View>
     <Text className="mb-3 mt-6 font-semibold text-foreground">Landmark location</Text>
-    <LocationPicker value={draft.location.map_pin ?? null} onChange={draft.setPin} disabled={draft.busy || draft.loading} />
+    <LocationPicker value={draft.location.map_pin ?? null} onChange={draft.setPin} disabled={draft.busy || draft.loading} region={draft.region} />
     {draft.savedLocation && <Choice label={`Use saved location: ${draft.savedLocation.landmark}`} onPress={draft.useSavedLocation} />}
     <Field label="Municipality or area" value={draft.location.municipality} onChangeText={(municipality) => draft.setLocation({ ...draft.location, municipality })} maxLength={100} />
     <Field label="Ward (optional)" value={draft.location.ward} onChangeText={(ward) => draft.setLocation({ ...draft.location, ward })} keyboardType="number-pad" maxLength={2} />

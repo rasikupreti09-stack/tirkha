@@ -2,15 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import {
   bookingRequestSchema, locationPreferenceSchema, locationToAddress, nepalDateTimeToIso,
   defaultNepalSchedule, estimateLabourPaisa, bookingErrorMessage, LOCATION_STORAGE_KEY,
-  PROFESSIONAL_PAGE_SIZE, type ServiceCategory, type PublicProfessional, type WorkflowBooking, type LocationPreference, type MapPin,
+  PROFESSIONAL_PAGE_SIZE, REGIONS, type ServiceCategory, type PublicProfessional, type WorkflowBooking, type LocationPreference, type MapPin, type RegionalCatalogRow,
 } from "@tirkha/shared";
-import { loadCategories, loadProfessionals } from "../lib/discovery";
+import { loadCategories, loadProfessionals, loadRegionalCatalog } from "../lib/discovery";
 import { createBooking } from "../lib/bookings";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { randomUUID } from "expo-crypto";
 export function useBookingDraft(initialSlug = "") {
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [categoryId, setCategoryId] = useState("");
+  const [region, setRegion] = useState<(typeof REGIONS)[number]>("Kathmandu Valley");
+  const [regionalCatalog, setRegionalCatalog] = useState<RegionalCatalogRow[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [offeringId, setOfferingId] = useState("");
   const [professionalId, setProfessionalId] = useState("");
   const [professionals, setProfessionals] = useState<{ category: string; items: PublicProfessional[] }>({ category: "", items: [] });
   const [proPage, setProPage] = useState(0);
@@ -30,6 +34,9 @@ export function useBookingDraft(initialSlug = "") {
   const busyRef = useRef(false);
   const requestRef = useRef<{ signature: string; id: string } | null>(null);
   const selectedCategory = categories.find((item) => item.id === categoryId);
+  const categoryOfferings = selectedCategory ? regionalCatalog.filter((row) => row.service.category_slug === selectedCategory.slug) : [];
+  const availableOfferings = categoryOfferings.filter((row) => row.availability_status === "available");
+  const selectedOffering = availableOfferings.find((row) => row.service.id === offeringId)?.service;
   const choices = professionals.category === categoryId ? professionals.items : [];
   const selectedProfessional = choices.find((item) => item.profile_id === professionalId);
   let estimate: number | null = null;
@@ -47,6 +54,26 @@ export function useBookingDraft(initialSlug = "") {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [initialSlug, dataAttempt]);
+  useEffect(() => {
+    let active = true;
+    setCatalogLoading(true);
+    setRegionalCatalog([]);
+    setOfferingId("");
+    void loadRegionalCatalog(region).then((rows) => {
+      if (!active) return;
+      setRegionalCatalog(rows);
+      const firstCategory = categories.find((item) => item.id === categoryId);
+      const firstAvailable = rows.find((row) => row.availability_status === "available" && (!firstCategory || row.service.category_slug === firstCategory.slug));
+      setOfferingId(firstAvailable?.service.id ?? "");
+    }).catch(() => { if (active) setDataError("Service availability could not be verified. Retry before booking."); })
+      .finally(() => { if (active) setCatalogLoading(false); });
+    return () => { active = false; };
+  }, [region, dataAttempt]);
+  useEffect(() => {
+    if (!selectedCategory || catalogLoading) return;
+    const currentIsAvailable = availableOfferings.some((row) => row.service.id === offeringId);
+    if (!currentIsAvailable) setOfferingId(availableOfferings[0]?.service.id ?? "");
+  }, [selectedCategory?.id, catalogLoading, regionalCatalog, offeringId]);
   useEffect(() => {
     let active = true;
     void (async () => {
@@ -83,12 +110,15 @@ export function useBookingDraft(initialSlug = "") {
     setError("");
     try {
       if (!selectedCategory) throw new Error("Choose a service category.");
+      if (catalogLoading) throw new Error("Please wait while service availability is checked.");
+      if (!selectedOffering) throw new Error(categoryOfferings.length ? "Choose a service available in your selected region." : "No service offering is available for this category in your selected region yet.");
       if (professionalId && !selectedProfessional) throw new Error("Choose a listed professional, or an unassigned request.");
       if (estimateError) throw new Error(estimateError);
       const address = locationPreferenceSchema.safeParse(location);
       if (!address.success) throw new Error(address.error.issues[0].message);
       if (!address.data.map_pin) throw new Error("Drop a pin on the map so nearby Heroes can receive the exact service location.");
       const payload = {
+        map_region_key: region, service_offering_id: selectedOffering.id,
         category_id: categoryId, professional_id: professionalId || null,
         service_address: locationToAddress(address.data), job_details: details,
         latitude: address.data.map_pin?.latitude ?? null, longitude: address.data.map_pin?.longitude ?? null,
@@ -109,7 +139,7 @@ export function useBookingDraft(initialSlug = "") {
     } catch (error) { setError(error instanceof Error ? error.message : "Check your booking details."); }
   }
   return {
-    categories, categoryId, professionalId, choices, loading, proLoading, hasMore,
+    categories, categoryId, region, regionalCatalog, categoryOfferings, availableOfferings, offeringId, catalogLoading, professionalId, choices, loading, proLoading, hasMore,
     dataError, error, location, savedLocation, schedule, duration, details, busy, created,
     estimate, estimateError, selectedProfessional,
     setPin(pin: MapPin | null) {
@@ -119,7 +149,12 @@ export function useBookingDraft(initialSlug = "") {
           : pin && current.map_pin?.resolved_address?.slice(0, 100) === current.municipality ? "" : current.municipality,
       }));
     },
-    setLocation, setSchedule, setDuration, setDetails, setProfessionalId,
+    setLocation, setSchedule, setDuration, setDetails, setProfessionalId, setOfferingId,
+    setRegion(value: (typeof REGIONS)[number]) {
+      setRegion(value);
+      setLocation((current) => ({ ...current, municipality: "", ward: "", landmark: "", map_pin: undefined }));
+      setProfessionals({ category: "", items: [] }); setProfessionalId(""); setProPage(0);
+    },
     changeCategory(id: string) { setCategoryId(id); setProfessionalId(""); setProPage(0); setProfessionals({ category: "", items: [] }); setHasMore(false); },
     useSavedLocation() { if (savedLocation) setLocation({ ...savedLocation, ward: savedLocation.ward || "" }); },
     loadMore() { setProPage((page) => page + 1); },

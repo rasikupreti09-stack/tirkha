@@ -10,6 +10,7 @@ export async function createBooking(input: BookingRequest) {
     p_latitude: input.latitude ?? null, p_longitude: input.longitude ?? null, p_resolved_address: input.resolved_address ?? null,
     p_diagnostic_summary: input.diagnostic_summary ?? null, p_diagnostic_severity: input.diagnostic_severity ?? null,
     p_diagnostic_urgency: input.diagnostic_urgency ?? null, p_suggested_parts: input.suggested_parts ?? [],
+    p_map_region_key: input.map_region_key, p_service_offering_id: input.service_offering_id,
   }).single();
   if (error) throw error;
   return workflowBookingSchema.parse(data);

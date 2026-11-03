@@ -4,7 +4,7 @@ import { coordinatesSchema, type MapPin } from "@tirkha/shared";
 import { usePinResolution } from "../hooks/use-pin-resolution";
 import LocationMap from "./location-map";
 
-export function LocationPicker({ value, onChange, disabled = false }: { value: MapPin | null; onChange: (pin: MapPin | null) => void; disabled?: boolean }) {
+export function LocationPicker({ value, onChange, disabled = false, region = "Kathmandu Valley" }: { value: MapPin | null; onChange: (pin: MapPin | null) => void; disabled?: boolean; region?: string }) {
   const lookup = usePinResolution(value, onChange, disabled);
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
@@ -14,7 +14,7 @@ export function LocationPicker({ value, onChange, disabled = false }: { value: M
   const button = "my-2 min-h-12 justify-center rounded-md border border-border bg-card p-3";
   return <View className="mb-5 gap-2">
     <Text className="text-sm text-muted-foreground">Tap the map, or long press the pin to drag it. Tap Resolve area to fill your municipality. A pin is optional; no location permission is needed.</Text>
-    <View className="overflow-hidden rounded-lg border border-border"><LocationMap value={value} onPick={lookup.pick} disabled={disabled} /></View>
+    <View className="overflow-hidden rounded-lg border border-border"><LocationMap value={value} onPick={lookup.pick} disabled={disabled} region={region} /></View>
     <Pressable accessibilityRole="button" onPress={() => setShowCoordinates(!showCoordinates)} className={button}><Text className="text-foreground">{showCoordinates ? "Hide coordinate entry" : "Enter coordinates manually"}</Text></Pressable>
     {showCoordinates && <View className="gap-2">
       <Text className="text-foreground">Latitude</Text><TextInput accessibilityLabel="Latitude" editable={!disabled} value={latitude} onChangeText={setLatitude} keyboardType="numbers-and-punctuation" className="min-h-12 rounded-md border border-border bg-card px-3 text-foreground" />
