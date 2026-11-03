@@ -2,12 +2,12 @@
 
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
 import { canvas, DomEvent, svg, type GeoJSON as LeafletGeoJSON, type Polyline as LeafletPolyline, type LatLngExpression } from "leaflet";
-import { CircleMarker, GeoJSON, Polygon, Polyline, Tooltip, useMap } from "react-leaflet";
+import { CircleMarker, GeoJSON, Polygon, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
 import { Crosshair, MapPin, MapPinned } from "lucide-react";
 import { getTirkhaUrbanBlocksInBounds, tirkhaCityViews, tirkhaLandmarks, tirkhaParks, tirkhaRoads, tirkhaWaterways } from "@/lib/tirkha-map-data";
 import { acquireSpatialEngine } from "@/lib/spatial-engine-client";
 import type { SpatialBuildingFeature, SpatialRegionalFeature, SpatialRoadFeature, SpatialViewportResult } from "@/lib/spatial-engine-protocol";
-import { getDistrictAtPoint, getDistrictsIntersectingViewport } from "@/lib/districtBounds";
+import { getDistrictAtPoint, getDistrictsIntersectingViewport, isDistrictKey, type DistrictKey } from "@/lib/districtBounds";
 import { TirkhaMark } from "./tirkha-mark";
 
 type RoadProperties = NonNullable<SpatialRoadFeature["properties"]>;
@@ -251,6 +251,7 @@ export const TirkhaMapArtwork = memo(function TirkhaMapArtwork() {
 function SpatialArtworkData() {
   const map = useMap();
   const [view, setView] = useState<{ key: string; zoom: number; data: SpatialViewportResult } | null>(null);
+  const [fallbackDistrict, setFallbackDistrict] = useState<DistrictKey | null>(null);
   useEffect(() => {
     let active = true;
     let sequence = 0;
@@ -276,11 +277,21 @@ function SpatialArtworkData() {
         size: { x: size.x, y: size.y },
         ...(supabaseUrl && supabaseAnonKey ? { supabase: { url: supabaseUrl, anonKey: supabaseAnonKey } } : {}),
       };
+      const district = isDistrictKey(query.region) ? query.region : null;
+      // Keep newly added districts legible while their PostGIS feature packs are
+      // empty. Once a roads layer is returned by the worker, Tirkha's vectors
+      // become the complete map renderer for that district.
+      setFallbackDistrict(district);
       const key = [query.zoom, query.bounds.south, query.bounds.west, query.bounds.north, query.bounds.east].join(":");
       void engine?.query(query).then((data) => {
-        if (active && generation === sequence) setView({ key, zoom: query.zoom, data });
+        if (active && generation === sequence) {
+          setView({ key, zoom: query.zoom, data });
+          const hasDistrictRoads = data.roads.features.length > 0
+            || data.regionalFeatures.some((feature) => /road|street|highway/i.test(feature.properties.kind));
+          setFallbackDistrict(hasDistrictRoads ? null : district);
+        }
       }).catch(() => {
-        if (active && generation === sequence) setView(null);
+        if (active && generation === sequence) { setView(null); setFallbackDistrict(district); }
       });
     };
     queryViewport();
@@ -288,11 +299,23 @@ function SpatialArtworkData() {
     return () => { active = false; sequence++; unsubscribe(); engine?.release(); engine = null; };
   }, [map]);
 
-  return view ? <>
+  return <>
+    {fallbackDistrict && <TileLayer
+      key={`district-fallback-${fallbackDistrict}`}
+      url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+      maxNativeZoom={19}
+      maxZoom={28}
+      updateWhenZooming={false}
+      updateWhenIdle
+      keepBuffer={2}
+      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    />}
+    {view ? <>
     {view.data.roads.features.length >= 12 ? <DetailedRoadNetwork data={view.data.roads} placements={view.data.labels} /> : <CuratedRoadNetwork />}
     <DetailedBuildingFootprints data={view.data.buildings} zoom={view.zoom} />
     <RegionalSpatialFeatures features={view.data.regionalFeatures} />
-  </> : <CuratedRoadNetwork />;
+    </> : <CuratedRoadNetwork />}
+  </>;
 }
 
 function RegionalSpatialFeatures({ features }: { features: SpatialRegionalFeature[] }) {
