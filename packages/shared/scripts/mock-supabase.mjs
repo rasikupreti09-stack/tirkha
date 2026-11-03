@@ -18,7 +18,8 @@ export async function startMockSupabase(port = 54321) {
   const functions = {
     list_verified_professionals: ["p_category_slug","p_limit","p_offset"],
     create_booking_request: ["p_request_id","p_category_id","p_professional_id","p_service_address","p_job_details","p_scheduled_at","p_duration_minutes","p_latitude","p_longitude","p_resolved_address"],
-    create_diagnostic_booking_request: ["p_request_id","p_category_id","p_professional_id","p_service_address","p_job_details","p_scheduled_at","p_duration_minutes","p_latitude","p_longitude","p_resolved_address","p_diagnostic_summary","p_diagnostic_severity","p_diagnostic_urgency","p_suggested_parts"],
+    create_diagnostic_booking_request: ["p_request_id","p_category_id","p_professional_id","p_service_address","p_job_details","p_scheduled_at","p_duration_minutes","p_latitude","p_longitude","p_resolved_address","p_diagnostic_summary","p_diagnostic_severity","p_diagnostic_urgency","p_suggested_parts","p_map_region_key","p_service_offering_id"],
+    get_regional_service_catalog: ["p_map_region_key"],
     confirm_cod: ["p_booking_id"],
     get_booking_contact: ["p_booking_id"],
     transition_booking: ["p_booking_id","p_action"],

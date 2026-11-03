@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import seed from "@tirkha/shared/service-catalog";
-import { applyCatalogPriceOverride, catalogServiceSchema, diagnosticDraftSchema, marketplaceStateSchema, serviceTotal, type CatalogService, type DemoOrder, type DiagnosticDraft, type MarketplaceState } from "@tirkha/shared";
+import { applyCatalogPriceOverride, catalogServiceSchema, diagnosticDraftSchema, marketplaceStateSchema, serviceTotal, fallbackAvailability, isServiceBookableInRegion, operationalRegionFor, regionalCatalogRowSchema, type CatalogService, type DemoOrder, type DiagnosticDraft, type MarketplaceState } from "@tirkha/shared";
 import { useAuth } from "./auth-provider";
 import { MarketplaceOverlays } from "./marketplace-overlays";
 import { ServiceAssistant } from "./service-assistant";
@@ -25,7 +25,7 @@ export function useMarketplace(){const value=useContext(Context);if(!value)throw
 export function MarketplaceProvider({children}:{children:ReactNode}){
  const {client,session:authSession,loading:authLoading,signOut:clearAuthSession}=useAuth();
  const [state,setState]=useState(initial);
- const [services,setServices]=useState(()=>catalogServiceSchema.array().parse(seed).map(applyCatalogPriceOverride));
+ const [services,setServices]=useState<CatalogService[]>(()=>catalogServiceSchema.array().parse(seed).map(service=>({...applyCatalogPriceOverride(service),availability_status:fallbackAvailability(service,initial.region),availability_region:operationalRegionFor(initial.region)??undefined})));
  const [ready,setReady]=useState(false),[notice,setNotice]=useState(""),[modal,setModal]=useState<Modal>(null),[detail,setDetail]=useState<string|null>(null),[legalModal,setLegalModal]=useState<LegalTopic|null>(null);
  const checkoutAfterLogin=useRef(false);
  useEffect(()=>{
@@ -56,19 +56,22 @@ export function MarketplaceProvider({children}:{children:ReactNode}){
    if(resumeCheckout){checkoutAfterLogin.current=false;setModal("cart");setNotice("You’re signed in. Continue to the address step to place your map pin.");}
  },[ready,authLoading,authSession]);
  useEffect(()=>{if(ready)try{const data=JSON.stringify(state);if(localStorage.getItem(storageKey)!==data)localStorage.setItem(storageKey,data);}catch{setNotice("Browser storage is unavailable. Keep this tab open to retain your demo cart.");}},[state,ready]);
- useEffect(()=>{if(!client)return;const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),8000);
-   void (async()=>{try{const {data,error}=await client.from("service_offerings").select("*").eq("active",true).order("sort_order").abortSignal(controller.signal);
+ useEffect(()=>{if(!client){setServices(catalogServiceSchema.array().parse(seed).map(service=>({...applyCatalogPriceOverride(service),availability_status:fallbackAvailability(service,state.region),availability_region:operationalRegionFor(state.region)??undefined})));return;}const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),8000);
+   void (async()=>{try{const {data,error}=await client.rpc("get_regional_service_catalog",{p_map_region_key:state.region}).abortSignal(controller.signal);
      if(error)throw error;
-     const parsed=catalogServiceSchema.array().parse(data).map(applyCatalogPriceOverride);
-     if(!controller.signal.aborted&&parsed.length>0)setServices(parsed);
-   }catch{ /* Bundled catalog is the validated offline fallback. */ }finally{clearTimeout(timer);}})();
+     const rows=regionalCatalogRowSchema.array().parse(data);
+      const parsed=rows.map(row=>({...applyCatalogPriceOverride(row.service),availability_status:row.availability_status,availability_region:row.region_id}));
+     if(!controller.signal.aborted)setServices(parsed);
+   }catch{ /* Keep the bundled snapshot; its emerging-region pairs fail closed. */
+      if(!controller.signal.aborted)setServices(catalogServiceSchema.array().parse(seed).map(service=>({...applyCatalogPriceOverride(service),availability_status:fallbackAvailability(service,state.region),availability_region:operationalRegionFor(state.region)??undefined})));
+   }finally{clearTimeout(timer);}})();
    return()=>{controller.abort();clearTimeout(timer);};
- },[client]);
+ },[client,state.region]);
  useEffect(()=>{const timer=setInterval(()=>setState(s=>s.session && s.session.expires<=Date.now()?{...s,session:null}:s),60000);return()=>clearInterval(timer);},[]);
  useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(""),5000);return()=>clearTimeout(timer);},[notice]);
  function add(id:string,checkout=false){
    if(!ready)return;
-   const service=services.find(s=>s.id===id&&s.active);if(!service)return;
+   const service=services.find(s=>s.id===id&&s.active);if(!service)return;if(!isServiceBookableInRegion(service,state.region)){setNotice(`${service.title} is coming soon in ${state.region}.`);return;}
    setState(s=>{const line=s.cart.find(l=>l.id===id);return {...s,cart:line?s.cart.map(l=>l.id===id?{...l,quantity:Math.min(10,l.quantity+1)}:l):[...s.cart,{id,quantity:1}]};});
    setNotice(service.title+" added to your cart");
    if(checkout){setDetail(null);checkoutAfterLogin.current=true;if(!state.session)try{sessionStorage.setItem(checkoutAfterLoginKey,"1");}catch{/* The return marker is best-effort; the cart itself remains persisted. */}setModal(state.session?"cart":"auth");}
@@ -81,7 +84,7 @@ export function MarketplaceProvider({children}:{children:ReactNode}){
    if(!state.cart.length)throw new Error("Add a service to your cart.");
    if(input.address.trim().length<5)throw new Error("Enter a complete landmark or address.");
    if(!Number.isFinite(Date.parse(input.scheduled)) || Date.parse(input.scheduled)<=Date.now())throw new Error("Choose a future appointment.");
-   const items=state.cart.map(l=>{const s=services.find(s=>s.id===l.id&&s.active);if(!s)throw new Error("A service is no longer available. Remove it from the cart.");return {id:s.id,title:s.title,quantity:l.quantity,unit_paisa:serviceTotal(s)};});
+   const items=state.cart.map(l=>{const s=services.find(s=>s.id===l.id&&s.active);if(!s)throw new Error("A service is no longer available. Remove it from the cart.");if(!isServiceBookableInRegion(s,state.region))throw new Error(`${s.title} is not available in ${state.region} yet. Remove it or choose another area.`);return {id:s.id,title:s.title,quantity:l.quantity,unit_paisa:serviceTotal(s)};});
    const order:DemoOrder={...input,address:input.address.trim(),diagnostic:state.diagnostic_draft??undefined,id:crypto.randomUUID(),created:new Date().toISOString(),region:state.region,items,total_paisa:items.reduce((t,i)=>t+i.quantity*i.unit_paisa,0),status:"requested",demo:true};
    setState(s=>({...s,cart:[],orders:[order,...s.orders].slice(0,20),diagnostic_draft:null}));setModal("orders");setNotice("Demo booking saved on this browser. No provider has been dispatched.");
  }

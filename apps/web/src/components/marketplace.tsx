@@ -1,13 +1,14 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MapPin, ArrowUpRight, ArrowRight, Search, ShoppingBag, Wrench, Sparkles, HeartPulse, BookOpen, ShieldCheck, Clock3, Check, Menu, X } from "lucide-react";
-import { REGIONS, catalogPriceLabel, catalogServiceMatchesQuery, inRegion, translateCatalogLabel, translatePriceLabel, translateUi, type CatalogService, type UiTranslationKey } from "@tirkha/shared";
+import { REGIONS, catalogPriceLabel, catalogServiceMatchesQuery, fallbackAvailability, isServiceBookableInRegion, translateCatalogLabel, translatePriceLabel, translateUi, type CatalogService, type UiTranslationKey } from "@tirkha/shared";
 import { useMarketplace } from "./marketplace-provider";
 import { useAuth } from "./auth-provider";
 import { LanguageSwitcher, useLanguage } from "./language-provider";
 import { TirkhaMark } from "./tirkha-mark";
 const categories: readonly (readonly [UiTranslationKey, typeof Sparkles])[] = [["allServices",Sparkles],["homeRepairs",Wrench],["cleaning",Sparkles],["careWellness",HeartPulse],["everydaySupport",BookOpen]];
-const openingSeenKey = "tirkha.opening-story.seen.v1";
+const openingSeenKey = "tirkha.opening-story.seen.v1";const regionTranslationKeys:Record<string,UiTranslationKey>={"Kathmandu Valley":"valley",Kathmandu:"city",Lalitpur:"lalitpur",Bhaktapur:"bhaktapur",Kirtipur:"kirtipur",Pokhara:"pokhara",Hetauda:"hetauda",Simara:"simara",Chitwan:"chitwan",Jhapa:"jhapa",Sunsari:"sunsari"};
+function localizedRegion(region:string,language:"en"|"np"){return translateUi(regionTranslationKeys[region]??"valley",language);}
 
 function OpeningStory() {
  const [visible,setVisible]=useState(true);
@@ -51,15 +52,18 @@ function OpeningStory() {
 }
 
 export function ServiceCard({service,compact=false}:{service:CatalogService;compact?:boolean}){
- const {add,setDetail,ready}=useMarketplace();
+ const {add,setDetail,ready,state}=useMarketplace();
  const {language}=useLanguage();
  const title=translateCatalogLabel(service.title,language);
+ const available=isServiceBookableInRegion(service,state.region);
+ const status=service.availability_status??fallbackAvailability(service,state.region);
+ const availabilityLabel=status==="available"?translateUi("serviceAvailable",language):status==="paused"?`${translateUi("pausedIn",language)} ${state.region}`:`${translateUi("comingSoonIn",language)} ${state.region}`;
  return <article className={compact?"mk-card mk-card-compact":"mk-card"}>
    <button className="mk-image-button" onClick={()=>setDetail(service.id)} aria-label={`${translateUi("viewService",language)} ${title}`}><img src={service.image} alt={`Local professional providing ${title.toLowerCase()} in a Kathmandu Valley home`} loading="lazy" width={900} height={600}/><span className="mk-image-tag">{translateCatalogLabel(service.category_name,language)}</span></button>
    <div className="mk-card-body"><div className="mk-card-meta"><span><Clock3 size={13}/>{service.duration_minutes} {translateUi("minutesShort",language)}</span><span>{translateUi("atDoorstep",language)}</span></div>
      <button className="mk-title-button" onClick={()=>setDetail(service.id)}><h3>{title}</h3></button>
      {!compact&&<p>{language === "np" ? translateCatalogLabel(service.description,language) : service.description}</p>}
-     <div className="mk-card-bottom"><div className="mk-card-price"><small>{translateUi("listedRate",language)}{service.pricing_unit ? ` · ${translateCatalogLabel(service.pricing_unit,language)}` : ""}</small><strong>{translatePriceLabel(catalogPriceLabel(service),language)}</strong>{service.pricing_note&&<small className="mk-card-price-note">{translateCatalogLabel(service.pricing_note,language)}</small>}</div><button className="mk-add" disabled={!ready} onClick={()=>add(service.id)} aria-label={`${translateUi("add",language)} ${title} ${language === "np" ? "कार्टमा" : "to cart"}`}>{translateUi("add",language)} <span>+</span></button></div>
+     <div className="mk-card-bottom"><div className="mk-card-price"><small>{translateUi("listedRate",language)}{service.pricing_unit ? ` · ${translateCatalogLabel(service.pricing_unit,language)}` : ""}</small><strong>{translatePriceLabel(catalogPriceLabel(service),language)}</strong><small className={"mk-availability "+(available?"is-available":"is-coming-soon")} aria-label={availabilityLabel}>{availabilityLabel}</small>{service.pricing_note&&<small className="mk-card-price-note">{translateCatalogLabel(service.pricing_note,language)}</small>}</div><button className="mk-add" disabled={!ready||!available} onClick={()=>add(service.id)} aria-label={`${translateUi("add",language)} ${title} ${language === "np" ? "कार्टमा" : "to cart"}`}>{available?translateUi("add",language):translateUi(status==="paused"?"pausedIn":"comingSoonIn",language)} {!available&&<span>{state.region}</span>}{available&&<span>+</span>}</button></div>
    </div>
  </article>;
 }
@@ -69,13 +73,13 @@ export function Marketplace(){
  const {language}=useLanguage();
  const tr=(key:UiTranslationKey)=>translateUi(key,language);
  const [query,setQuery]=useState(""),[vertical,setVertical]=useState("All services"),[nav,setNav]=useState(false);
- const filtered=useMemo(()=>services.filter(s=>s.active&&inRegion(s,state.region)&&(vertical==="All services"||s.vertical===vertical)&&catalogServiceMatchesQuery(s,query)),[services,state.region,vertical,query]);
+ const filtered=useMemo(()=>services.filter(s=>s.active&&(vertical==="All services"||s.vertical===vertical)&&catalogServiceMatchesQuery(s,query)),[services,state.region,vertical,query]);
  const count=state.cart.reduce((sum,l)=>sum+l.quantity,0);
  const signedIn=Boolean(session||state.session);
  return <><OpeningStory/><div className="mk">
   <div className="mk-announcement">{tr("tagline")} <span>{tr("madeForNepal")} <ArrowUpRight size={12}/></span></div>
   <header className="mk-header"><a href="/" className="mk-brand" aria-label="Tirkha | तिर्खा home"><TirkhaMark className="mk-brand-mark"/><span className="mk-brand-name">Tirkha <span className="mk-brand-nepali">| तिर्खा</span></span></a>
-   <label className="mk-region"><MapPin size={17}/><span className="sr-only">{language === "np" ? "सेवा क्षेत्र" : "Service region"}</span><select value={state.region} onChange={e=>setRegion(e.target.value as typeof state.region)}>{REGIONS.map(r=><option key={r} value={r}>{translateUi(r === "Pokhara" ? "pokhara" : r === "Kathmandu" ? "city" : r === "Lalitpur" ? "lalitpur" : r === "Bhaktapur" ? "bhaktapur" : r === "Kirtipur" ? "kirtipur" : r === "Hetauda" ? "hetauda" : r === "Simara" ? "simara" : "valley",language)}</option>)}</select></label>
+   <label className="mk-region"><MapPin size={17}/><span className="sr-only">{language === "np" ? "सेवा क्षेत्र" : "Service region"}</span><select value={state.region} onChange={e=>setRegion(e.target.value as typeof state.region)}>{REGIONS.map(r=><option key={r} value={r}>{localizedRegion(r,language)}</option>)}</select></label>
    <nav className={nav?"mk-nav mk-nav-open":"mk-nav"} aria-label="Main navigation"><a href="#catalog" onClick={()=>setNav(false)}>{tr("exploreServices")}</a><a href="/map" onClick={()=>setNav(false)}>{tr("ourMap")}</a><a href="#how-it-works" onClick={()=>setNav(false)}>{tr("howItWorks")}</a><button onClick={()=>{setModal("orders");setNav(false);}}>{tr("myBookings")}</button></nav>
    <div className="mk-header-actions"><LanguageSwitcher/><button className="mk-bag" onClick={()=>setModal("cart")} aria-label={language === "np" ? `कार्ट खोल्नुहोस्, ${count} वस्तु` : `Open cart, ${count} items`}><ShoppingBag size={20}/>{count>0&&<span>{count}</span>}</button>
    <button className="mk-login" disabled={!ready} onClick={()=>signedIn?logout():setModal("auth")}>{signedIn?tr("signOut"):tr("signIn")}</button><button className="mk-mobile-nav" aria-label={nav?"Close navigation":"Open navigation"} onClick={()=>setNav(!nav)}>{nav?<X/>:<Menu/>}</button></div>
@@ -97,7 +101,7 @@ export function Marketplace(){
    <section className="mk-discovery" id="catalog"><div className="mk-section-top"><div><span className="mk-kicker">{tr("discoveryEyebrow")}</span><h2>{tr("discoveryTitle")}</h2><p>{tr("discoverySub")}</p></div>
      <label className="mk-search"><Search size={18}/><input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder={tr("searchServices")} aria-label={language === "np" ? "सेवा खोज्नुहोस्" : "Search services"}/></label></div>
      <div className="mk-category-tabs" aria-label={language === "np" ? "सेवा वर्गहरू" : "Service categories"}>{categories.map(([key,Icon])=>{const label=translateUi(key,language);const verticalKey=key === "allServices" ? "All services" : key === "homeRepairs" ? "Home repairs" : key === "careWellness" ? "Care & wellness" : key === "everydaySupport" ? "Everyday support" : "Cleaning";return <button key={key} aria-pressed={vertical===verticalKey} className={vertical===verticalKey?"is-active":""} onClick={()=>setVertical(verticalKey)}><Icon size={19}/>{label}</button>;})}</div>
-     <div className="mk-results-label"><span>{filtered.length} {tr("servicesCount")}</span><span><MapPin size={13}/>{translateUi(state.region === "Pokhara" ? "pokhara" : state.region === "Kathmandu" ? "city" : state.region === "Lalitpur" ? "lalitpur" : state.region === "Bhaktapur" ? "bhaktapur" : state.region === "Hetauda" ? "hetauda" : state.region === "Simara" ? "simara" : "valley",language)}</span></div>
+     <div className="mk-results-label"><span>{filtered.length} {tr("servicesCount")}</span><span><MapPin size={13}/>{localizedRegion(state.region,language)}</span></div>
      <div className="mk-grid">{filtered.map(service=><ServiceCard key={service.id} service={service}/>)}</div>
      {!filtered.length&&<div className="mk-empty"><Search/><h3>{tr("noMatches")}</h3><p>{tr("noMatchesHint")}</p><button className="mk-primary" onClick={()=>{setQuery("");setVertical("All services");}}>{tr("showAll")}</button></div>}
      <p className="mk-price-note">{tr("priceNote")}</p>

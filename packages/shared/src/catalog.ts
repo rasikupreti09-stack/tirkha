@@ -6,14 +6,30 @@ export const catalogServiceSchema = z.object({
  base_paisa:z.number().int().nonnegative().max(100000000), visit_paisa:z.number().int().nonnegative().max(100000000),
  price_max_paisa:z.number().int().nonnegative().max(100000000).optional(), pricing_mode:z.enum(["fixed","starting_at","range"]).optional(), pricing_unit:z.string().optional(), pricing_note:z.string().optional(),
  duration_minutes:z.number().int().positive(), description:z.string(), included:z.array(z.string()), excluded:z.array(z.string()),
- keywords:z.array(z.string()), image:z.string().startsWith("/images/"), regions:z.array(z.string()),active:z.boolean(),sort_order:z.number().int(),
+ keywords:z.array(z.string()), image:z.string().startsWith("/images/"), regions:z.array(z.string()),active:z.boolean(),sort_order:z.number().int(),availability_status:z.enum(["available","coming_soon","paused"]).optional(),availability_region:z.string().optional(),
 });
 export type CatalogService=z.infer<typeof catalogServiceSchema>;
 export const REGIONS=["Kathmandu Valley","Kathmandu","Lalitpur","Bhaktapur","Kirtipur","Pokhara","Hetauda","Simara","Chitwan","Jhapa","Sunsari"] as const;
-export function inRegion(service:CatalogService, region:string) {
- const valleyCities=["Kathmandu","Lalitpur","Bhaktapur","Kirtipur"];
- return region==="Kathmandu Valley"||region==="Kirtipur" ? service.regions.some(r=>valleyCities.includes(r)) : service.regions.includes(region);
+export const operationalRegionSchema=z.enum(["kathmandu-valley","pokhara","hetauda","simara","chitwan","jhapa","sunsari"]);
+export type OperationalRegion=z.infer<typeof operationalRegionSchema>;
+export const regionalCatalogRowSchema=z.object({service:catalogServiceSchema,availability_status:z.enum(["available","coming_soon","paused"]),region_id:operationalRegionSchema,region_name:z.string().min(1)});
+export type RegionalCatalogRow=z.infer<typeof regionalCatalogRowSchema>;
+const regionAliases:Record<(typeof REGIONS)[number],OperationalRegion>={"Kathmandu Valley":"kathmandu-valley",Kathmandu:"kathmandu-valley",Lalitpur:"kathmandu-valley",Bhaktapur:"kathmandu-valley",Kirtipur:"kathmandu-valley",Pokhara:"pokhara",Hetauda:"hetauda",Simara:"simara",Chitwan:"chitwan",Jhapa:"jhapa",Sunsari:"sunsari"};
+export function operationalRegionFor(region:string):OperationalRegion|null{return region in regionAliases?regionAliases[region as keyof typeof regionAliases]:null;}
+/** Legacy arrays are trusted only for originally-listed Valley and Pokhara coverage. */
+export function fallbackAvailability(service:CatalogService,region:string):"available"|"coming_soon"{
+ const operational=operationalRegionFor(region);
+ if(operational==="kathmandu-valley")return service.regions.some(value=>["Kathmandu","Lalitpur","Bhaktapur","Kirtipur","Kathmandu Valley"].includes(value))?"available":"coming_soon";
+ if(operational==="pokhara")return service.regions.includes("Pokhara")?"available":"coming_soon";
+ return "coming_soon";
 }
+export function isServiceBookableInRegion(service:CatalogService,region:string){
+ const selected=operationalRegionFor(region);
+ if(!service.active||!selected)return false;
+ if(service.availability_region&&service.availability_region!==selected)return false;
+ return (service.availability_status??fallbackAvailability(service,region))==="available";
+}
+export function inRegion(service:CatalogService,region:string){return fallbackAvailability(service,region)==="available";}
 export function serviceTotal(service:CatalogService){const priced=applyCatalogPriceOverride(service);return priced.base_paisa+priced.visit_paisa;}
 export function catalogMoney(paisa:number){return "Rs. "+new Intl.NumberFormat("en-NP",{maximumFractionDigits:2}).format(paisa/100);}
 export function catalogPriceLabel(service:CatalogService){

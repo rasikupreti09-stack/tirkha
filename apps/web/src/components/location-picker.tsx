@@ -17,29 +17,22 @@ function isInRegion(latitude: number, longitude: number, region: typeof REGIONS[
   const bounds = boundsForRegion(region);
   return !!bounds && latitude >= bounds.south && latitude <= bounds.north && longitude >= bounds.west && longitude <= bounds.east;
 }
-function inferRegion(pin: MapPin | null): typeof REGIONS[number] {
-  if (!pin) return "Kathmandu Valley";
-  if (isInRegion(pin.latitude, pin.longitude, "Kathmandu Valley")) return "Kathmandu Valley";
-  return tirkhaCityViews.find(view => isInRegion(pin.latitude, pin.longitude, view.label as typeof REGIONS[number]))?.label as typeof REGIONS[number] | undefined ?? "Kathmandu Valley";
-}
-export function LocationPicker({ value, onChange, disabled = false }: { value: MapPin | null; onChange: (pin: MapPin | null) => void; disabled?: boolean }) {
+export function LocationPicker({ value, onChange, region, onRegionChange, disabled = false }: { value: MapPin | null; onChange: (pin: MapPin | null) => void; region: typeof REGIONS[number]; onRegionChange: (region: typeof REGIONS[number]) => void; disabled?: boolean }) {
   const lookup = usePinResolution(value, onChange, disabled);
   const id = useId();
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const [inputError, setInputError] = useState("");
-  const [region, setRegion] = useState<typeof REGIONS[number]>(() => inferRegion(value));
   useEffect(() => {
     setLatitude(value ? String(value.latitude) : "");
     setLongitude(value ? String(value.longitude) : "");
     setInputError("");
-    if (value) setRegion(current => isInRegion(value.latitude, value.longitude, current) ? current : inferRegion(value));
   }, [value?.latitude, value?.longitude]);
   return <div className="space-y-3">
     <p className="text-sm text-muted-foreground">Choose your service region, then tap the map or drag the pin. The pin stays inside that region. This optional pin is saved with your booking.</p>
     <p className="text-xs font-medium text-emerald-800">Selected region: {region}</p>
     <div className="overflow-hidden rounded-lg border border-border"><LocationMap region={region} serviceAreaOnly onRegionChange={nextRegion => {
-      setRegion(nextRegion);
+      onRegionChange(nextRegion);
       if (value && !isInRegion(value.latitude, value.longitude, nextRegion)) onChange(null);
     }} value={value} onPick={point => {
       if (!isInRegion(point.latitude, point.longitude, region)) { setInputError("Choose a point inside the selected service region."); return; }

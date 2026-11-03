@@ -34,7 +34,7 @@ test("pilot journey across every migration: signup → browse → landmark → b
   const requestId = randomUUID(), attemptId = randomUUID(), nonce = randomUUID();
   const customerDevice = randomUUID(), proDevice = randomUUID();
   const schedule = defaultNepalSchedule();
-  const createBooking = () => db.query("select row_to_json(b) data from public.create_booking_request($1,$2,$3,$4,$5,$6,$7) b", [requestId,category,ids.professional,"Lalitpur, Ward 4, Near Patan Dhoka","Repair the leaking kitchen tap",nepalDateTimeToIso(schedule.date,schedule.time),90]);
+  const createBooking = () => db.query("select row_to_json(b) data from public.create_diagnostic_booking_request($1,$2,$3,$4,$5,$6,$7,null,null,null,null,null,null,'{}','Lalitpur','sink-leak') b", [requestId,category,ids.professional,"Lalitpur, Ward 4, Near Patan Dhoka","Repair the leaking kitchen tap",nepalDateTimeToIso(schedule.date,schedule.time),90]);
   const transition = async (status) => (await db.query("select row_to_json(b) data from public.transition_booking($1,$2) b", [booking.id,status])).rows[0].data;
   await t.test("signup provisions customer and pending professional without self-verification", async () => {
     for (const [name,id] of Object.entries(ids)) {
@@ -64,7 +64,9 @@ test("pilot journey across every migration: signup → browse → landmark → b
     assert.equal(booking.total_price_paisa,18827);assert.equal(booking.status,"requested");
     assert.equal((await createBooking()).rows[0].data.id,booking.id);
     await admin();const queue=(await db.query("select * from public.push_outbox")).rows;
-    assert.equal(queue.length,1);assert.equal(queue[0].recipient_id,ids.professional);
+    assert.equal(queue.length,2);
+    assert.deepEqual(queue.map(row=>row.kind).sort(),["hero_dispatch","job_status"]);
+    assert.ok(queue.every(row=>row.recipient_id===ids.professional));
   });
   await t.test("acceptance and participant chat enforce access, replay safety and Realtime publication",async()=>{
     await as(ids.professional);booking=await transition("accepted");
@@ -129,7 +131,7 @@ test("pilot journey across every migration: signup → browse → landmark → b
   await t.test("completed COD work writes a single private 12.5% Hero commission ledger entry",async()=>{
     const codRequest=randomUUID(),codSchedule=new Date(Date.now()+3*86400000).toISOString();
     await as(ids.customer);
-    const codBooking=(await db.query("select row_to_json(b) data from public.create_booking_request($1,$2,$3,$4,$5,$6,$7) b",[codRequest,category,ids.professional,"Kathmandu, New Baneshwor","Repair a leaking sink pipe",codSchedule,60])).rows[0].data;
+    const codBooking=(await db.query("select row_to_json(b) data from public.create_diagnostic_booking_request($1,$2,$3,$4,$5,$6,$7,null,null,null,null,null,null,'{}','Kathmandu','sink-leak') b",[codRequest,category,ids.professional,"Kathmandu, New Baneshwor","Repair a leaking sink pipe",codSchedule,60])).rows[0].data;
     await db.query("select * from public.confirm_cod($1)",[codBooking.id]);
     await as(ids.professional);
     const move=async(action)=>(await db.query("select row_to_json(b) data from public.transition_booking($1,$2) b",[codBooking.id,action])).rows[0].data;

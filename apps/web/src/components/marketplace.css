@@ -349,3 +349,7 @@
 @keyframes tirkha-splash-glow{to{opacity:.45;transform:scale(1.07)}}
 @media(max-width:650px){.tirkha-splash-logo{width:98px;height:98px}.tirkha-splash-orbit{width:118px;height:118px}.tirkha-splash-name{font-size:36px}}
 @media(prefers-reduced-motion:reduce){.tirkha-launch-splash,.tirkha-splash-content,.tirkha-splash-logo,.tirkha-splash-orbit,.tirkha-splash-glow,.tirkha-splash-loader i{animation:none;transition:none}.tirkha-splash-content{opacity:1}}
+.mk-availability{display:inline-flex;width:max-content;max-width:100%;margin-top:7px;padding:4px 8px;border:1px solid #d8e4dc;border-radius:999px;font-size:10px;line-height:1.25;font-weight:700;white-space:normal}
+.mk-availability.is-available{color:#176b4d;background:#edf7f1}
+.mk-availability.is-coming-soon{color:#75541d;background:#fbf5e8;border-color:#eadbb9}
+.mk-add:disabled{cursor:not-allowed;opacity:.66}

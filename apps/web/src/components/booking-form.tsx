@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { DIAGNOSTIC_PREFILL_STORAGE_KEY, diagnosticBookingPrefillSchema, DURATION_OPTIONS, NEPAL_AREA_SUGGESTIONS, formatNpr, hourlyRateLabel, formatBookingDate } from "@tirkha/shared";
+import { DIAGNOSTIC_PREFILL_STORAGE_KEY, diagnosticBookingPrefillSchema, DURATION_OPTIONS, NEPAL_AREA_SUGGESTIONS, formatNpr, hourlyRateLabel, formatBookingDate, isServiceBookableInRegion } from "@tirkha/shared";
 import { useBookingDraft } from "@/hooks/use-booking-draft";
 import { useAuth } from "./auth-provider";
 import { useMarketplace } from "./marketplace-provider";
@@ -42,10 +42,16 @@ function DemoBookingHandoff({ slug }: { slug: string }) {
       }
     } catch { /* Continue using the selected catalog service without a draft. */ }
     const serviceSlug = prefill?.category_slug || slug;
-    const service = services.find(item => item.active && item.category_slug === serviceSlug);
+    const service = services.find(item => item.active && item.id === prefill?.service_offering_id)
+      ?? services.find(item => item.active && item.category_slug === serviceSlug && isServiceBookableInRegion(item,state.region));
     if (!service) {
       initiated.current = true;
       setMessage("This demo request could not be matched to a catalog service. Browse the catalog and choose a service to continue.");
+      return;
+    }
+    if (!isServiceBookableInRegion(service,state.region)) {
+      initiated.current = true;
+      setMessage(`${service.title} is coming soon in ${state.region}. Return to the catalog to choose an available service or another region.`);
       return;
     }
     initiated.current = true;
@@ -81,6 +87,12 @@ function BookingFields({ slug, inspectionOnly }: { slug: string; inspectionOnly:
             <option value="">Select a service</option>{form.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
           </select>
         </div>
+        <div className="space-y-2"><Label htmlFor="booking-offering">Specific service</Label>
+          <select id="booking-offering" value={form.serviceOfferingId} onChange={event=>form.setServiceOfferingId(event.target.value)} className={selectStyle} required>
+              <option value="">Select a service</option>{form.offerings.map(service=><option key={service.id} value={service.id}>{service.title}{isServiceBookableInRegion(service,form.mapRegion)?"":` — ${service.availability_status==="paused"?"Temporarily unavailable":"Coming soon"} in ${form.mapRegion}`}</option>)}
+          </select>
+          {form.selectedOffering&&!form.offeringAvailable&&<p role="status" className="text-sm text-amber-800">{form.selectedOffering.title} is not bookable in {form.mapRegion} yet. Choose another service or select a supported region.</p>}
+        </div>
         <div className="space-y-2"><Label htmlFor="booking-professional">Professional</Label>
           <select id="booking-professional" value={form.professionalId} onChange={(event) => form.setProfessionalId(event.target.value)} className={selectStyle} disabled={!form.categoryId || form.proLoading}>
             <option value="">Unassigned — let an eligible professional accept</option>
@@ -97,7 +109,8 @@ function BookingFields({ slug, inspectionOnly }: { slug: string; inspectionOnly:
         <div className="space-y-2"><Label htmlFor="booking-duration">{inspectionOnly ? "Appointment duration window" : "Estimated duration"}</Label><select id="booking-duration" value={form.duration} onChange={(event) => form.setDuration(Number(event.target.value))} className={selectStyle}>{DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</select></div>
         <section className="space-y-4 rounded-lg border bg-card p-5" aria-labelledby="address-heading">
           <h2 id="address-heading" className="text-lg font-semibold">Service location</h2>
-          <LocationPicker value={form.location.map_pin ?? null} onChange={form.setPin} disabled={form.busy || form.loading} />
+          <div className="space-y-2"><Label htmlFor="booking-region">Service region</Label><select id="booking-region" value={form.mapRegion} onChange={event=>form.setMapRegion(event.target.value as typeof form.mapRegion)} className={selectStyle}>{form.regions.map(region=><option key={region} value={region}>{region}</option>)}</select><p className="text-xs text-muted-foreground">Booking availability is checked for this region before your request is saved.</p></div>
+          <LocationPicker value={form.location.map_pin ?? null} onChange={form.setPin} region={form.mapRegion} onRegionChange={form.setMapRegion} disabled={form.busy || form.loading} />
           {form.savedLocation && <Button type="button" variant="outline" className="h-auto min-h-11 whitespace-normal text-left" onClick={form.useSavedLocation}>Use saved location: {form.savedLocation.municipality}, {form.savedLocation.landmark}</Button>}
           <div className="space-y-2"><Label htmlFor="booking-city">Municipality or area</Label><Input id="booking-city" list="booking-municipalities" value={form.location.municipality} onChange={(event) => form.setLocation({ ...form.location, municipality: event.target.value })} maxLength={100} />
             <datalist id="booking-municipalities">{NEPAL_AREA_SUGGESTIONS.map((area) => <option key={area.municipality} value={area.municipality} />)}</datalist></div>
@@ -115,7 +128,7 @@ function BookingFields({ slug, inspectionOnly }: { slug: string; inspectionOnly:
           {form.estimateError && <p role="alert" className="mt-2">{form.estimateError}</p>}
         </div>
         {form.error && <p role="alert" className="rounded-md border p-4 text-sm">{form.error} <Link href="/bookings" className="underline">My bookings</Link></p>}
-        <Button type="submit" className="min-h-11 w-full" disabled={form.busy || !!form.estimateError}>{form.busy ? "Submitting request…" : inspectionOnly ? "Request on-site inspection" : "Submit booking request"}</Button>
+        <Button type="submit" className="min-h-11 w-full" disabled={form.busy || !!form.estimateError || !form.offeringAvailable}>{form.busy ? "Submitting request…" : inspectionOnly ? "Request on-site inspection" : "Submit booking request"}</Button>
       </fieldset>
     </form>
   </main>;

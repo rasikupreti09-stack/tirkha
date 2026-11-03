@@ -50,7 +50,7 @@ test("provider tracking enforces ordered transitions, ownership, retry safety, c
   await db.query("insert into public.professional_service_categories values($1,$2)",[ids.professional,category]);
   await as(ids.customer);
   await db.query("select public.register_push_device($1,$2)",["ExponentPushToken[tracking_customer]",randomUUID()]);
-  const create=async()=>(await db.query("select row_to_json(b) data from public.create_booking_request($1,$2,null,'Near Baneshwor chowk','Repair kitchen tap please',$3,60) b",[randomUUID(),category,new Date(Date.now()+86400000).toISOString()])).rows[0].data;
+  const create=async()=>(await db.query("select row_to_json(b) data from public.create_diagnostic_booking_request($1,$2,null,'Kathmandu, near Baneshwor chowk','Repair kitchen tap please',$3,60,null,null,null,null,null,null,'{}','Kathmandu Valley','sink-leak') b",[randomUUID(),category,new Date(Date.now()+86400000).toISOString()])).rows[0].data;
   let booking=await create();const overlap=await create();
   const transition=async(action,id=booking.id)=>(await db.query("select row_to_json(b) data from public.transition_booking($1,$2) b",[id,action])).rows[0].data;
   await assert.rejects(transition("on_the_way"),/VERIFIED_PROFESSIONAL_REQUIRED/);

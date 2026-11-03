@@ -127,6 +127,7 @@ export function detectHomeSafetyRisk(text: string): "electric" | "water-electric
 export const DIAGNOSTIC_PREFILL_STORAGE_KEY = "tirkha.booking-diagnostic.v1";
 export const diagnosticBookingPrefillSchema = z.object({
   category_slug: z.string().trim().min(1).max(80),
+  service_offering_id: z.string().trim().min(1).max(100).optional(),
   duration_minutes: z.number().int().min(15).max(480),
   diagnostic: diagnosticDraftSchema,
 });

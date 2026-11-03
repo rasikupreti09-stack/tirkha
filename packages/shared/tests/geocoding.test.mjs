@@ -33,7 +33,7 @@ test("saved pins round-trip; incomplete coordinates and orphan labels are reject
   const pin = { latitude:27.69,longitude:85.34,resolved_address:"Baneshwor, Kathmandu" };
   const location = { municipality:"Kathmandu",landmark:"Baneshwor chowk",map_pin:pin };
   assert.deepEqual(locationPreferenceSchema.parse(JSON.parse(JSON.stringify(location))),location);
-  const request = { request_id:randomUUID(),category_id:randomUUID(),professional_id:null,service_address:"Near Baneshwor chowk",job_details:"Please repair the kitchen tap",scheduled_at:new Date(Date.now()+86400000).toISOString(),duration_minutes:60 };
+  const request = { request_id:randomUUID(),map_region_key:"Kathmandu Valley",service_offering_id:"sink-leak",category_id:randomUUID(),professional_id:null,service_address:"Near Baneshwor chowk",job_details:"Please repair the kitchen tap",scheduled_at:new Date(Date.now()+86400000).toISOString(),duration_minutes:60 };
   assert.equal(bookingRequestSchema.safeParse({...request,...pin}).success,true);
   for (const extra of [{latitude:27.69},{longitude:85.34},{resolved_address:"Baneshwor"},{...pin,latitude:Infinity}]) assert.equal(bookingRequestSchema.safeParse({...request,...extra}).success,false);
   assert.equal(bookingRequestSchema.safeParse(request).success,true);
@@ -44,7 +44,7 @@ test("migration 07 persists pins, protects retries, and enforces a private globa
   await db.query("insert into auth.users(id,raw_user_meta_data) values($1,$2)",[ids.customer,{full_name:"Map customer",requested_role:"customer"}]);
   const category=(await db.query("select id from public.service_categories where slug='plumbing'")).rows[0].id;
   const args=[randomUUID(),category,null,"Baneshwor, Kathmandu, near chowk","Please repair the kitchen tap",new Date(Date.now()+86400000).toISOString(),60,27.69,85.34,"Baneshwor, Kathmandu"];
-  const create=async(values)=>(await db.query("select row_to_json(b) data from public.create_booking_request($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) b",values)).rows[0].data;
+  const create=async(values)=>(await db.query("select row_to_json(b) data from public.create_diagnostic_booking_request($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,null,null,null,'{}',$11,$12) b",[...values,"Kathmandu Valley","sink-leak"])).rows[0].data;
   await as(ids.customer);
   const booking=workflowBookingSchema.parse(await create(args));
   assert.equal(booking.latitude,27.69); assert.equal(booking.longitude,85.34); assert.equal(booking.resolved_address,"Baneshwor, Kathmandu");

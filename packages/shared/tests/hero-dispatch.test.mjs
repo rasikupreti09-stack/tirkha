@@ -13,7 +13,7 @@ test("diagnostic booking dispatches a private live alert only to nearby verified
   await admin();
   await db.query("insert into auth.users(id,raw_user_meta_data) values($1,$2),($3,$4),($5,$6)", [far, { requested_role: "professional", full_name: "Far Hero" }, customer, { requested_role: "customer", full_name: "Test Customer" }, nearby, { requested_role: "professional", full_name: "Nearby Hero" }]);
   await prepareVerifiedHero(nearby);
-  await prepareVerifiedHero(far);
+  await prepareVerifiedHero(far, "Pokhara");
   const category = (await db.query("select id from public.service_categories where slug='plumbing'")).rows[0].id;
   await db.query("insert into public.professional_service_categories values($1,$2),($3,$2)", [nearby, category, far]);
   const installLocation = async (id, latitude, longitude) => {
@@ -21,12 +21,12 @@ test("diagnostic booking dispatches a private live alert only to nearby verified
     await db.query("select public.update_hero_location($1,$2,null,null,null,null)", [latitude, longitude]);
   };
   await installLocation(nearby, 27.7000, 85.3200);
-  await installLocation(far, 28.2000, 85.3200);
+  await installLocation(far, 28.2000, 83.9900);
 
   await as(customer);
   const requestId = randomUUID();
   const booking = (await db.query(`select row_to_json(b) data from public.create_diagnostic_booking_request(
-    $1,$2,null,$3,$4,$5,60,$6,$7,$8,$9,$10,$11,$12
+    $1,$2,null,$3,$4,$5,60,$6,$7,$8,$9,$10,$11,$12,'Kathmandu Valley','sink-leak'
   ) b`, [requestId, category, "Kathmandu, Ward 10, near Baneshwor", "AI triage: tap leak; inspect before work.", new Date(Date.now() + 86400000).toISOString(), 27.7010, 85.3210, "New Baneshwor, Kathmandu", "Tap leak: customer reports water below sink; cause not confirmed.", "Getting worse", "soon", ["Tap washer or cartridge (inspect first)"]])).rows[0].data;
   assert.equal(booking.status, "requested");
   assert.deepEqual(booking.suggested_parts, ["Tap washer or cartridge (inspect first)"]);

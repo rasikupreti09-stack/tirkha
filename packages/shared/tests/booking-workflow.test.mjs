@@ -42,7 +42,7 @@ test("booking RPCs enforce ownership, pricing, retries, job transitions and read
   for (const id of [pro, competitor, pending, electrician]) await db.query("insert into public.professional_service_categories values ($1,$2)", [id, id === electrician ? electrical : plumbing]);
   const actor = async (id) => { await db.exec("reset role"); await db.query("select set_config('request.jwt.claim.sub',$1,false)", [id]); await db.exec("set role authenticated"); };
   const appointment = new Date(Date.now() + 7 * 86400000).toISOString();
-  const payload = (overrides = {}) => ({ request_id: randomUUID(), category_id: plumbing, professional_id: null, service_address: "Lalitpur, Ward 4, Near Patan Dhoka", job_details: "Repair leaking kitchen tap", scheduled_at: appointment, duration_minutes: 30, ...overrides });
+  const payload = (overrides = {}) => ({ request_id: randomUUID(), map_region_key: "Lalitpur", service_offering_id: "sink-leak", category_id: plumbing, professional_id: null, service_address: "Lalitpur, Ward 4, Near Patan Dhoka", job_details: "Repair leaking kitchen tap", scheduled_at: appointment, duration_minutes: 30, ...overrides });
   const create = async (p) => (await db.query("select row_to_json(b) data from public.create_booking_request($1,$2,$3,$4,$5,$6,$7) b", [p.request_id,p.category_id,p.professional_id,p.service_address,p.job_details,p.scheduled_at,p.duration_minutes])).rows[0].data;
   const change = async (id, action) => (await db.query("select row_to_json(b) data from public.transition_booking($1,$2) b", [id, action])).rows[0].data;
   const rejects = async (promise, message) => assert.rejects(promise, (e) => e.message === message);

@@ -130,9 +130,11 @@ export const workflowBookingSchema = bookingSchema.safeExtend({
   hourly_rate_paisa: paisaSchema.nullable(),
   client_request_id: z.uuid().nullable(),
   updated_at: timestampSchema,
+  service_offering_id: z.string().min(1).max(100).nullable().optional(),
   diagnostic_summary: z.string().max(1200).nullable().optional(),
   diagnostic_severity: z.string().max(120).nullable().optional(),
   diagnostic_urgency: z.enum(["routine", "soon", "urgent"]).nullable().optional(),
+  service_region_id: z.enum(["kathmandu-valley", "pokhara", "hetauda", "simara", "chitwan", "jhapa", "sunsari"]).nullable().optional(),
   suggested_parts: z.array(z.string().max(100)).max(12).optional(),
 });
 export const bookingRequestSchema = z.strictObject({
@@ -140,6 +142,8 @@ export const bookingRequestSchema = z.strictObject({
   longitude: coordinatesSchema.shape.longitude.nullable().optional(),
   resolved_address: mapPinSchema.shape.resolved_address.optional(),
   request_id: z.uuid(),
+  map_region_key: z.enum(["Kathmandu Valley", "Kathmandu", "Lalitpur", "Bhaktapur", "Kirtipur", "Pokhara", "Hetauda", "Simara", "Chitwan", "Jhapa", "Sunsari"]),
+  service_offering_id: z.string().trim().min(1).max(100),
   category_id: z.uuid(),
   professional_id: z.uuid().nullable(),
   service_address: z.string().trim().min(5, "Enter your municipality and landmark.").max(500),

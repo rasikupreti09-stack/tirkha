@@ -84,6 +84,9 @@ export function bookingErrorMessage(error: unknown): string {
   const messages: Record<string, string> = {
     PAYMENT_REVIEW_REQUIRED: "Check payment status first. A pending or paid booking needs payment review or a refund before cancellation. Contact support.",
     CUSTOMER_REQUIRED: "Only customer accounts can create booking requests.",
+    SERVICE_NOT_AVAILABLE_IN_REGION: "This service is not available to book in the selected region yet. Choose a different area or service.",
+    SERVICE_REGION_REQUIRED: "Choose a service region before submitting your booking.",
+    INVALID_SERVICE_REGION: "The selected service region is unavailable. Refresh and choose a valid area.",
     REQUEST_ID_REUSED: "This request changed after submission. Check My bookings before creating a new request.",
     INVALID_SCHEDULE: "Choose a future appointment within the next year.",
     INVALID_DURATION: "Choose a duration between 30 minutes and 8 hours.",

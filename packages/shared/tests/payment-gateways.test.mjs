@@ -44,10 +44,10 @@ test("gateway payloads preserve integer paisa and reject mismatched or unverifie
 test("payment methods enforce COD ownership, cross-gateway locks, server settlement and immutable job progress", async t => {
   const {db,ids,as,admin}=await createPilotFixture();t.after(()=>db.close());
   for(const id of [ids.customer,ids.outsider]) await db.query("insert into auth.users(id,raw_user_meta_data) values($1,$2)",[id,{full_name:"Payment customer",requested_role:"customer"}]);
-  const category=(await db.query("select id from public.service_categories limit 1")).rows[0].id;
+  const category=(await db.query("select id from public.service_categories where slug='plumbing'")).rows[0].id;
   async function booking() {
     await as(ids.customer);
-    const row=(await db.query("select * from public.create_booking_request($1,$2,null,'Near Baneshwor chowk','Repair a kitchen tap',$3,60)",[randomUUID(),category,new Date(Date.now()+86400000).toISOString()])).rows[0];
+    const row=(await db.query("select * from public.create_diagnostic_booking_request($1,$2,null,'Kathmandu, near Baneshwor chowk','Repair a kitchen tap',$3,60,null,null,null,null,null,null,'{}','Kathmandu Valley','sink-leak')",[randomUUID(),category,new Date(Date.now()+86400000).toISOString()])).rows[0];
     await admin();await db.query("update public.bookings set total_price_paisa=12345 where id=$1",[row.id]);return row;
   }
   const cod=await booking();await as(ids.outsider);

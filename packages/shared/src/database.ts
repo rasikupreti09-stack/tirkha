@@ -20,6 +20,9 @@ export type Database = {
       professional_profiles: Table<ProfessionalProfile, Pick<ProfessionalProfile, "profile_id"> & Partial<Omit<ProfessionalProfile, "profile_id">>, Partial<ProfessionalProfile>>;
       service_categories: Table<ServiceCategory, Pick<ServiceCategory, "name" | "slug"> & Partial<Omit<ServiceCategory, "name" | "slug">>, Partial<ServiceCategory>>;
       bookings: Table<WorkflowBooking, Pick<WorkflowBooking, "customer_id" | "category_id" | "service_address" | "scheduled_at"> & Partial<Omit<WorkflowBooking, "customer_id" | "category_id" | "service_address" | "scheduled_at">>, Partial<WorkflowBooking>>;
+      service_regions: Table<{ id: string; display_name: string; hero_operational_zone: string | null; enabled: boolean; created_at: string; updated_at: string }, never, Partial<{ id: string; display_name: string; hero_operational_zone: string | null; enabled: boolean; updated_at: string }>>;
+      service_region_aliases: Table<{ map_region_key: string; service_region_id: string; display_name: string }, never, never>;
+      service_region_availability: Table<{ service_offering_id: string; service_region_id: string; status: "available" | "coming_soon" | "paused"; updated_at: string; updated_by: string | null }, never, { status?: "available" | "coming_soon" | "paused"; updated_at?: string; updated_by?: string | null }>;
       professional_service_categories: Table<{ professional_id: string; category_id: string }, { professional_id: string; category_id: string }, { professional_id?: string; category_id?: string }>;
       professional_job_quotes: Table<ProfessionalJobQuote, never, never>;
       completed_transactions: Table<CompletedTransaction, never, never>;
@@ -35,6 +38,7 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
+      get_regional_service_catalog: { Args: { p_map_region_key: string }; Returns: unknown };
       get_booking_contact: { Args: { p_booking_id: string }; Returns: { full_name: string | null; phone: string }[] };
       submit_hero_registration: { Args: { p_full_name: string; p_phone: string; p_trade_code: "PLUMBING" | "ELECTRICAL" | "APPLIANCE_TECHNICIAN" | "BEAUTICIAN" | "PAINTER" | "CLEANER" | "HANDYMAN"; p_operational_zone: "Kathmandu Valley" | "Pokhara" | "Hetauda" | "Simara"; p_document_path: string }; Returns: VerificationStatus };
       admin_set_hero_status: { Args: { p_profile_id: string; p_status: "verified" | "rejected" | "suspended" }; Returns: undefined };
@@ -65,7 +69,7 @@ export type Database = {
         Args: { p_request_id: string; p_category_id: string; p_professional_id: string | null; p_service_address: string; p_job_details: string; p_scheduled_at: string; p_duration_minutes: number; p_latitude?: number | null; p_longitude?: number | null; p_resolved_address?: string | null };
         Returns: WorkflowBooking[];
       };
-      create_diagnostic_booking_request: { Args: { p_request_id: string; p_category_id: string; p_professional_id: string | null; p_service_address: string; p_job_details: string; p_scheduled_at: string; p_duration_minutes: number; p_latitude?: number | null; p_longitude?: number | null; p_resolved_address?: string | null; p_diagnostic_summary?: string | null; p_diagnostic_severity?: string | null; p_diagnostic_urgency?: "routine" | "soon" | "urgent" | null; p_suggested_parts?: string[] }; Returns: WorkflowBooking[] };
+      create_diagnostic_booking_request: { Args: { p_request_id: string; p_category_id: string; p_professional_id: string | null; p_service_address: string; p_job_details: string; p_scheduled_at: string; p_duration_minutes: number; p_latitude?: number | null; p_longitude?: number | null; p_resolved_address?: string | null; p_diagnostic_summary?: string | null; p_diagnostic_severity?: string | null; p_diagnostic_urgency?: "routine" | "soon" | "urgent" | null; p_suggested_parts?: string[]; p_map_region_key: string; p_service_offering_id: string }; Returns: WorkflowBooking[] };
       transition_booking: { Args: { p_booking_id: string; p_action: string }; Returns: WorkflowBooking[] };
       update_professional_presence: { Args: { p_latitude: number; p_longitude: number; p_heading?: number | null }; Returns: undefined };
       update_hero_location: { Args: { p_latitude: number; p_longitude: number; p_heading?: number | null; p_speed_mps?: number | null; p_battery_level?: number | null; p_active_booking_id?: string | null }; Returns: undefined };

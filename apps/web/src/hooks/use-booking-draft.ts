@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import {
   bookingRequestSchema, diagnosticBookingPrefillSchema, DIAGNOSTIC_PREFILL_STORAGE_KEY, DURATION_OPTIONS, formatNpr, locationPreferenceSchema, locationToAddress, nepalDateTimeToIso,
   defaultNepalSchedule, estimateLabourPaisa, bookingErrorMessage, LOCATION_STORAGE_KEY,
-  PROFESSIONAL_PAGE_SIZE, type ServiceCategory, type PublicProfessional, type WorkflowBooking, type LocationPreference, type MapPin,
+  PROFESSIONAL_PAGE_SIZE, REGIONS, isServiceBookableInRegion, type CatalogService, type ServiceCategory, type PublicProfessional, type WorkflowBooking, type LocationPreference, type MapPin,
 } from "@tirkha/shared";
 import { loadCategories, loadProfessionals } from "../lib/discovery";
 import { createBooking } from "../lib/bookings";
+import { useMarketplace } from "../components/marketplace-provider";
 
 function diagnosticJobDetails(prefill: ReturnType<typeof diagnosticBookingPrefillSchema.parse>) {
   const { diagnostic, duration_minutes: duration } = prefill;
@@ -30,8 +31,10 @@ function diagnosticJobDetails(prefill: ReturnType<typeof diagnosticBookingPrefil
   ].filter(Boolean).join("\n").slice(0, 2000);
 }
 export function useBookingDraft(initialSlug = "", inspectionOnly = false) {
+  const { state: marketplaceState, services: catalogServices, setRegion } = useMarketplace();
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [categoryId, setCategoryId] = useState("");
+  const [serviceOfferingId, setServiceOfferingId] = useState("");
   const [professionalId, setProfessionalId] = useState("");
   const [professionals, setProfessionals] = useState<{ category: string; items: PublicProfessional[] }>({ category: "", items: [] });
   const [proPage, setProPage] = useState(0);
@@ -51,7 +54,11 @@ export function useBookingDraft(initialSlug = "", inspectionOnly = false) {
   const [created, setCreated] = useState<WorkflowBooking | null>(null);
   const busyRef = useRef(false);
   const requestRef = useRef<{ signature: string; id: string } | null>(null);
+  const previousRegion = useRef(marketplaceState.region);
   const selectedCategory = categories.find((item) => item.id === categoryId);
+  const offerings: CatalogService[] = catalogServices.filter((item) => item.active && item.category_slug === selectedCategory?.slug);
+  const selectedOffering = offerings.find((item) => item.id === serviceOfferingId);
+  const offeringAvailable = Boolean(selectedOffering && isServiceBookableInRegion(selectedOffering, marketplaceState.region));
   const choices = professionals.category === categoryId ? professionals.items : [];
   const selectedProfessional = choices.find((item) => item.profile_id === professionalId);
   let estimate: number | null = null;
@@ -70,6 +77,17 @@ export function useBookingDraft(initialSlug = "", inspectionOnly = false) {
     return () => { active = false; };
   }, [initialSlug, dataAttempt]);
   useEffect(() => {
+    if (!offerings.length) { setServiceOfferingId(""); return; }
+    setServiceOfferingId(current => offerings.some(item => item.id === current && isServiceBookableInRegion(item, marketplaceState.region))
+      ? current
+      : (offerings.find(item => isServiceBookableInRegion(item, marketplaceState.region)) ?? offerings[0]).id);
+  }, [categoryId, marketplaceState.region, catalogServices]);
+  useEffect(() => {
+    if (previousRegion.current === marketplaceState.region) return;
+    previousRegion.current = marketplaceState.region;
+    setLocation(current => ({ ...current, map_pin: undefined }));
+  }, [marketplaceState.region]);
+  useEffect(() => {
     let active = true;
     let prefill: ReturnType<typeof diagnosticBookingPrefillSchema.parse> | null = null;
     try {
@@ -79,6 +97,7 @@ export function useBookingDraft(initialSlug = "", inspectionOnly = false) {
         if (result.success) {
           prefill = result.data;
           setDiagnostic(result.data.diagnostic);
+          if (result.data.service_offering_id) setServiceOfferingId(result.data.service_offering_id);
           setDetails(diagnosticJobDetails(result.data));
           if ((DURATION_OPTIONS as readonly number[]).includes(result.data.duration_minutes)) setDuration(result.data.duration_minutes);
         }
@@ -121,6 +140,8 @@ export function useBookingDraft(initialSlug = "", inspectionOnly = false) {
     setError("");
     try {
       if (!selectedCategory) throw new Error("Choose a service category.");
+      if (!selectedOffering) throw new Error("Choose a specific catalog service.");
+      if (!offeringAvailable) throw new Error(`${selectedOffering.title} is not available in ${marketplaceState.region} yet.`);
       if (professionalId && !selectedProfessional) throw new Error("Choose a listed professional, or an unassigned request.");
       if (estimateError) throw new Error(estimateError);
       const address = locationPreferenceSchema.safeParse(location);
@@ -143,8 +164,10 @@ export function useBookingDraft(initialSlug = "", inspectionOnly = false) {
         "Preliminary routing only; confirm on site. No AI price or repair approval.",
       ].filter(Boolean).join("; ").slice(0, 1200) : undefined;
       const payload = {
-        category_id: categoryId, professional_id: inspectionOnly ? null : professionalId || null,
-        service_address: locationToAddress(address.data), job_details: inspectionOnly ? `${details.slice(0, 1750)}\n\nInspection request: no AI price or repair approval. Require an on-site inspection and written quote before work.` : details,
+        category_id: categoryId, map_region_key: marketplaceState.region, service_offering_id: selectedOffering.id, professional_id: inspectionOnly ? null : professionalId || null,
+        service_address: locationToAddress(address.data), job_details: inspectionOnly ? `${details.slice(0, 1750)}
+
+Inspection request: no AI price or repair approval. Require an on-site inspection and written quote before work.` : details,
         latitude: address.data.map_pin?.latitude ?? null, longitude: address.data.map_pin?.longitude ?? null,
         resolved_address: address.data.map_pin?.resolved_address ?? null,
         diagnostic_summary: diagnosticSummary,
@@ -167,7 +190,7 @@ export function useBookingDraft(initialSlug = "", inspectionOnly = false) {
     } catch (error) { setError(error instanceof Error ? error.message : "Check your booking details."); }
   }
   return {
-    categories, categoryId, professionalId, choices, loading, proLoading, hasMore,
+    categories, categoryId, serviceOfferingId, offerings, selectedOffering, offeringAvailable, professionalId, choices, loading, mapRegion: marketplaceState.region, regions: REGIONS, setMapRegion: setRegion, proLoading, hasMore,
     dataError, error, location, savedLocation, schedule, duration, details, busy, created,
     estimate, estimateError, selectedProfessional,
     setPin(pin: MapPin | null) {
@@ -178,7 +201,8 @@ export function useBookingDraft(initialSlug = "", inspectionOnly = false) {
       }));
     },
     setLocation, setSchedule, setDuration, setDetails, setProfessionalId,
-    changeCategory(id: string) { setCategoryId(id); setProfessionalId(""); setProPage(0); setProfessionals({ category: "", items: [] }); setHasMore(false); },
+    setServiceOfferingId,
+    changeCategory(id: string) { setCategoryId(id); setServiceOfferingId(""); setProfessionalId(""); setProPage(0); setProfessionals({ category: "", items: [] }); setHasMore(false); },
     useSavedLocation() { if (savedLocation) setLocation({ ...savedLocation, ward: savedLocation.ward || "" }); },
     loadMore() { setProPage((page) => page + 1); },
     retryData() { setDataAttempt((count) => count + 1); },

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import seed from "../src/service-catalog.json" with { type: "json" };
-import { assistantReply, catalogServiceMatchesQuery, catalogServiceSchema, codCommissionPaisa, getServiceQuickRecommendations, matchServices, normalizeServiceSearchQuery, serviceTotal } from "../src/catalog.ts";
+import { assistantReply, catalogServiceMatchesQuery, catalogServiceSchema, fallbackAvailability, inRegion, isServiceBookableInRegion, operationalRegionFor, codCommissionPaisa, getServiceQuickRecommendations, matchServices, normalizeServiceSearchQuery, serviceTotal } from "../src/catalog.ts";
 import { buildDemoPaymentQrUrl } from "../src/payments.ts";
 
 test("seeded marketplace catalog has complete scopes, usable images and integer NPR estimates", () => {
@@ -74,6 +74,20 @@ test("assistant gives measured follow-up guidance and escalates household hazard
   assert.match(safety.text, /matches the provider details/);
 });
 
+test("regional availability maps Valley aliases and fails closed for unconfirmed regions", () => {
+  const service = catalogServiceSchema.parse(seed.find(item => item.id === "sink-leak"));
+  assert.equal(operationalRegionFor("Lalitpur"), "kathmandu-valley");
+  assert.equal(operationalRegionFor("Kirtipur"), "kathmandu-valley");
+  assert.equal(fallbackAvailability(service, "Kathmandu"), "available");
+  assert.equal(fallbackAvailability(service, "Pokhara"), "available");
+  for (const region of ["Hetauda", "Simara", "Chitwan", "Jhapa", "Sunsari"]) {
+    assert.equal(fallbackAvailability(service, region), "coming_soon", region);
+    assert.equal(inRegion(service, region), false, region);
+  }
+  assert.equal(isServiceBookableInRegion({...service, availability_status:"paused"}, "Kathmandu"), false);
+  assert.equal(isServiceBookableInRegion({...service, availability_status:"available"}, "Hetauda"), true);
+  assert.equal(isServiceBookableInRegion({...service, availability_status:"available", availability_region:"kathmandu-valley"}, "Hetauda"), false, "stale region results fail closed while a new region loads");
+});
 test("COD commission helper rounds integer paisa and restricts platform rates to 10–15%", () => {
   assert.equal(codCommissionPaisa(18827), 2353);
   assert.equal(codCommissionPaisa(10000, 1000), 1000);
