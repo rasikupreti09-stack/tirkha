@@ -12,7 +12,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "653f131b-22cd-49c6-8f2f-d266a38b4ace"
+      }
+    },
+    "owner": "rasikupreti09"
   }
 }
-
