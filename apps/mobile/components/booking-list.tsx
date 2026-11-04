@@ -23,9 +23,14 @@ function Records({ account, professional }: { account: Account; professional: bo
   const [page, setPage] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [dispatchRefresh, setDispatchRefresh] = useState(0);
   const busyRef = useRef(false);
   const verified = account.professional?.verification_status === "verified";
   const feed = useBookingFeed(account.profile.id, account.profile.role, mode, page);
+  const refresh = () => {
+    feed.refresh();
+    if (professional && mode === "available") setDispatchRefresh((value) => value + 1);
+  };
   async function update(booking: WorkflowBooking, action: BookingAction) {
     if (busyRef.current) return;
     busyRef.current = true; setBusy(booking.id); setMessage("");
@@ -40,20 +45,20 @@ function Records({ account, professional }: { account: Account; professional: bo
   }
   const modes: { key: BookingListMode; label: string }[] = [...(professional ? [{ key: "available" as const, label: "Available" }] : []), { key: "active", label: professional ? "Assigned" : "Active" }, { key: "completed", label: "Completed" }, { key: "cancelled", label: "Cancelled" }];
   return <FlatList className="flex-1 bg-background" contentContainerStyle={{ padding: 24, paddingBottom: 48, flexGrow: 1 }} data={feed.items} keyExtractor={(item) => item.id}
-    refreshing={feed.loading} onRefresh={feed.refresh}
+    refreshing={feed.loading} onRefresh={refresh}
     ListHeaderComponent={<View className="mb-6">
       <Link href="/(app)/dashboard" className="mb-6 py-3 text-primary underline">← Dashboard</Link>
       <Text accessibilityRole="header" className="text-3xl font-semibold text-primary">{professional ? "Hero Dispatch · Professional jobs" : "My bookings"}</Text>
       {!professional && <Link href="/(app)/book" className="mt-4 rounded-md bg-primary p-4 text-center font-semibold text-primary-foreground">Request a service</Link>}
       {professional && verified && <HeroAvailabilityControl account={account} />}
-      {professional && verified && <HeroDispatchInbox onAccepted={feed.refresh} />}
+      {professional && verified && <HeroDispatchInbox refreshSignal={dispatchRefresh} />}
       {professional && <Text className="mt-4 text-muted-foreground">{verified ? "Available requests match your service categories. Confirm the landmark and appointment before accepting." : "Verification is required to view available requests and update jobs."}</Text>}
-      <View className="mt-6 flex-row flex-wrap gap-2">{modes.map((item) => <Action key={item.key} label={item.label} selected={mode === item.key} onPress={() => { setMode(item.key); setPage(0); setMessage(""); }} />)}<Action label="Refresh" onPress={feed.refresh} /></View>
-      <Text className="mt-4 text-xs text-muted-foreground">{feed.localMock ? "Local mock polling" : feed.live ? "Live updates connected" : "Connecting live updates"} · refreshes every 30 seconds</Text>
+      <View className="mt-6 flex-row flex-wrap gap-2">{modes.map((item) => <Action key={item.key} label={item.label} selected={mode === item.key} onPress={() => { setMode(item.key); setPage(0); setMessage(""); }} />)}<Action label="Refresh" onPress={refresh} /></View>
+      {!(professional && mode === "available") && <Text className="mt-4 text-xs text-muted-foreground">{feed.localMock ? "Local mock polling" : feed.live ? "Live updates connected" : "Connecting live updates"} · refreshes every 30 seconds</Text>}
       {!!message && <Text accessibilityRole="alert" className="mt-4 rounded-md border border-border p-4 text-foreground">{message}</Text>}
       {!!feed.error && <Text accessibilityRole="alert" className="mt-4 text-foreground">{feed.error}</Text>}
     </View>}
-    ListEmptyComponent={feed.loading ? <ActivityIndicator color={tokens.colors.primary} accessibilityLabel="Loading bookings" /> : !feed.error ? <Text className="text-muted-foreground">No bookings in this view.</Text> : null}
+    ListEmptyComponent={professional && mode === "available" ? null : feed.loading ? <ActivityIndicator color={tokens.colors.primary} accessibilityLabel="Loading bookings" /> : !feed.error ? <Text className="text-muted-foreground">No bookings in this view.</Text> : null}
     renderItem={({ item }) => <View className="mb-4 rounded-lg border border-border bg-card p-5">
       <Text accessibilityRole="header" className="text-xl font-semibold text-primary">{feed.categories.find((category) => category.id === item.category_id)?.name || "Service request"}</Text>
       <Text className="mt-3 self-start rounded-full bg-primary px-3 py-1 text-sm text-primary-foreground">{BOOKING_STATUS_LABELS[item.status]}</Text>
@@ -68,7 +73,7 @@ function Records({ account, professional }: { account: Account; professional: bo
       {professional ? <ProviderWorkflow booking={item} userId={account.profile.id} verified={verified} busy={busy !== null} updating={busy === item.id} onAction={(action) => confirm(item, action)} /> : <BookingTrackingCard booking={item} live={feed.live} localMock={feed.localMock} stale={!!feed.error} />}
       {!professional && <PaymentCheckout bookingId={item.id} amount={item.total_price_paisa} cancelled={item.status === "cancelled"} />}
     </View>}
-    ListFooterComponent={<View className="mt-6 flex-row items-center justify-between"><Action label="Previous" disabled={page === 0 || feed.loading} onPress={() => setPage((value) => value - 1)} /><Text className="text-foreground">Page {page + 1}</Text><Action label="Next" disabled={feed.items.length < BOOKING_PAGE_SIZE || feed.loading} onPress={() => setPage((value) => value + 1)} /></View>}
+    ListFooterComponent={professional && mode === "available" ? null : <View className="mt-6 flex-row items-center justify-between"><Action label="Previous" disabled={page === 0 || feed.loading} onPress={() => setPage((value) => value - 1)} /><Text className="text-foreground">Page {page + 1}</Text><Action label="Next" disabled={feed.items.length < BOOKING_PAGE_SIZE || feed.loading} onPress={() => setPage((value) => value + 1)} /></View>}
   />;
 }
 

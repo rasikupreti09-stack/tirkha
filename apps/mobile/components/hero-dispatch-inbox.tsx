@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, AppState, Linking, Pressable, Text, View } from "react-native";
 import { formatBookingDate, type Database } from "@tirkha/shared";
 import { useAuth } from "../providers/auth-provider";
@@ -7,38 +7,53 @@ import { changeBooking } from "../lib/bookings";
 import { tokens } from "@tirkha/shared";
 
 type DispatchNotice = Database["public"]["Tables"]["hero_dispatch_notifications"]["Row"];
-export function HeroDispatchInbox({ onAccepted }: { onAccepted: () => void }) {
+export function HeroDispatchInbox({ refreshSignal }: { refreshSignal: number }) {
   const { client, session } = useAuth();
   const userId = session?.user.id;
   const [items, setItems] = useState<DispatchNotice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const previousRefreshSignal = useRef(refreshSignal);
+  const activeRef = useRef(false);
+  const requestRef = useRef(0);
   const refresh = useCallback(async () => {
-    if (!client || !userId) return;
-    const { data, error: failure } = await client.from("hero_dispatch_notifications")
-      .select("*").eq("professional_id", userId).in("status", ["new", "seen"])
-      .order("created_at", { ascending: false }).limit(20);
-    if (failure) setError("Nearby alerts are temporarily unavailable. Pull to refresh your jobs.");
-    else { setItems(data ?? []); setError(""); }
-    setLoading(false);
+    if (!client || !userId) { setLoading(false); return; }
+    const request = ++requestRef.current;
+    try {
+      const { data, error: failure } = await client.from("hero_dispatch_notifications")
+        .select("*").eq("professional_id", userId).in("status", ["new", "seen"])
+        .order("created_at", { ascending: false }).limit(20);
+      if (!activeRef.current || request !== requestRef.current) return;
+      if (failure) setError("Nearby alerts are temporarily unavailable. Refresh to try again.");
+      else { setItems(data ?? []); setError(""); }
+    } catch {
+      if (activeRef.current && request === requestRef.current) setError("Nearby alerts are temporarily unavailable. Refresh to try again.");
+    } finally {
+      if (activeRef.current && request === requestRef.current) setLoading(false);
+    }
   }, [client, userId]);
   useEffect(() => {
     if (!client || !userId) return;
-    let active = true;
-    const load = () => { if (active) void refresh(); };
+    activeRef.current = true;
+    const load = () => { if (activeRef.current) void refresh(); };
     load();
     const channel = client.channel(`hero-dispatch:${userId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "hero_dispatch_notifications", filter: `professional_id=eq.${userId}` }, load)
       .subscribe();
     const timer = setInterval(load, 30_000);
     const appState = AppState.addEventListener("change", state => { if (state === "active") load(); });
-    return () => { active = false; clearInterval(timer); appState.remove(); void client.removeChannel(channel); };
+    return () => { activeRef.current = false; requestRef.current++; clearInterval(timer); appState.remove(); void client.removeChannel(channel); };
   }, [client, userId, refresh]);
+  useEffect(() => {
+    if (previousRefreshSignal.current === refreshSignal) return;
+    previousRefreshSignal.current = refreshSignal;
+    void refresh();
+  }, [refresh, refreshSignal]);
   async function accept(item: DispatchNotice) {
     if (busy) return;
     setBusy(item.id); setError("");
-    try { await changeBooking(item.booking_id, "accepted"); await refresh(); onAccepted(); }
+    try { await changeBooking(item.booking_id, "accepted"); await refresh(); }
     catch (failure) { setError(failure instanceof Error ? failure.message : "This request is no longer available. Refresh and try again."); await refresh(); }
     finally { setBusy(null); }
   }
