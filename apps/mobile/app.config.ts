@@ -7,18 +7,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const androidPackage = process.env.TIRKHA_ANDROID_PACKAGE?.trim() || "com.tirkha.app";
   const iosBundleIdentifier = process.env.TIRKHA_IOS_BUNDLE_ID?.trim() || "com.tirkha.app";
   const projectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID?.trim();
-  const androidMapsKey = process.env.GOOGLE_MAPS_ANDROID_API_KEY?.trim();
 
   for (const [label, value] of [["TIRKHA_ANDROID_PACKAGE", androidPackage], ["TIRKHA_IOS_BUNDLE_ID", iosBundleIdentifier]] as const) {
     if (!identifierPattern.test(value)) throw new Error(`${label} must be a valid reverse-domain application identifier.`);
   }
 
   // Fail before an EAS production build can ship with broken auth, missing server
-  // endpoints, a mock backend, or Android maps that render as a blank grid.
+  // endpoints or a mock backend.
   if (process.env.EAS_BUILD_PROFILE === "production" || process.env.EAS_BUILD_PROFILE === "preview") {
     const buildPlatform = process.env.EAS_BUILD_PLATFORM;
     const required = ["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY", "EXPO_PUBLIC_API_URL", "EXPO_PUBLIC_EAS_PROJECT_ID"];
-    if (buildPlatform !== "ios") required.push("GOOGLE_MAPS_ANDROID_API_KEY");
     const missing = required.filter((name) => !process.env[name]?.trim());
     if (missing.length) throw new Error(`Production mobile build is missing EAS environment variables: ${missing.join(", ")}.`);
     for (const name of ["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_API_URL"]) {
@@ -58,7 +56,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: [
       ...(config.plugins || []),
-      ["react-native-maps", { ...(androidMapsKey ? { androidGoogleMapsApiKey: androidMapsKey } : {}) }],
+      "@maplibre/maplibre-react-native",
       ["expo-location", { locationWhenInUsePermission: "Tirkha uses your location to place a customer service pin. Verified Heroes can choose Go online to share their own position for nearby dispatch and active jobs; GPS sharing pauses in the background." }],
     ],
     ...(projectId ? { updates: { ...config.updates, url: `https://u.expo.dev/${projectId}` }, runtimeVersion: { policy: "appVersion" } } : {}),

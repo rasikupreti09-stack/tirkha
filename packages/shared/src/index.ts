@@ -32,3 +32,4 @@ export * from "./universal-diagnostics.ts";
 
 export * from "./hero-portal";
 export * from "./i18n";
+export * from "./map-config";

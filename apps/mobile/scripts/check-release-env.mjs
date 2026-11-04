@@ -10,7 +10,6 @@ const required = [
   "EXPO_PUBLIC_API_URL",
   "EXPO_PUBLIC_EAS_PROJECT_ID",
 ];
-if (platform !== "ios") required.push("GOOGLE_MAPS_ANDROID_API_KEY");
 const missing = required.filter((name) => {
   const value = process.env[name]?.trim();
   return !value || value.includes("YOUR_");
