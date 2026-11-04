@@ -24,6 +24,8 @@ html { scroll-behavior: smooth; }
 .tirkha-vector-map .leaflet-overlay-pane canvas { will-change: transform; transform: translate3d(0, 0, 0); backface-visibility: hidden; }
 .tirkha-vector-map .leaflet-tooltip { text-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; }
 .tirkha-vector-map.leaflet-zoom-anim .leaflet-zoom-animated { transition-duration: 100ms !important; }
+.tirkha-vector-map .tirkha-current-location-marker { background: transparent; border: 0; }
+.tirkha-vector-map .tirkha-current-location-dot { display: block; width: 18px; height: 18px; border: 3px solid #fff; border-radius: 50%; background: #2563eb; box-shadow: 0 0 0 7px rgb(37 99 235 / 20%), 0 1px 6px rgb(15 23 42 / 35%); }
 .leaflet-tooltip.tirkha-place-label,
 .leaflet-tooltip.tirkha-city-label { border: 1px solid #d1d9d2; border-radius: 7px; padding: 4px 7px; background: #fffffff2; box-shadow: 0 2px 8px #0f172a26; color: #1f2937; font: 800 10px/1.2 Arial, sans-serif; letter-spacing: .08em; text-shadow: none; white-space: nowrap; }
 .leaflet-tooltip.tirkha-city-label { color: #064e3b; font-size: 11px; font-weight: 850; letter-spacing: .12em; }

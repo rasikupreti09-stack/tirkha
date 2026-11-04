@@ -15,7 +15,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
   // Fail before an EAS production build can ship with broken auth, missing server
   // endpoints, a mock backend, or Android maps that render as a blank grid.
-  if (process.env.EAS_BUILD_PROFILE === "production") {
+  if (process.env.EAS_BUILD_PROFILE === "production" || process.env.EAS_BUILD_PROFILE === "preview") {
     const buildPlatform = process.env.EAS_BUILD_PLATFORM;
     const required = ["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY", "EXPO_PUBLIC_API_URL", "EXPO_PUBLIC_EAS_PROJECT_ID"];
     if (buildPlatform !== "ios") required.push("GOOGLE_MAPS_ANDROID_API_KEY");
@@ -59,6 +59,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     plugins: [
       ...(config.plugins || []),
       ["react-native-maps", { ...(androidMapsKey ? { androidGoogleMapsApiKey: androidMapsKey } : {}) }],
+      ["expo-location", { locationWhenInUsePermission: "Tirkha uses your location to place the service pin at your home and help a Hero reach you." }],
     ],
     ...(projectId ? { updates: { ...config.updates, url: `https://u.expo.dev/${projectId}` }, runtimeVersion: { policy: "appVersion" } } : {}),
     extra: {

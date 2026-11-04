@@ -8,7 +8,7 @@ import { SpatialEngineErrorBoundary } from "./spatial-engine-error-boundary";
 import { tirkhaCityViews } from "@/lib/tirkha-map-data";
 import { NEPAL_LEAFLET_BOUNDS } from "@/lib/districtBounds";
 
-type Props = { value: MapPin | null; onPick: (point: Coordinates) => void; disabled: boolean; height?: number; region?: typeof REGIONS[number]; regionFocusKey?: number; serviceAreaOnly?: boolean; onRegionChange?: (region: typeof REGIONS[number]) => void; focusPinOnChange?: boolean };
+type Props = { value: MapPin | null; currentLocation?: Coordinates | null; autoLocate?: boolean; onPick: (point: Coordinates) => void; disabled: boolean; height?: number; region?: typeof REGIONS[number]; regionFocusKey?: number; serviceAreaOnly?: boolean; onRegionChange?: (region: typeof REGIONS[number]) => void; onLocated?: (point: Coordinates) => boolean | void; focusPinOnChange?: boolean };
 type RegionView = (typeof tirkhaCityViews)[number];
 type MapBounds = [[number, number], [number, number]];
 const valleyView: RegionView = {
@@ -107,6 +107,7 @@ export default function LocationMap(props: Props) {
   const [pinningEnabled, setPinningEnabled] = useState(false);
   const [locationError, setLocationError] = useState("");
   const [mapRegionFocusKey, setMapRegionFocusKey] = useState(0);
+  const autoLocateStarted = useRef(false);
   const disarmPinning = useCallback(() => setPinningEnabled(false), []);
   const previousRegionFocus = useRef(`${props.region ?? ""}:${props.regionFocusKey ?? 0}:${mapRegionFocusKey}`);
   const pinIcon = useMemo(() => divIcon({
@@ -114,6 +115,12 @@ export default function LocationMap(props: Props) {
     iconSize: [32, 32],
     iconAnchor: [16, 32],
     html: '<svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><path d="M16 31C13.7 27.7 3 20.1 3 14A13 13 0 1 1 29 14C29 20.1 18.3 27.7 16 31Z" fill="#047857" stroke="#f8fafc" stroke-width="1.5"/><circle class="tirkha-pin-pulse" cx="16" cy="14" r="6" fill="none" stroke="#d1fae5" stroke-width="2"/><circle cx="16" cy="14" r="2.5" fill="#f8fafc" stroke="#1f2937" stroke-width="1"/></svg>',
+  }), []);
+  const currentLocationIcon = useMemo(() => divIcon({
+    className: "tirkha-current-location-marker",
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+    html: '<span class="tirkha-current-location-dot" aria-label="Your current location"></span>',
   }), []);
   const availableRegionViews = tirkhaCityViews;
   const regionView = availableRegionViews.find(view => view.label === props.region)
@@ -130,7 +137,7 @@ export default function LocationMap(props: Props) {
     }
     previousRegionFocus.current = regionFocusSignature;
   }, [regionFocusSignature, props.region, regionView]);
-  const locateMe = () => {
+  const locateMe = useCallback(() => {
     if (!navigator.geolocation || locating || props.disabled) {
       if (!navigator.geolocation) setLocationError("This browser does not provide location access.");
       return;
@@ -138,17 +145,35 @@ export default function LocationMap(props: Props) {
     setLocating(true); setLocationError("");
     navigator.geolocation.getCurrentPosition(position => {
       const point = { latitude: position.coords.latitude, longitude: position.coords.longitude };
-      if (props.serviceAreaOnly && pinBounds && (point.latitude < pinBounds[0][0] || point.latitude > pinBounds[1][0]
+      if (!props.onLocated && props.serviceAreaOnly && pinBounds && (point.latitude < pinBounds[0][0] || point.latitude > pinBounds[1][0]
         || point.longitude < pinBounds[0][1] || point.longitude > pinBounds[1][1])) {
         setLocationError("Your current location is outside the selected Tirkha service region. Choose a region to place the pin there.");
         setLocating(false);
         return;
       }
       props.onPick(point);
-      mapRef.current?.flyTo([point.latitude, point.longitude], Math.max(16, mapRef.current.getZoom()), { animate: true, duration: 0.75 });
+      if (props.onLocated?.(point) === false) {
+        setLocationError("Your current position is outside the mapped Tirkha service regions. Choose a mapped region or set a location manually.");
+        setLocating(false);
+        return;
+      }
+      if (!props.onLocated) requestAnimationFrame(() => mapRef.current?.flyTo([point.latitude, point.longitude], Math.max(16, mapRef.current.getZoom()), { animate: true, duration: 0.75 }));
       setLocating(false);
-    }, () => { setLocationError("Location permission was unavailable. You can still tap the map or enter coordinates."); setLocating(false); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
-  };
+    }, error => {
+      const message = error.code === error.PERMISSION_DENIED
+        ? "Location permission is off. Allow it in your browser, then choose Use my location. You can still select a point manually."
+        : error.code === error.POSITION_UNAVAILABLE
+          ? "Your device could not determine a GPS position. Check Location/GPS settings and try again, or choose a point manually."
+          : "Location lookup timed out. Try Use my location again, or choose a point manually.";
+      setLocationError(message);
+      setLocating(false);
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
+  }, [locating, props.disabled, props.onLocated, props.onPick, props.serviceAreaOnly, pinBounds]);
+  useEffect(() => {
+    if (!props.autoLocate || autoLocateStarted.current) return;
+    autoLocateStarted.current = true;
+    locateMe();
+  }, [locateMe, props.autoLocate]);
   if (typeof window === "undefined") return <div className="h-[300px] w-full animate-pulse rounded-lg bg-slate-100" role="status">Loading map…</div>;
   return <>
     <div className="tirkha-map-frame">
@@ -161,6 +186,7 @@ export default function LocationMap(props: Props) {
         }} />
         <TirkhaMapZoomControl onLocate={locateMe} locating={locating} pinningEnabled={pinningEnabled} onTogglePinning={() => setPinningEnabled(value => !value)} />
         <Pin value={props.value} onPick={props.onPick} onPinPlaced={disarmPinning} disabled={props.disabled} focusPinOnChange={props.focusPinOnChange} pinningEnabled={pinningEnabled} icon={pinIcon} allowedBounds={pinBounds} />
+        {props.currentLocation && <Marker position={[props.currentLocation.latitude, props.currentLocation.longitude]} icon={currentLocationIcon} interactive={false} keyboard={false} title="Your current location" />}
       </MapContainer></SpatialEngineErrorBoundary>
       <TirkhaMapSignature caption="Kathmandu · Lalitpur · Bhaktapur · Kirtipur · Pokhara · Hetauda · Simara · Chitwan · Jhapa · Sunsari" />
     </div>
