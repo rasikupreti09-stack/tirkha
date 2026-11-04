@@ -1,7 +1,25 @@
 import { z } from "zod";
+import type { Coordinates } from "./schemas";
 
 export const HERO_TRADES = ["PLUMBING", "ELECTRICAL", "APPLIANCE_TECHNICIAN", "BEAUTICIAN", "PAINTER", "CLEANER", "HANDYMAN"] as const;
 export const HERO_OPERATIONAL_ZONES = ["Kathmandu Valley", "Pokhara", "Hetauda", "Simara"] as const;
+export const HERO_OPERATIONAL_REGION_BOUNDS: Readonly<Record<HeroOperationalZone, Readonly<{ south: number; west: number; north: number; east: number }>>> = {
+  "Kathmandu Valley": { south: 27.625, west: 85.245, north: 27.755, east: 85.465 },
+  Pokhara: { south: 28.175, west: 83.940, north: 28.255, east: 84.035 },
+  Hetauda: { south: 27.350, west: 84.970, north: 27.500, east: 85.120 },
+  Simara: { south: 27.120, west: 84.910, north: 27.240, east: 85.080 },
+};
+
+/** Keep client-side Hero GPS checks consistent across web and native clients. */
+export function isCoordinateInHeroOperationalZone(value: unknown, zone: string | null | undefined): value is Coordinates {
+  if (!value || typeof value !== "object" || !zone || !(zone in HERO_OPERATIONAL_REGION_BOUNDS)) return false;
+  const point = value as Partial<Coordinates>;
+  if (typeof point.latitude !== "number" || !Number.isFinite(point.latitude)
+    || typeof point.longitude !== "number" || !Number.isFinite(point.longitude)) return false;
+  const bounds = HERO_OPERATIONAL_REGION_BOUNDS[zone as HeroOperationalZone];
+  return point.latitude >= bounds.south && point.latitude <= bounds.north
+    && point.longitude >= bounds.west && point.longitude <= bounds.east;
+}
 export const heroTradeSchema = z.enum(HERO_TRADES);
 export const heroOperationalZoneSchema = z.enum(HERO_OPERATIONAL_ZONES);
 export const heroRegistrationSchema = z.strictObject({

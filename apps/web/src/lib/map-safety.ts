@@ -1,12 +1,5 @@
-import type { Coordinates } from "@tirkha/shared";
+import { isCoordinateInHeroOperationalZone, type Coordinates } from "@tirkha/shared";
 import { NEPAL_BOUNDS } from "./districtBounds";
-
-const OPERATIONAL_REGION_BOUNDS: Record<string, { south: number; west: number; north: number; east: number }> = {
-  "Kathmandu Valley": { south: 27.625, west: 85.245, north: 27.755, east: 85.465 },
-  Pokhara: { south: 28.175, west: 83.940, north: 28.255, east: 84.035 },
-  Hetauda: { south: 27.350, west: 84.970, north: 27.500, east: 85.120 },
-  Simara: { south: 27.120, west: 84.910, north: 27.240, east: 85.080 },
-};
 
 /** Numeric safety envelope for GPS and map API data (not a legal border polygon). */
 export function isNepalCoordinate(value: unknown): value is Coordinates {
@@ -20,10 +13,7 @@ export function isNepalCoordinate(value: unknown): value is Coordinates {
 
 /** Keep Hero availability aligned with the server-enforced operational zone. */
 export function isCoordinateInOperationalRegion(value: unknown, region: string | null | undefined): value is Coordinates {
-  if (!isNepalCoordinate(value) || !region) return false;
-  const bounds = OPERATIONAL_REGION_BOUNDS[region];
-  return !!bounds && value.latitude >= bounds.south && value.latitude <= bounds.north
-    && value.longitude >= bounds.west && value.longitude <= bounds.east;
+  return isNepalCoordinate(value) && isCoordinateInHeroOperationalZone(value, region);
 }
 
 /** Rejects malformed, stale, or implausibly future-dated location pings. */

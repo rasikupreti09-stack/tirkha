@@ -59,7 +59,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     plugins: [
       ...(config.plugins || []),
       ["react-native-maps", { ...(androidMapsKey ? { androidGoogleMapsApiKey: androidMapsKey } : {}) }],
-      ["expo-location", { locationWhenInUsePermission: "Tirkha uses your location to place the service pin at your home and help a Hero reach you." }],
+      ["expo-location", { locationWhenInUsePermission: "Tirkha uses your location to place a customer service pin. Verified Heroes can choose Go online to share their own position for nearby dispatch and active jobs; GPS sharing pauses in the background." }],
     ],
     ...(projectId ? { updates: { ...config.updates, url: `https://u.expo.dev/${projectId}` }, runtimeVersion: { policy: "appVersion" } } : {}),
     extra: {

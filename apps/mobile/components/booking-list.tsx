@@ -10,6 +10,7 @@ import type { Account } from "../hooks/use-account";
 import { useBookingFeed } from "../hooks/use-booking-feed";
 import { changeBooking } from "../lib/bookings";
 import { HeroDispatchInbox } from "./hero-dispatch-inbox";
+import { HeroAvailabilityControl } from "./hero-availability-control";
 
 function Action({ label, onPress, disabled = false, selected = false }: { label: string; onPress: () => void; disabled?: boolean; selected?: boolean }) {
   return <Pressable accessibilityRole="button" accessibilityState={{ disabled, selected }} disabled={disabled} onPress={onPress} className={`min-h-12 justify-center rounded-md border border-border px-4 py-3 ${selected ? "bg-primary" : "bg-card"} ${disabled ? "opacity-40" : ""}`}><Text className={selected ? "text-primary-foreground" : "text-primary"}>{label}</Text></Pressable>;
@@ -44,6 +45,7 @@ function Records({ account, professional }: { account: Account; professional: bo
       <Link href="/(app)/dashboard" className="mb-6 py-3 text-primary underline">← Dashboard</Link>
       <Text accessibilityRole="header" className="text-3xl font-semibold text-primary">{professional ? "Hero Dispatch · Professional jobs" : "My bookings"}</Text>
       {!professional && <Link href="/(app)/book" className="mt-4 rounded-md bg-primary p-4 text-center font-semibold text-primary-foreground">Request a service</Link>}
+      {professional && verified && <HeroAvailabilityControl account={account} />}
       {professional && verified && <HeroDispatchInbox onAccepted={feed.refresh} />}
       {professional && <Text className="mt-4 text-muted-foreground">{verified ? "Available requests match your service categories. Confirm the landmark and appointment before accepting." : "Verification is required to view available requests and update jobs."}</Text>}
       <View className="mt-6 flex-row flex-wrap gap-2">{modes.map((item) => <Action key={item.key} label={item.label} selected={mode === item.key} onPress={() => { setMode(item.key); setPage(0); setMessage(""); }} />)}<Action label="Refresh" onPress={feed.refresh} /></View>
