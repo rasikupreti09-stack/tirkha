@@ -1,10 +1,10 @@
 # Phase 8 — booking map locations
 
-Web bookings use Leaflet 1.9.4 / React Leaflet 5.0.0, loaded with SSR disabled.
-Native bookings use Expo 57's compatible react-native-maps 1.27.2. Both have
-reusable controlled `LocationPicker` components, manual coordinate entry,
-draggable pins, optional area lookup and a landmark fallback. The initial
-Kathmandu map center is not saved as a selection until the customer picks a pin.
+Web bookings use Leaflet / React Leaflet, loaded with SSR disabled. Native
+bookings use MapLibre Native (`@maplibre/maplibre-react-native` 11.5.1) with the
+public OpenFreeMap style. Both have controlled location pickers, draggable pins,
+manual address fallback and optional area lookup. The initial Kathmandu camera
+center is not saved as a selection until the customer picks a pin.
 
 ## Database and server setup
 
@@ -54,20 +54,22 @@ Pin coordinates remain at their original precision. OpenStreetMap attribution
 is visible on both pickers. The web map uses normal browser-cached OSM tiles,
 with no prefetch/offline-download feature; preserve its attribution and browser
 Referer headers per the [tile policy](https://operations.osmfoundation.org/policies/tiles/).
-Native maps use the platform provider and its built-in attribution.
+Native maps use the OpenFreeMap style with MapLibre attribution enabled.
 
-## Native build configuration
+## Native map and build configuration
 
-`apps/mobile/app.config.ts` registers the react-native-maps config plugin.
-For Android development/production builds, enable Maps SDK for Android and set
-`GOOGLE_MAPS_ANDROID_API_KEY` in the build environment. Restrict the key to the
-application package and signing certificate. Rebuild the native binary after
-changing the key or adding the native dependency; a JavaScript update alone
-does not install it. Do not commit a key. iOS uses Apple Maps by default and
-does not need a Google Maps key. See [Expo maps setup](https://docs.expo.dev/versions/latest/sdk/map-view/).
+The native app uses MapLibre Native and OpenFreeMap; the current setup does not
+require a Google Maps API key, Google Cloud billing, or `GOOGLE_MAPS_ANDROID_API_KEY`.
+Do not create or add that variable for this map implementation. The public map
+style is best-effort and has no service-level guarantee; map tiles need internet,
+so keep address entry available when tiles or GPS are unavailable. Preserve map
+attribution in the app.
 
-Expo Go uses its own map configuration. Expo's web renderer falls back to
-coordinate entry; the full browser map is in `apps/web`.
+MapLibre contains native code, so use an EAS development/preview build or another
+custom native build. Expo Go cannot load this native module. After changing
+MapLibre or its native configuration, create a new native build; a JavaScript
+update alone cannot install native code. The complete browser map remains in
+`apps/web`.
 
 ## Local pilot and verification
 
@@ -77,10 +79,11 @@ route returns **Kathmandu (local demo)** for pins in the Kathmandu pilot area.
 This is explicit fixture data, not a live reverse-geocoding result. Outside
 that area, enter the address manually. Map tiles themselves still need internet.
 
-Run `pnpm typecheck` and `pnpm test`. Tests cover label parsing/provider errors
-using a fake fetch transport, saved pins, database coordinate constraints,
-idempotent retries, private rate-limit/cache permissions and actual Supabase SDK
-booking round-trips against the local service. Tests do not query public OSM.
+Run `pnpm typecheck` and the relevant shared package tests. Tests cover label
+parsing/provider errors using a fake fetch transport, saved pins, database
+coordinate constraints, idempotent retries, private rate-limit/cache
+permissions and Supabase SDK booking round-trips against the local service.
+Tests do not query public OSM.
 
 Before a device pilot, verify tap/drag, manual coordinates, saved-pin restoration,
 lookup failure and retry, moving a pin during lookup, and the returned booking
