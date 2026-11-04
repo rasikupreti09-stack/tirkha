@@ -103,35 +103,6 @@ revoke all on public.hero_dispatch_notifications from public, anon, authenticate
 grant select on public.hero_dispatch_notifications to authenticated;
 grant all on public.hero_dispatch_notifications to service_role;
 
-drop policy if exists hero_dispatch_recipient_read on public.hero_dispatch_notifications;
-create policy hero_dispatch_recipient_read on public.hero_dispatch_notifications
-for select to authenticated
-using (
-  professional_id = (select auth.uid())
-  and exists (
-    select 1 from public.profiles p
-    join public.professional_profiles pp on pp.profile_id=p.id
-    where p.id=(select auth.uid()) and p.role='professional'
-      and pp.verification_status='verified' and pp.suspended_at is null
-      and pp.citizenship_document_path is not null
-      and hero_dispatch_notifications.trade_category=coalesce(pp.trade_category,pp.trade_code)
-  )
-  and exists (
-    select 1 from public.bookings b
-    join public.professional_service_categories pc
-      on pc.professional_id=(select auth.uid()) and pc.category_id=b.category_id
-    where b.id=hero_dispatch_notifications.booking_id
-      and (b.professional_id=(select auth.uid()) or
-        (b.professional_id is null and b.status='requested' and b.scheduled_at>now()
-          and b.service_region_id is not null
-          and exists (select 1 from public.service_regions sr
-            join public.professional_profiles pp on pp.profile_id=(select auth.uid())
-            where sr.id=b.service_region_id and sr.hero_operational_zone=pp.operational_zone)
-          and b.latitude is not null and b.longitude is not null
-          and public.hero_is_near_booking((select auth.uid()),b.latitude,b.longitude)))
-  )
-);
-
 -- Private KYC storage; each Hero can upload/read/delete only their own object path.
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
 values ('hero-kyc-documents','hero-kyc-documents',false,10485760,array['image/jpeg','image/png','image/webp','application/pdf'])
@@ -180,6 +151,36 @@ returns boolean language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public.hero_is_near_booking(uuid,double precision,double precision) from public,anon;
 grant execute on function public.hero_is_near_booking(uuid,double precision,double precision) to authenticated;
+
+-- Create the notification policy only after its helper functions exist.
+drop policy if exists hero_dispatch_recipient_read on public.hero_dispatch_notifications;
+create policy hero_dispatch_recipient_read on public.hero_dispatch_notifications
+for select to authenticated
+using (
+  professional_id = (select auth.uid())
+  and exists (
+    select 1 from public.profiles p
+    join public.professional_profiles pp on pp.profile_id=p.id
+    where p.id=(select auth.uid()) and p.role='professional'
+      and pp.verification_status='verified' and pp.suspended_at is null
+      and pp.citizenship_document_path is not null
+      and hero_dispatch_notifications.trade_category=coalesce(pp.trade_category,pp.trade_code)
+  )
+  and exists (
+    select 1 from public.bookings b
+    join public.professional_service_categories pc
+      on pc.professional_id=(select auth.uid()) and pc.category_id=b.category_id
+    where b.id=hero_dispatch_notifications.booking_id
+      and (b.professional_id=(select auth.uid()) or
+        (b.professional_id is null and b.status='requested' and b.scheduled_at>now()
+          and b.service_region_id is not null
+          and exists (select 1 from public.service_regions sr
+            join public.professional_profiles pp on pp.profile_id=(select auth.uid())
+            where sr.id=b.service_region_id and sr.hero_operational_zone=pp.operational_zone)
+          and b.latitude is not null and b.longitude is not null
+          and public.hero_is_near_booking((select auth.uid()),b.latitude,b.longitude)))
+  )
+);
 
 -- Latest registration contract used by the web and mobile Hero portals.
 create or replace function public.submit_hero_registration(
