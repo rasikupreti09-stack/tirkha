@@ -13,7 +13,7 @@
 
 1. `pnpm --filter @tirkha/mobile typecheck`
 2. `pnpm --filter @tirkha/shared test`
-3. Run `expo install --check` from `apps/mobile`. The current SDK 57 pins are six patch releases behind Expo's recommendations (`expo`, `expo-constants`, `expo-crypto`, `expo-notifications`, `expo-linking`, and `expo-router`); update the pins and lockfile together, then rerun this check before any EAS build.
+3. Run `pnpm --filter @tirkha/mobile check:deps` from the repository root. Keep Expo SDK packages aligned with the SDK's expected versions and commit `pnpm-lock.yaml` alongside any package version changes.
 4. With production EAS variables loaded locally or in CI, run `pnpm --filter @tirkha/mobile check:release`.
 5. `pnpm --filter @tirkha/mobile build:preview`
 6. Install the Android APK and iOS internal build on real devices; verify login, Hero trade onboarding, maps, booking, chat, push permission, deep links, offline/error recovery, and sign-out.

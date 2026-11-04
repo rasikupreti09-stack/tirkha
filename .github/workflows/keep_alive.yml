@@ -27,6 +27,10 @@ jobs:
             echo "Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in GitHub repository Actions secrets."
             exit 1
           fi
+          case "$SUPABASE_URL" in
+            https://*) ;;
+            *) echo "NEXT_PUBLIC_SUPABASE_URL must be an HTTPS URL."; exit 1 ;;
+          esac
 
       - name: Ping Supabase Project
         env:
@@ -37,10 +41,14 @@ jobs:
           CLEAN_URL=$(echo "$SUPABASE_URL" | tr -d '\r')
           CLEAN_KEY=$(echo "$SUPABASE_ANON_KEY" | tr -d '\r')
 
-          # Using -I (HEAD request) avoids parsing response bodies completely, 
-          # preventing curl exit code 23 stream write errors.
-          curl -I -s --max-time 30 \
-            "${CLEAN_URL%/}/rest/v1/" \
-            -H "apikey: ${CLEAN_KEY}"
+          # Read one public catalog row so the check proves the REST API,
+          # public key, table, and anonymous read policy are all reachable.
+          # This is best-effort activity only; Supabase may still pause a free project.
+          curl --fail --silent --show-error --retry 2 --max-time 30 \
+            --get "${CLEAN_URL%/}/rest/v1/service_categories" \
+            --data-urlencode "select=id" \
+            --data-urlencode "limit=1" \
+            -H "apikey: ${CLEAN_KEY}" \
+            -H "Authorization: Bearer ${CLEAN_KEY}"
           
-          echo "Supabase keep-alive ping sent successfully."
+          echo "Supabase REST reachability check passed; this does not guarantee that the project will never pause."

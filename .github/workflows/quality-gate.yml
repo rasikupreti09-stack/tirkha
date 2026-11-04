@@ -1,0 +1,65 @@
+name: Tirkha quality gate
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, tests, and production bundles
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://ci.invalid.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-only-placeholder
+      NEXT_PUBLIC_TIRKHA_LOCAL_MOCK: "1"
+      EXPO_PUBLIC_SUPABASE_URL: https://ci.invalid.supabase.co
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ci-only-placeholder
+      EXPO_PUBLIC_API_URL: https://ci.invalid
+      EXPO_PUBLIC_TIRKHA_LOCAL_MOCK: "1"
+      EXPO_NO_TELEMETRY: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check shared theme output
+        run: pnpm theme:check
+
+      - name: Typecheck all workspace packages
+        run: pnpm typecheck
+
+      - name: Run shared integration and contract tests
+        run: pnpm test
+
+      - name: Verify Expo SDK package compatibility
+        run: pnpm check:expo
+
+      - name: Build web production export
+        run: pnpm build:web
+
+      - name: Bundle Android and iOS JavaScript
+        run: pnpm --filter @tirkha/mobile export:native

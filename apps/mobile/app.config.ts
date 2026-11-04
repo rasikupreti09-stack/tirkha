@@ -16,7 +16,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   // Fail before an EAS production build can ship with broken auth, missing server
   // endpoints, a mock backend, or Android maps that render as a blank grid.
   if (process.env.EAS_BUILD_PROFILE === "production") {
-    const required = ["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY", "EXPO_PUBLIC_API_URL", "EXPO_PUBLIC_EAS_PROJECT_ID", "GOOGLE_MAPS_ANDROID_API_KEY"];
+    const buildPlatform = process.env.EAS_BUILD_PLATFORM;
+    const required = ["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY", "EXPO_PUBLIC_API_URL", "EXPO_PUBLIC_EAS_PROJECT_ID"];
+    if (buildPlatform !== "ios") required.push("GOOGLE_MAPS_ANDROID_API_KEY");
     const missing = required.filter((name) => !process.env[name]?.trim());
     if (missing.length) throw new Error(`Production mobile build is missing EAS environment variables: ${missing.join(", ")}.`);
     for (const name of ["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_API_URL"]) {
