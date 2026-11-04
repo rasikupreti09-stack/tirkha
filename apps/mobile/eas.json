@@ -14,6 +14,7 @@
       "distribution": "internal",
       "channel": "preview",
       "environment": "preview",
+      "env": { "EXPO_PUBLIC_TIRKHA_DEMO_AUTH": "1" },
       "android": { "buildType": "apk" }
     },
     "preview-simulator": {
@@ -23,6 +24,7 @@
     "production": {
       "channel": "production",
       "environment": "production",
+      "env": { "EXPO_PUBLIC_TIRKHA_DEMO_AUTH": "0" },
       "autoIncrement": true
     }
   },

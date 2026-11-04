@@ -32,6 +32,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     }
     if (process.env.EXPO_PUBLIC_TIRKHA_LOCAL_MOCK === "1") throw new Error("Production mobile builds cannot use EXPO_PUBLIC_TIRKHA_LOCAL_MOCK=1.");
   }
+  if (process.env.EAS_BUILD_PROFILE === "production" && process.env.EXPO_PUBLIC_TIRKHA_DEMO_AUTH === "1") {
+    throw new Error("Production mobile builds cannot enable local demo authentication.");
+  }
 
   return {
     ...config,

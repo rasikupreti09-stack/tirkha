@@ -1,75 +1,73 @@
-import { useEffect, useState } from "react";
 import { Link } from "expo-router";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
-import { profileSchema, professionalProfileSchema, tokens, type Profile, type ProfessionalProfile } from "@tirkha/shared";
-import { useAuth } from "../../providers/auth-provider";
+import { tokens } from "@tirkha/shared";
+import { useAccount } from "../../hooks/use-account";
 import { NotificationSettings } from "../../components/notification-settings";
 import { disablePushNotifications } from "../../lib/notifications";
 
 export default function Dashboard() {
-  const { client, session } = useAuth();
-  const [account, setAccount] = useState<{ owner: string; profile: Profile; professional: ProfessionalProfile | null } | null>(null);
-  const [error, setError] = useState("");
-  const [attempt, setAttempt] = useState(0);
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    if (!client || !session) return;
-    let active = true;
-    const owner = session.user.id;
-    setError(""); setAccount(null);
-    void (async () => {
-      try {
-        const result = await client.from("profiles").select("*").eq("id", owner).single();
-        if (result.error) throw result.error;
-        const profile = profileSchema.parse(result.data);
-        let professional: ProfessionalProfile | null = null;
-        if (profile.role === "professional") {
-          const result = await client.from("professional_profiles").select("*").eq("profile_id", owner).single();
-          if (result.error) throw result.error;
-          professional = professionalProfileSchema.parse(result.data);
-        }
-        if (active) setAccount({ owner, profile, professional });
-      } catch { if (active) setError("We could not load your profile. Please try again or contact support."); }
-    })();
-    return () => { active = false; };
-  }, [client, session?.user.id, attempt]);
+  const state = useAccount();
+
   async function signOut() {
-    if (!client || busy) return;
-    setBusy(true); setError("");
+    if (state.signOutBusy) return;
     try {
-      await disablePushNotifications();
-      const { error } = await client.auth.signOut({ scope: "local" });
-      if (error) throw error;
-    } catch (error) { setError(error instanceof Error ? error.message : "Sign out failed. Please try again."); }
-    finally { setBusy(false); }
+      if (!state.isDemo && state.session) await disablePushNotifications();
+      await state.signOut();
+    } catch (failure) {
+      state.setNotice(failure instanceof Error ? failure.message : "Sign out failed. Please try again.");
+    }
   }
-  if (!session) return null;
-  const current = account?.owner === session.user.id ? account : null;
+
+  if (state.accountLoading) return <View className="flex-1 items-center justify-center bg-background p-8">
+    <ActivityIndicator color={tokens.colors.primary} accessibilityLabel="Loading your Tirkha account" />
+    <Text className="mt-4 text-center text-muted-foreground">Loading your account…</Text>
+  </View>;
+
+  if (!state.account) return <View className="flex-1 justify-center bg-background p-6">
+    <Text accessibilityRole="header" className="mb-2 text-2xl font-semibold text-primary">We couldn’t open your dashboard</Text>
+    <Text accessibilityRole="alert" className="mb-5 text-foreground">{state.accountError || "Your account details are unavailable right now."}</Text>
+    <Pressable accessibilityRole="button" onPress={state.retry} className="min-h-12 items-center justify-center rounded-md bg-primary p-3">
+      <Text className="font-semibold text-primary-foreground">Try again</Text>
+    </Pressable>
+    <Pressable accessibilityRole="button" onPress={() => void signOut()} className="mt-2 min-h-12 items-center justify-center p-3">
+      <Text className="text-primary underline">Sign out and return to sign in</Text>
+    </Pressable>
+  </View>;
+
+  const { profile, professional } = state.account;
   return <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 24 }}>
     <View className="mb-8 flex-row items-center justify-between">
-      <Text className="text-2xl font-semibold text-primary">Tirkha</Text>
-      <Pressable accessibilityRole="button" disabled={busy} onPress={signOut} className="min-h-11 justify-center rounded-md border border-border px-4 py-3">
-        <Text className="font-medium text-primary">{busy ? "Signing out…" : "Sign out"}</Text>
+      <View>
+        <Text className="text-2xl font-semibold text-primary">Tirkha | तिर्खा</Text>
+        <Text className="text-sm text-muted-foreground">Your home, effortlessly managed.</Text>
+      </View>
+      <Pressable accessibilityRole="button" disabled={state.signOutBusy} onPress={() => void signOut()} className="min-h-11 justify-center rounded-md border border-border px-4 py-3">
+        <Text className="font-medium text-primary">{state.signOutBusy ? "Signing out…" : "Sign out"}</Text>
       </Pressable>
     </View>
-    <Link href="/(app)/categories" className="mb-6 rounded-md bg-primary px-4 py-4 text-center font-semibold text-primary-foreground">Explore services</Link>
-    <View className="rounded-lg border border-border bg-card p-6">
-      <Text accessibilityRole="header" className="mb-4 text-2xl font-semibold text-foreground">{current ? `Welcome, ${current.profile.full_name || "there"}` : "Your dashboard"}</Text>
-      {error ? <View>
-        <Text accessibilityRole="alert" className="text-foreground">{error}</Text>
-        <Pressable accessibilityRole="button" onPress={() => setAttempt((value) => value + 1)} className="mt-4 min-h-11 justify-center">
-          <Text className="font-medium text-primary underline">Try again</Text>
-        </Pressable>
-      </View> : !current ? <ActivityIndicator color={tokens.colors.primary} accessibilityLabel="Loading profile" /> : <View>
-        <Text className="mb-4 capitalize text-foreground">{current.profile.role} account</Text>
-        {current.professional && (!current.professional.operational_zone || !current.professional.citizenship_document_path)
-          ? <View className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-4"><Text className="mb-2 font-semibold text-foreground">Complete Hero verification</Text><Text className="mb-3 text-foreground">Choose your service zone and submit an identity document for private admin review. Job dispatch stays locked until approval.</Text><Link href="/(app)/hero-register" className="min-h-11 rounded-md bg-primary p-3 text-center font-semibold text-primary-foreground">Continue registration</Link></View>
-          : current.professional && <Text className="mb-4 text-foreground">Verification: {current.professional.verification_status}. {current.professional.verification_status === "pending" ? "Your application is awaiting admin review; job dispatch stays locked until approval." : current.professional.verification_status === "rejected" ? "Contact support about your verification." : "Your professional account is verified."}</Text>}
-        {current.profile.role === "customer" && <View><Link href="/(app)/book" className="mb-3 rounded-md bg-primary p-4 text-center font-semibold text-primary-foreground">Request a service</Link><Link href="/(app)/bookings" className="py-4 text-primary underline">My bookings</Link></View>}{current.profile.role === "professional" && <Link href="/(app)/jobs" className="rounded-md bg-primary p-4 text-center font-semibold text-primary-foreground">Professional jobs</Link>}
-      </View>}
+
+    {state.notice ? <Text accessibilityRole="alert" className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-foreground">{state.notice}</Text> : null}
+    {state.isDemo ? <View className="mb-5 rounded-lg border border-emerald-300 bg-emerald-50 p-4">
+      <Text className="mb-1 font-semibold text-emerald-950">Demo session on this device</Text>
+      <Text className="text-emerald-900">You are signed in as a {profile.role === "professional" ? "Hero" : "customer"} preview. Browse the app safely; demo requests do not create live bookings, contact Heroes, or send payments.</Text>
+    </View> : null}
+
+    <View className="mb-5 rounded-lg border border-border bg-card p-5">
+      <Text accessibilityRole="header" className="mb-1 text-2xl font-semibold text-foreground">Namaste, {profile.full_name || "there"}</Text>
+      <Text className="mb-5 capitalize text-muted-foreground">{profile.role === "professional" ? `${professional?.trade_category?.replaceAll("_", " ").toLowerCase() || "service"} Hero` : "Customer account"}</Text>
+      <Link href="/(app)/categories" className="mb-3 min-h-12 rounded-md bg-primary p-4 text-center font-semibold text-primary-foreground">Explore services</Link>
+      {profile.role === "customer" && !state.isDemo ? <>
+        <Link href="/(app)/book" className="mb-3 min-h-12 rounded-md border border-border p-4 text-center font-semibold text-primary">Request a service</Link>
+        <Link href="/(app)/bookings" className="min-h-12 p-3 text-center text-primary underline">My bookings</Link>
+      </> : null}
+      {profile.role === "professional" ? <View className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-4">
+        <Text className="mb-1 font-semibold text-foreground">{state.isDemo ? "Hero preview" : `Verification: ${professional?.verification_status ?? "pending"}`}</Text>
+        <Text className="mb-3 text-foreground">{state.isDemo ? "Live job dispatch and GPS sharing need a verified, database-backed Hero account." : professional?.verification_status === "verified" ? "Your profile is verified." : "Your application is awaiting admin review. Job dispatch stays locked until approval."}</Text>
+        {!state.isDemo && (!professional?.operational_zone || !professional?.citizenship_document_path) ? <Link href="/(app)/hero-register" className="min-h-11 rounded-md bg-primary p-3 text-center font-semibold text-primary-foreground">Continue registration</Link> : null}
+        {!state.isDemo && professional?.verification_status === "verified" ? <Link href="/(app)/jobs" className="min-h-11 rounded-md bg-primary p-3 text-center font-semibold text-primary-foreground">Open job board</Link> : null}
+      </View> : null}
+      {profile.role === "customer" && state.isDemo ? <Text className="mt-3 text-sm text-muted-foreground">Sign in with a real verified account to create and track live service requests.</Text> : null}
     </View>
-    <NotificationSettings />
+    {!state.isDemo && state.session ? <NotificationSettings /> : null}
   </ScrollView>;
 }
-
-
