@@ -55,16 +55,28 @@ export default function Dashboard() {
     <View className="mb-5 rounded-lg border border-border bg-card p-5">
       <Text accessibilityRole="header" className="mb-1 text-2xl font-semibold text-foreground">Namaste, {profile.full_name || "there"}</Text>
       <Text className="mb-5 capitalize text-muted-foreground">{profile.role === "professional" ? `${professional?.trade_category?.replaceAll("_", " ").toLowerCase() || "service"} Hero` : "Customer account"}</Text>
-      <Link href="/(app)/categories" className="mb-3 min-h-12 rounded-md bg-primary p-4 text-center font-semibold text-primary-foreground">Explore services</Link>
+      <Link href="/(app)/categories" asChild>
+        <Pressable accessibilityRole="button" className="mb-3 min-h-12 items-center justify-center rounded-md bg-primary px-4 py-3">
+          <Text className="font-semibold text-primary-foreground">Explore services</Text>
+        </Pressable>
+      </Link>
       {profile.role === "customer" && !state.isDemo ? <>
-        <Link href="/(app)/book" className="mb-3 min-h-12 rounded-md border border-border p-4 text-center font-semibold text-primary">Request a service</Link>
-        <Link href="/(app)/bookings" className="min-h-12 p-3 text-center text-primary underline">My bookings</Link>
+        <Link href="/(app)/book" asChild>
+          <Pressable accessibilityRole="button" className="mb-3 min-h-12 items-center justify-center rounded-md border border-border px-4 py-3">
+            <Text className="font-semibold text-primary">Request a service</Text>
+          </Pressable>
+        </Link>
+        <Link href="/(app)/bookings" asChild>
+          <Pressable accessibilityRole="button" className="min-h-12 items-center justify-center px-3 py-2">
+            <Text className="text-primary underline">My bookings</Text>
+          </Pressable>
+        </Link>
       </> : null}
       {profile.role === "professional" ? <View className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-4">
         <Text className="mb-1 font-semibold text-foreground">{state.isDemo ? "Hero preview" : `Verification: ${professional?.verification_status ?? "pending"}`}</Text>
         <Text className="mb-3 text-foreground">{state.isDemo ? "Live job dispatch and GPS sharing need a verified, database-backed Hero account." : professional?.verification_status === "verified" ? "Your profile is verified." : "Your application is awaiting admin review. Job dispatch stays locked until approval."}</Text>
-        {!state.isDemo && (!professional?.operational_zone || !professional?.citizenship_document_path) ? <Link href="/(app)/hero-register" className="min-h-11 rounded-md bg-primary p-3 text-center font-semibold text-primary-foreground">Continue registration</Link> : null}
-        {!state.isDemo && professional?.verification_status === "verified" ? <Link href="/(app)/jobs" className="min-h-11 rounded-md bg-primary p-3 text-center font-semibold text-primary-foreground">Open job board</Link> : null}
+        {!state.isDemo && (!professional?.operational_zone || !professional?.citizenship_document_path) ? <Link href="/(app)/hero-register" asChild><Pressable accessibilityRole="button" className="min-h-11 items-center justify-center rounded-md bg-primary p-3"><Text className="font-semibold text-primary-foreground">Continue registration</Text></Pressable></Link> : null}
+        {!state.isDemo && professional?.verification_status === "verified" ? <Link href="/(app)/jobs" asChild><Pressable accessibilityRole="button" className="min-h-11 items-center justify-center rounded-md bg-primary p-3"><Text className="font-semibold text-primary-foreground">Open job board</Text></Pressable></Link> : null}
       </View> : null}
       {profile.role === "customer" && state.isDemo ? <Text className="mt-3 text-sm text-muted-foreground">Sign in with a real verified account to create and track live service requests.</Text> : null}
     </View>
