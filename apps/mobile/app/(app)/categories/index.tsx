@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, Text, View, useWindowDimensions } from "react-native";
-import { Link } from "expo-router";
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { useRouter } from "expo-router";
 import { tokens, type ServiceCategory } from "@tirkha/shared";
 import { loadCategories } from "../../../lib/discovery";
 
@@ -11,6 +11,7 @@ export default function Categories() {
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
   const columns = useWindowDimensions().width >= 600 ? 2 : 1;
+  const router = useRouter();
   useEffect(() => {
     let active = true; setLoading(true); setError("");
     void loadCategories().then((data) => { if (active) setCategories(data); })
@@ -18,25 +19,99 @@ export default function Categories() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [attempt]);
-  return <FlatList key={columns} numColumns={columns} data={loading || error ? [] : categories}
-    keyExtractor={(item) => item.id} className="flex-1 bg-background"
-    contentContainerStyle={{ padding: 20, flexGrow: 1 }} columnWrapperStyle={columns > 1 ? { gap: 16 } : undefined}
-    ListHeaderComponent={<View className="mb-6">
-      <Link href="/(app)/dashboard" className="mb-6 py-3 font-medium text-primary underline">← Dashboard</Link>
-      <Text accessibilityRole="header" className="text-3xl font-semibold text-primary">Explore services</Text>
-      <Text className="mt-3 text-base leading-6 text-muted-foreground">Find verified professionals for everyday help at home.</Text>
-    </View>}
-    ListEmptyComponent={loading ? <ActivityIndicator color={tokens.colors.primary} accessibilityLabel="Loading services" /> : error ? <View>
-      <Text accessibilityRole="alert" className="text-foreground">{error}</Text>
-      <Pressable accessibilityRole="button" onPress={() => setAttempt((value) => value + 1)} className="mt-4 min-h-12 items-center justify-center rounded-md bg-primary px-4"><Text className="font-medium text-primary-foreground">Try again</Text></Pressable>
-    </View> : <Text className="text-muted-foreground">Service categories are being prepared. Please check back soon.</Text>}
-    renderItem={({ item }) => <Link href={{ pathname: "/(app)/categories/[slug]", params: { slug: item.slug } }} asChild>
-      <Pressable accessibilityRole="link" accessibilityLabel={`${item.name}, view professionals`} className="mb-4 flex-1 rounded-lg border border-border bg-card p-6">
-        <Text accessible={false} className="mb-5 text-lg font-semibold text-muted-foreground">{initials[item.slug] || "SV"}</Text>
-        <Text className="text-xl font-semibold text-primary">{item.name}</Text>
-        <Text className="mt-2 text-sm leading-6 text-muted-foreground">{item.description || "Explore professionals for this service."}</Text>
-        <Text className="mt-5 font-medium text-primary underline">View professionals</Text>
-      </Pressable>
-    </Link>}
-  />;
+  return (
+    <FlatList
+      key={columns}
+      numColumns={columns}
+      data={loading || error ? [] : categories}
+      keyExtractor={(item) => item.id}
+      style={styles.list}
+      contentContainerStyle={styles.content}
+      columnWrapperStyle={columns > 1 ? styles.columns : undefined}
+      ListHeaderComponent={
+        <View style={styles.header}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push("/(app)/dashboard")}
+            style={styles.backButton}
+            hitSlop={8}
+          >
+            <Text style={styles.backText}>← Dashboard</Text>
+          </Pressable>
+          <Text accessibilityRole="header" style={styles.title}>Explore services</Text>
+          <Text style={styles.subtitle}>Find verified professionals for everyday help at home.</Text>
+        </View>
+      }
+      ListEmptyComponent={
+        loading ? (
+          <View style={styles.state}>
+            <ActivityIndicator color={tokens.colors.primary} accessibilityLabel="Loading services" />
+            <Text style={styles.stateText}>Loading services…</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.state}>
+            <Text accessibilityRole="alert" style={styles.stateText}>{error}</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setAttempt((value) => value + 1)}
+              style={styles.retryButton}
+            >
+              <Text style={styles.retryText}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Text style={styles.stateText}>Service categories are being prepared. Please check back soon.</Text>
+        )
+      }
+      renderItem={({ item }) => (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${item.name}, view professionals`}
+          onPress={() => router.push({ pathname: "/(app)/categories/[slug]", params: { slug: item.slug } })}
+          style={({ pressed }) => [
+            styles.card,
+            columns > 1 ? styles.gridCard : styles.singleCard,
+            pressed && styles.cardPressed,
+          ]}
+        >
+          <Text accessible={false} style={styles.initials}>{initials[item.slug] || "SV"}</Text>
+          <Text style={styles.cardTitle}>{item.name}</Text>
+          <Text style={styles.description}>{item.description || "Explore professionals for this service."}</Text>
+          <Text style={styles.action}>View professionals</Text>
+        </Pressable>
+      )}
+    />
+  );
 }
+
+const styles = StyleSheet.create({
+  list: { flex: 1, backgroundColor: tokens.colors.background },
+  content: { padding: 20, paddingBottom: 32, flexGrow: 1 },
+  columns: { gap: 16, alignItems: "stretch" },
+  header: { marginBottom: 24 },
+  backButton: { alignSelf: "flex-start", paddingVertical: 12, marginBottom: 16 },
+  backText: { color: tokens.colors.primary, fontSize: 16, fontWeight: "600", textDecorationLine: "underline" },
+  title: { color: tokens.colors.primary, fontSize: 30, lineHeight: 38, fontWeight: "700" },
+  subtitle: { color: tokens.colors["muted-foreground"], fontSize: 16, lineHeight: 24, marginTop: 10 },
+  state: { paddingVertical: 28, alignItems: "center", gap: 12 },
+  stateText: { color: tokens.colors["muted-foreground"], fontSize: 16, lineHeight: 24 },
+  retryButton: { minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 8, backgroundColor: tokens.colors.primary, paddingHorizontal: 20 },
+  retryText: { color: tokens.colors["primary-foreground"], fontSize: 16, fontWeight: "600" },
+  card: {
+    flexGrow: 0,
+    flexShrink: 0,
+    marginBottom: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: tokens.colors.border,
+    borderRadius: 18,
+    backgroundColor: tokens.colors.card,
+  },
+  singleCard: { width: "100%" },
+  gridCard: { flex: 1, minWidth: 0 },
+  cardPressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
+  initials: { color: tokens.colors["muted-foreground"], fontSize: 18, lineHeight: 24, fontWeight: "700", marginBottom: 20 },
+  cardTitle: { color: tokens.colors.primary, fontSize: 21, lineHeight: 28, fontWeight: "700" },
+  description: { color: tokens.colors["muted-foreground"], fontSize: 16, lineHeight: 24, marginTop: 8 },
+  action: { color: tokens.colors.primary, fontSize: 16, lineHeight: 22, fontWeight: "600", textDecorationLine: "underline", marginTop: 20 },
+});
