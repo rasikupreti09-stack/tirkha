@@ -12,6 +12,7 @@
     "dev:mobile": "pnpm --filter @tirkha/mobile start",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm --filter @tirkha/shared test",
+    "check": "pnpm typecheck && pnpm test && pnpm theme:check && pnpm check:env",
     "test:pilot": "pnpm --filter @tirkha/shared test:pilot",
     "check:env": "node scripts/check-environment.mjs",
     "check:env:pilot": "node scripts/check-environment.mjs --full",
