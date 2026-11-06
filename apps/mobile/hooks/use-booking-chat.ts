@@ -1,10 +1,10 @@
 
 import { useEffect, useRef, useState } from "react";
-import { CHAT_PAGE_SIZE, chatMessageSchema, sendMessageSchema, workflowBookingSchema, canChat, chatError, type ChatMessage, type WorkflowBooking } from "@tirkha/shared";
+import { CHAT_PAGE_SIZE, chatMessageSchema, sendMessageSchema, workflowBookingSchema, canChat, chatError, translateUi, type ChatMessage, type UiLanguage, type UiTranslationKey, type WorkflowBooking } from "@tirkha/shared";
 import { getSupabase, isLocalMock } from "../lib/supabase";
 import { AppState } from "react-native";
 import { randomUUID } from "expo-crypto";
-export function useBookingChat(bookingId: string, userId: string) {
+export function useBookingChat(bookingId: string, userId: string, language: UiLanguage = "en") {
   const [booking, setBooking] = useState<WorkflowBooking | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [cursor, setCursor] = useState<ChatMessage | null>(null);
@@ -24,7 +24,7 @@ export function useBookingChat(bookingId: string, userId: string) {
     let active = true;
     setLoading(true); setError("");
     if (!sendMessageSchema.shape.booking_id.safeParse(bookingId).success) {
-      setError("Invalid booking reference."); setLoading(false); return;
+      setError(translateUi("invalidBookingReference", language)); setLoading(false); return;
     }
     const client = getSupabase();
     void (async () => {
@@ -39,11 +39,11 @@ export function useBookingChat(bookingId: string, userId: string) {
         if (history.error) throw history.error;
         const rows = chatMessageSchema.array().parse(history.data).reverse();
         if (active) { setBooking(row); setMessages(rows); }
-      } catch { if (active) { setBooking(null); setMessages([]); setError("Could not load this conversation. Only booking participants have access. Try Refresh."); } }
+      } catch { if (active) { setBooking(null); setMessages([]); setError(translateUi("chatLoadError", language)); } }
       finally { if (active) setLoading(false); }
     })();
     return () => { active = false; };
-  }, [bookingId, userId, cursor, revision]);
+  }, [bookingId, userId, cursor, revision, language]);
   useEffect(() => {
     if (!sendMessageSchema.shape.booking_id.safeParse(bookingId).success) return;
     const client = getSupabase();
@@ -62,13 +62,36 @@ export function useBookingChat(bookingId: string, userId: string) {
     const text = draft.trim();
     if (!attempt.current || attempt.current.text !== text) attempt.current = { text, id: randomUUID() };
     const input = sendMessageSchema.safeParse({ booking_id: bookingId, client_message_id: attempt.current.id, body: text });
-    if (!input.success) { setSendError(input.error.issues[0].message); return; }
+    if (!input.success) {
+      const message = input.error.issues[0].message;
+      const key: UiTranslationKey = message === "Enter a message."
+        ? "chatEmptyMessageError"
+        : message === "Keep messages under 2,000 characters."
+          ? "chatMessageTooLongError"
+          : "chatInvalidMessageError";
+      setSendError(translateUi(key, language));
+      return;
+    }
     lock.current = true; setSending(true); setSendError("");
     try {
       const { error } = await getSupabase().rpc("send_booking_message", { p_booking_id: bookingId, p_client_message_id: input.data.client_message_id, p_body: input.data.body });
       if (error) throw error;
       if (mounted.current) { setDraft(""); attempt.current = null; setCursor(null); refresh(); }
-    } catch (error) { if (mounted.current) setSendError(chatError(error)); }
+    } catch (error) {
+      if (mounted.current) {
+        const message = chatError(error);
+        const keyByMessage: Record<string, UiTranslationKey> = {
+          "This conversation is now read-only.": "chatClosedError",
+          "This conversation is unavailable to your account.": "chatUnavailableError",
+          "Please wait a moment before sending another message.": "chatRateLimitError",
+          "Enter 1–2,000 characters.": "chatInvalidMessageError",
+          "Enter a message.": "chatEmptyMessageError",
+          "Keep messages under 2,000 characters.": "chatMessageTooLongError",
+          "Message could not be confirmed. Retry the same message to avoid duplicates.": "chatRetryError",
+        };
+        setSendError(translateUi(keyByMessage[message] ?? "chatRetryError", language));
+      }
+    }
     finally { lock.current = false; if (mounted.current) setSending(false); }
   }
   return { localMock: isLocalMock, booking, messages, loading, live, error, draft, setDraft, sending, sendError, send, refresh,

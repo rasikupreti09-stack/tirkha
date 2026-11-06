@@ -1,10 +1,11 @@
 import { createServer } from "node:http";
+import { Readable } from "node:stream";
 import { createHmac, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { createPilotFixture } from "../tests/pilot-fixture.mjs";
 
 export const MOCK_ANON_KEY = "tirkha-local-anon-key";
-export async function startMockSupabase(port = 54321) {
+export async function startMockSupabase(port = 54321, { listen = true } = {}) {
   const fixture = await createPilotFixture();
   const { db } = fixture;
   const secret = randomUUID(), users = new Map(), sessions = new Map(), refreshTokens = new Map();
@@ -53,7 +54,7 @@ export async function startMockSupabase(port = 54321) {
   await fixture.prepareVerifiedHero(professional.id, "Kathmandu Valley");
   await db.query("insert into public.professional_service_categories select $1,id from public.service_categories",[professional.id]);
   let queue = Promise.resolve();
-  const server = createServer((request,response) => {
+  const handleRequest = (request,response) => {
     const send = (data,status=200) => { response.writeHead(status,{"Content-Type":"application/json","Cache-Control":"no-store"});response.end(data===null?"":JSON.stringify(data)); };
     const origin = request.headers.origin;
     if (origin && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) { send({message:"Local origins only"},403);return; }
@@ -138,10 +139,43 @@ export async function startMockSupabase(port = 54321) {
       finally {await fixture.admin();}
     };
     queue=queue.then(task,task);
-  });
-  try {await new Promise((resolve,reject)=>{server.once("error",reject);server.listen(port,"127.0.0.1",resolve);});}
-  catch(error){await db.close();throw error;}
-  return { server,url:"http://127.0.0.1:"+server.address().port,customer:publicUser(customer),professional:publicUser(professional),async close(){await new Promise(resolve=>server.close(resolve));await queue;await db.close();} };
+  };
+  const server = createServer(handleRequest);
+  if (listen) {
+    try {await new Promise((resolve,reject)=>{server.once("error",reject);server.listen(port,"127.0.0.1",resolve);});}
+    catch(error){await db.close();throw error;}
+  }
+  const url = listen ? "http://127.0.0.1:"+server.address().port : "http://mock.supabase.local";
+  const mockFetch = async (input, init = {}) => {
+    const requestUrl = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+    const requestHeaders = new Headers(input instanceof Request ? input.headers : undefined);
+    new Headers(init.headers).forEach((value, key) => requestHeaders.set(key, value));
+    const requestBody = init.body ?? (input instanceof Request && input.body ? await input.clone().text() : undefined);
+    const request = Readable.from(requestBody == null ? [] : [requestBody]);
+    request.headers = Object.fromEntries(requestHeaders.entries());
+    request.method = init.method ?? (input instanceof Request ? input.method : "GET");
+    request.url = requestUrl.pathname + requestUrl.search;
+
+    let status = 200;
+    const responseHeaders = new Headers();
+    let resolveResponse;
+    const completed = new Promise(resolve => { resolveResponse = resolve; });
+    const response = {
+      writeHead(code, headers = {}) {
+        status = code;
+        for (const [key, value] of Object.entries(headers)) responseHeaders.set(key, value);
+      },
+      setHeader(key, value) { responseHeaders.set(key, value); },
+      end(body) {
+        // Fetch Response forbids bodies for 204/205/304, even an empty string.
+        const responseBody = [204, 205, 304].includes(status) ? null : (body ?? null);
+        resolveResponse(new Response(responseBody, { status, headers: responseHeaders }));
+      },
+    };
+    handleRequest(request, response);
+    return completed;
+  };
+  return { server,url,fetch:mockFetch,customer:publicUser(customer),professional:publicUser(professional),async close(){if(server.listening) await new Promise(resolve=>server.close(resolve));await queue;await db.close();} };
 }
 if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   const mock=await startMockSupabase(Number(process.env.TIRKHA_MOCK_PORT||54321));

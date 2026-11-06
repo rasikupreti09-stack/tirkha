@@ -6,8 +6,8 @@ import { startMockSupabase, MOCK_ANON_KEY } from "../scripts/mock-supabase.mjs";
 const { createClient } = createRequire(new URL("../../../apps/web/package.json", import.meta.url))("@supabase/supabase-js");
 
 test("local service works with the actual Supabase SDK: signup, sessions, profiles, browse and booking/chat RPCs", async (t) => {
-  const mock=await startMockSupabase(0);t.after(()=>mock.close());
-  const client=()=>createClient(mock.url,MOCK_ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+  const mock=await startMockSupabase(0,{listen:false});t.after(()=>mock.close());
+  const client=()=>createClient(mock.url,MOCK_ANON_KEY,{global:{fetch:mock.fetch},auth:{persistSession:false,autoRefreshToken:false}});
   const customer=client(), professional=client(), newcomer=client();
   const result=await newcomer.auth.signUp({email:"new@tirkha.test",password:"ValidLocalPassword!",options:{data:{full_name:"New professional",requested_role:"professional"}}});
   assert.equal(result.error,null);assert.ok(result.data.session);
@@ -33,14 +33,14 @@ test("local service works with the actual Supabase SDK: signup, sessions, profil
   const message=await customer.rpc("send_booking_message",{p_booking_id:booking.data.id,p_client_message_id:randomUUID(),p_body:"Use the side entrance."}).single();assert.equal(message.error,null);
   const messages=await professional.from("booking_messages").select("*").eq("booking_id",booking.data.id).order("created_at",{ascending:false}).order("id",{ascending:false}).limit(50);assert.equal(messages.error,null);assert.equal(messages.data[0].body,"Use the side entrance.");
   const outsider=await newcomer.from("booking_messages").select("*");assert.equal(outsider.data.length,0);
-  const origin=await fetch(mock.url+"/health",{headers:{Origin:"https://external.example"}});assert.equal(origin.status,403);
+  const origin=await mock.fetch(mock.url+"/health",{headers:{Origin:"https://external.example"}});assert.equal(origin.status,403);
   assert.equal((await customer.auth.signOut({scope:"local"})).error,null);
   assert.equal((await customer.auth.getSession()).data.session,null);
 });
 
 test("phone OTP SDK flow verifies a six-digit code, persists a session, and protects booking contacts", async t => {
-  const mock=await startMockSupabase(0);t.after(()=>mock.close());
-  const create=()=>createClient(mock.url,MOCK_ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+  const mock=await startMockSupabase(0,{listen:false});t.after(()=>mock.close());
+  const create=()=>createClient(mock.url,MOCK_ANON_KEY,{global:{fetch:mock.fetch},auth:{persistSession:false,autoRefreshToken:false}});
   const customer=create(),professional=create(),outsider=create();
   for(const [sdk,phone,metadata] of [[customer,mock.customer.phone,{full_name:"Phone Customer"}],[professional,mock.professional.phone,{full_name:"Phone Professional"}],[outsider,"+9779600000099",{full_name:"Phone Customer"}]]) {
     const sent=await sdk.auth.signInWithOtp({phone,options:{shouldCreateUser:true,data:metadata}});
