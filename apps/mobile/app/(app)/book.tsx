@@ -1,12 +1,13 @@
 import { Link, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View, type TextInputProps } from "react-native";
-import { DURATION_OPTIONS, REGIONS, formatBookingDate, formatNpr, hourlyRateLabel, tokens, translateCatalogLabel, translateUi } from "@tirkha/shared";
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps } from "react-native";
+import { catalogPriceLabel, DURATION_OPTIONS, REGIONS, formatBookingDate, formatNpr, hourlyRateLabel, tokens, translateCatalogLabel, translateUi } from "@tirkha/shared";
 import { AccountGate } from "../../components/account-gate";
 import { PaymentCheckout } from "../../components/payment-checkout";
 import { useBookingDraft } from "../../hooks/use-booking-draft";
 import { LocationPicker } from "../../components/location-picker";
 import { LanguageSwitcher } from "../../components/language-switcher";
 import { useLanguage } from "../../providers/language-provider";
+import { getServiceArtwork } from "../../lib/service-artwork";
 
 function Field({ label, ...props }: TextInputProps & { label: string }) {
   return <View className="mb-4"><Text className="mb-2 font-medium text-foreground">{label}</Text><TextInput accessibilityLabel={label} placeholderTextColor={tokens.colors["muted-foreground"]} className="min-h-12 rounded-md border border-border bg-card px-3 py-3 text-foreground" {...props} /></View>;
@@ -44,8 +45,17 @@ function BookingFields({ slug }: { slug: string }) {
     </ScrollView>
     {draft.loading && <ActivityIndicator color={tokens.colors.primary} accessibilityLabel={t("loadingServicesForBooking")} />}
     <Text className="mb-3 font-semibold text-foreground">{t("serviceCategory")}</Text>
-    {draft.categories.map((item) => <Choice key={item.id} label={translateCatalogLabel(item.name, language)} selected={draft.categoryId === item.id} onPress={() => draft.changeCategory(item.id)} />)}
-    {draft.categoryId && <><Text className="mb-3 mt-4 font-semibold text-foreground">{t("specificService")}</Text>{draft.catalogLoading ? <ActivityIndicator color={tokens.colors.primary} accessibilityLabel={t("checkingServices")} /> : draft.categoryOfferings.map((row) => <Choice key={row.service.id} label={`${translateCatalogLabel(row.service.title, language)} · ${row.availability_status === "available" ? formatNpr(row.service.base_paisa + row.service.visit_paisa) : row.availability_status === "paused" ? t("pausedHere") : `${t("comingSoonIn")} ${regionKeys[draft.region] ? t(regionKeys[draft.region]) : draft.region}`}`} selected={draft.offeringId === row.service.id} disabled={row.availability_status !== "available"} onPress={() => draft.setOfferingId(row.service.id)} />)}{!draft.catalogLoading && draft.categoryOfferings.length === 0 && <Text className="mb-3 text-muted-foreground">{t("noRegionalServices")} {regionKeys[draft.region] ? t(regionKeys[draft.region]) : draft.region}.</Text>}</>}
+    {draft.categories.map((item) => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: draft.categoryId === item.id }} onPress={() => draft.changeCategory(item.id)} style={[bookingStyles.card, draft.categoryId === item.id && bookingStyles.selectedCard]}>
+      <Image source={getServiceArtwork(undefined, item.slug)} style={bookingStyles.artwork} resizeMode="cover" accessibilityLabel={translateCatalogLabel(item.name, language)} />
+      <View style={bookingStyles.cardBody}><Text style={bookingStyles.title}>{translateCatalogLabel(item.name, language)}</Text><Text style={bookingStyles.description}>{item.description ? translateCatalogLabel(item.description, language) : t("genericServiceDescription")}</Text><Text style={bookingStyles.action}>{t("viewProfessionals")}</Text></View>
+    </Pressable>)}
+    {draft.categoryId && <><Text className="mb-3 mt-4 font-semibold text-foreground">{t("specificService")}</Text>{draft.catalogLoading ? <ActivityIndicator color={tokens.colors.primary} accessibilityLabel={t("checkingServices")} /> : draft.categoryOfferings.map((row) => <Pressable key={row.service.id} accessibilityRole="button" accessibilityState={{ selected: draft.offeringId === row.service.id, disabled: row.availability_status !== "available" }} disabled={row.availability_status !== "available"} onPress={() => draft.setOfferingId(row.service.id)} style={[bookingStyles.offerCard, draft.offeringId === row.service.id && bookingStyles.selectedCard, row.availability_status !== "available" && bookingStyles.unavailableCard]}>
+      <Image source={getServiceArtwork(row.service.image, row.service.category_slug)} style={bookingStyles.offerArtwork} resizeMode="cover" accessibilityLabel={translateCatalogLabel(row.service.title, language)} />
+      <View style={bookingStyles.offerBody}><View style={bookingStyles.offerHeading}><Text style={bookingStyles.title}>{translateCatalogLabel(row.service.title, language)}</Text><Text style={bookingStyles.price}>{row.availability_status === "available" ? catalogPriceLabel(row.service) : row.availability_status === "paused" ? t("pausedHere") : `${t("comingSoonIn")} ${regionKeys[draft.region] ? t(regionKeys[draft.region]) : draft.region}`}</Text></View>
+        {row.service.description ? <Text style={bookingStyles.description}>{translateCatalogLabel(row.service.description, language)}</Text> : null}
+        <Text style={bookingStyles.duration}>{row.service.duration_minutes} {t("durationMinutes")}</Text>
+      </View>
+    </Pressable>)}{!draft.catalogLoading && draft.categoryOfferings.length === 0 && <Text className="mb-3 text-muted-foreground">{t("noRegionalServices")} {regionKeys[draft.region] ? t(regionKeys[draft.region]) : draft.region}.</Text>}</>}
     <Text className="mb-3 mt-6 font-semibold text-foreground">{t("professional")}</Text>
     <Choice label={t("unassignedQuotePending")} selected={!draft.professionalId} onPress={() => draft.setProfessionalId("")} />
     {draft.choices.map((item) => <Choice key={item.profile_id} label={`${item.full_name || t("verifiedProfessional")} · ${hourlyRateLabel(item.hourly_rate_paisa)}`} selected={draft.professionalId === item.profile_id} onPress={() => draft.setProfessionalId(item.profile_id)} />)}
@@ -71,5 +81,22 @@ function BookingFields({ slug }: { slug: string }) {
     <Link href="/(app)/bookings" className="mt-4 py-3 text-center text-primary underline">{t("myBookings")}</Link>
   </ScrollView></KeyboardAvoidingView>;
 }
+
+const bookingStyles = StyleSheet.create({
+  card: { marginBottom: 14, borderWidth: 1, borderColor: tokens.colors.border, borderRadius: 18, backgroundColor: tokens.colors.card, overflow: "hidden" },
+  offerCard: { marginBottom: 12, borderWidth: 1, borderColor: tokens.colors.border, borderRadius: 16, backgroundColor: tokens.colors.card, overflow: "hidden" },
+  selectedCard: { borderColor: tokens.colors.primary, borderWidth: 2 },
+  unavailableCard: { opacity: 0.74 },
+  artwork: { width: "100%", height: 148, backgroundColor: tokens.colors.muted },
+  offerArtwork: { width: "100%", height: 124, backgroundColor: tokens.colors.muted },
+  cardBody: { padding: 16 },
+  offerBody: { padding: 14, gap: 6 },
+  offerHeading: { gap: 5 },
+  title: { color: tokens.colors.foreground, fontSize: 17, lineHeight: 23, fontWeight: "700" },
+  description: { color: tokens.colors["muted-foreground"], fontSize: 14, lineHeight: 20, marginTop: 5 },
+  action: { color: tokens.colors.primary, fontSize: 14, lineHeight: 20, fontWeight: "700", marginTop: 12 },
+  price: { color: tokens.colors.primary, fontSize: 15, lineHeight: 21, fontWeight: "700" },
+  duration: { color: tokens.colors["muted-foreground"], fontSize: 13, marginTop: 3 },
+});
 
 

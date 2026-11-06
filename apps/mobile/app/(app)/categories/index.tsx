@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { tokens, translateCatalogLabel, translateUi, type ServiceCategory } from "@tirkha/shared";
 import { loadCategories } from "../../../lib/discovery";
 import { LanguageSwitcher } from "../../../components/language-switcher";
 import { useLanguage } from "../../../providers/language-provider";
+import { getServiceArtwork } from "../../../lib/service-artwork";
 
-const initials: Record<string, string> = { plumbing: "PL", electrical: "EL", "home-cleaning": "HC", "appliance-repair": "AR", painting: "PA" };
 export default function Categories() {
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,10 +64,17 @@ export default function Categories() {
           onPress={() => router.push({ pathname: "/(app)/categories/[slug]", params: { slug: item.slug } })}
           style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
         >
-          <Text accessible={false} style={styles.initials}>{initials[item.slug] || "SV"}</Text>
-          <Text style={styles.cardTitle}>{translateCatalogLabel(item.name, language)}</Text>
-          <Text style={styles.description}>{item.description ? translateCatalogLabel(item.description, language) : t("genericServiceDescription")}</Text>
-          <Text style={styles.action}>{t("viewProfessionals")}</Text>
+          <Image
+            source={getServiceArtwork(undefined, item.slug)}
+            style={styles.artwork}
+            resizeMode="cover"
+            accessibilityLabel={translateCatalogLabel(item.name, language)}
+          />
+          <View style={styles.cardBody}>
+            <Text style={styles.cardTitle}>{translateCatalogLabel(item.name, language)}</Text>
+            <Text style={styles.description}>{item.description ? translateCatalogLabel(item.description, language) : t("genericServiceDescription")}</Text>
+            <Text style={styles.action}>{t("viewProfessionals")}</Text>
+          </View>
         </Pressable>
       ))}
     </ScrollView>
@@ -90,7 +97,7 @@ const styles = StyleSheet.create({
   card: {
     alignSelf: "stretch",
     marginBottom: 16,
-    padding: 20,
+    padding: 0,
     borderWidth: 1,
     borderColor: tokens.colors.border,
     borderRadius: 18,
@@ -98,7 +105,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   cardPressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
-  initials: { color: tokens.colors["muted-foreground"], fontSize: 18, lineHeight: 24, fontWeight: "700", marginBottom: 20 },
+  artwork: { width: "100%", height: 190, backgroundColor: tokens.colors["muted"] },
+  cardBody: { padding: 20 },
   cardTitle: { color: tokens.colors.primary, fontSize: 21, lineHeight: 28, fontWeight: "700" },
   description: { color: tokens.colors["muted-foreground"], fontSize: 16, lineHeight: 24, marginTop: 8 },
   action: { color: tokens.colors.primary, fontSize: 16, lineHeight: 22, fontWeight: "600", textDecorationLine: "underline", marginTop: 20 },
