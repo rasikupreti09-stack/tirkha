@@ -18,6 +18,7 @@ import {
   resolveDiagnosticCode,
   serviceIdForDiagnosticCode,
   catalogPriceLabel,
+  operationalRegionFor,
   type CatalogService,
 } from "@tirkha/shared";
 import { useLanguage } from "../../providers/language-provider";
@@ -127,8 +128,16 @@ export default function AssistantScreen() {
 
   useEffect(() => {
     let alive = true;
+    const region = operationalRegionFor(bookingDraft.region);
     setCatalogLoading(true);
-    void loadRegionalCatalog("kathmandu-valley")
+    setServices([]);
+    if (!region) {
+      setCatalogLoading(false);
+      return () => {
+        alive = false;
+      };
+    }
+    void loadRegionalCatalog(region)
       .then((rows) => {
         if (!alive) return;
         setServices(
@@ -146,7 +155,7 @@ export default function AssistantScreen() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [bookingDraft.region]);
 
   useEffect(() => {
     if (messages.length) {
