@@ -9,5 +9,5 @@ export default function Home() {
     <Text accessibilityLiveRegion="polite" className="mt-5 text-xl font-semibold text-primary">Tirkha | तिर्खा</Text>
     <Text className="mt-2 text-center text-muted-foreground">Preparing your account…</Text>
   </View>;
-  return <Redirect href={session || isDemo ? "/(app)/dashboard" : "/(auth)/login"} />;
+  return <Redirect href={session || isDemo ? "/(app)/assistant" : "/(auth)/login"} />;
 }

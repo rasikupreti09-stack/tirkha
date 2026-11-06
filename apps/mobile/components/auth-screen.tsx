@@ -49,7 +49,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
       lock.current = true; setBusy(true); setError("");
       try {
         await demoSignIn(normalizedPhone, role, name || "Tirkha Demo User", role === "professional" ? trade : undefined);
-        router.replace("/(app)/dashboard");
+        router.replace("/(app)/assistant");
       } catch (failure) { setError(failure instanceof Error ? failure.message : "Demo sign-in could not be saved. Please try again."); }
       finally { lock.current = false; setBusy(false); }
       return;
@@ -62,6 +62,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
         : await auth.signInWithPhone(normalizedPhone, signup ? { full_name: name, role, ...(role === "professional" ? { trade_category: trade } : {}) } : undefined);
       if (result.error) throw result.error;
       if (!verify) { setSent(true); setToken(""); setCooldown(60); }
+      else router.replace("/(app)/assistant");
     } catch (failure) { setError(phoneAuthError(failure)); }
     finally { lock.current = false; setBusy(false); }
   }
