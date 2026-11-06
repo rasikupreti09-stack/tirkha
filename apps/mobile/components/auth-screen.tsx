@@ -6,6 +6,7 @@ import { useAuth } from "../providers/auth-provider";
 
 const demoAuthEnabled = process.env.EXPO_PUBLIC_TIRKHA_DEMO_AUTH === "1";
 
+const isValidNepalMobile = (value: string) => /^(97|98)\d{8}$/.test(value.replace(/\D/g, "").replace(/^977/, ""));
 export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
   const signup = mode === "signup";
   const { client, error: sessionError, demoSignIn } = useAuth();
@@ -20,7 +21,9 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
   const [error, setError] = useState("");
   const [cooldown, setCooldown] = useState(0);
   const lock = useRef(false);
-  const normalizedPhone = normalizeNepalPhoneNumber(phone);
+  const nationalNumber = phone.replace(/\D/g, "").replace(/^977/, "");
+    if (!isValidNepalMobile(nationalNumber)) { setError("Enter a valid 10-digit Nepal mobile number beginning with 97 or 98."); return; }
+    const normalizedPhone = `+977${nationalNumber}`;
   const localDigits = normalizedPhone.replace(/\D/g, "").replace(/^977/, "");
   const isDemoPhone = demoAuthEnabled && phoneSchema.safeParse(normalizedPhone).success && /^(97|98)/.test(localDigits);
   useEffect(() => { const timer = setInterval(() => setCooldown(n => Math.max(0, n - 1)), 1000); return () => clearInterval(timer); }, []);
@@ -80,11 +83,11 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
           </Pressable>)}
           <Text className="text-xs text-muted-foreground">Your Hero profile remains pending until the required verification is completed.</Text>
         </View>}
-        <Text className="text-foreground">Mobile number (+977)</Text><TextInput accessibilityLabel="Mobile number +977" className={inputClass} value={phone} onChangeText={value => {
+        <Text className="text-foreground">Mobile number (+977)</Text><View className="flex-row items-center"><Text className="mr-3 font-semibold text-slate-900">+977</Text><TextInput accessibilityLabel="Mobile number +977" className={inputClass} value={phone.replace(/^\+?977/, "")} onChangeText={value => {
           const digits = value.replace(/\D/g, "");
           const national = digits.startsWith("977") ? digits.slice(3) : digits;
           setPhone(`+977${national.slice(0, 10)}`);
-        }} keyboardType="phone-pad" autoComplete="tel" maxLength={14} editable={!busy && !sent} />
+        }} keyboardType="phone-pad" autoComplete="tel" maxLength={14} editable={!busy && !sent} /></View>
         {sent && <><Text accessibilityLiveRegion="polite" className="mb-2 text-foreground">Enter the SMS code for {phone}.</Text><TextInput accessibilityLabel="Six-digit SMS code" className={inputClass} keyboardType="number-pad" autoComplete="sms-otp" textContentType="oneTimeCode" value={token} onChangeText={v => setToken(v.replace(/\D/g, ""))} maxLength={6} editable={!busy} /></>}
         {sent && isDemoPhone && <Text accessibilityLiveRegion="polite" className="mb-2 rounded-md border border-emerald-300 bg-emerald-50 p-3 font-semibold text-emerald-900">Demo Mode: Enter OTP {DEMO_PHONE_AUTH_CODE}</Text>}
         <Pressable accessibilityRole="button" disabled={busy || (!client && !isDemoPhone) || (!sent && cooldown > 0)} onPress={() => void submit()} className="min-h-12 items-center justify-center rounded-md bg-primary p-3"><Text className="font-semibold text-primary-foreground">{busy ? "Please wait…" : sent ? "Verify and continue" : cooldown ? `Wait ${cooldown}s` : isDemoPhone ? "Continue with demo code" : "Send SMS code"}</Text></Pressable>
