@@ -22,13 +22,16 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
   const [cooldown, setCooldown] = useState(0);
   const lock = useRef(false);
   const nationalNumber = phone.replace(/\D/g, "").replace(/^977/, "");
-    if (!isValidNepalMobile(nationalNumber)) { setError("Enter a valid 10-digit Nepal mobile number beginning with 97 or 98."); return; }
-    const normalizedPhone = `+977${nationalNumber}`;
+  const normalizedPhone = `+977${nationalNumber}`;
   const localDigits = normalizedPhone.replace(/\D/g, "").replace(/^977/, "");
   const isDemoPhone = demoAuthEnabled && phoneSchema.safeParse(normalizedPhone).success && /^(97|98)/.test(localDigits);
   useEffect(() => { const timer = setInterval(() => setCooldown(n => Math.max(0, n - 1)), 1000); return () => clearInterval(timer); }, []);
   async function submit(verify = sent) {
     if (lock.current || (!verify && cooldown > 0)) return;
+    if (!isValidNepalMobile(nationalNumber)) {
+      setError("Enter a valid 10-digit Nepal mobile number beginning with 97 or 98.");
+      return;
+    }
     if (!verify && isDemoPhone) {
       if (signup) {
         try {
@@ -87,7 +90,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
           const digits = value.replace(/\D/g, "");
           const national = digits.startsWith("977") ? digits.slice(3) : digits;
           setPhone(`+977${national.slice(0, 10)}`);
-        }} keyboardType="phone-pad" autoComplete="tel" maxLength={14} editable={!busy && !sent} /></View>
+        }} keyboardType="phone-pad" autoComplete="tel-national" maxLength={10} editable={!busy && !sent} /></View>
         {sent && <><Text accessibilityLiveRegion="polite" className="mb-2 text-foreground">Enter the SMS code for {phone}.</Text><TextInput accessibilityLabel="Six-digit SMS code" className={inputClass} keyboardType="number-pad" autoComplete="sms-otp" textContentType="oneTimeCode" value={token} onChangeText={v => setToken(v.replace(/\D/g, ""))} maxLength={6} editable={!busy} /></>}
         {sent && isDemoPhone && <Text accessibilityLiveRegion="polite" className="mb-2 rounded-md border border-emerald-300 bg-emerald-50 p-3 font-semibold text-emerald-900">Demo Mode: Enter OTP {DEMO_PHONE_AUTH_CODE}</Text>}
         <Pressable accessibilityRole="button" disabled={busy || (!client && !isDemoPhone) || (!sent && cooldown > 0)} onPress={() => void submit()} className="min-h-12 items-center justify-center rounded-md bg-primary p-3"><Text className="font-semibold text-primary-foreground">{busy ? "Please wait…" : sent ? "Verify and continue" : cooldown ? `Wait ${cooldown}s` : isDemoPhone ? "Continue with demo code" : "Send SMS code"}</Text></Pressable>

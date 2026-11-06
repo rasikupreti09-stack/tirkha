@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps } from "react-native";
 import { catalogPriceLabel, DURATION_OPTIONS, REGIONS, formatBookingDate, formatNpr, hourlyRateLabel, tokens, translateCatalogLabel, translateUi } from "@tirkha/shared";
@@ -16,12 +17,19 @@ function Choice({ label, selected, disabled, onPress }: { label: string; selecte
   return <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled} onPress={onPress} className={selected ? "mb-2 min-h-12 justify-center rounded-md bg-primary p-3" : "mb-2 min-h-12 justify-center rounded-md border border-border p-3"}><Text className={selected ? "text-primary-foreground" : "text-foreground"}>{label}</Text></Pressable>;
 }
 export default function Book() {
-  const { category } = useLocalSearchParams<{ category?: string }>();
-  return <AccountGate roles={["customer"]}>{() => <BookingFields key={category || ""} slug={typeof category === "string" ? category : ""} />}</AccountGate>;
+  const { category, serviceId } = useLocalSearchParams<{ category?: string; serviceId?: string }>();
+  const slug = typeof category === "string" ? category : "";
+  const selectedServiceId = typeof serviceId === "string" ? serviceId : "";
+  return <AccountGate roles={["customer"]}>{() => <BookingFields key={`${slug}:${selectedServiceId}`} slug={slug} selectedServiceId={selectedServiceId} />}</AccountGate>;
 }
-function BookingFields({ slug }: { slug: string }) {
+function BookingFields({ slug, selectedServiceId }: { slug: string; selectedServiceId: string }) {
   const draft = useBookingDraft(slug);
   const { language } = useLanguage();
+  useEffect(() => {
+    if (!selectedServiceId || draft.catalogLoading || draft.offeringId === selectedServiceId) return;
+    const selected = draft.categoryOfferings.find((row) => row.service.id === selectedServiceId && row.availability_status === "available");
+    if (selected) draft.setOfferingId(selected.service.id);
+  }, [selectedServiceId, draft.catalogLoading, draft.offeringId, draft.categoryOfferings, draft.setOfferingId]);
   const t = (key: Parameters<typeof translateUi>[0]) => translateUi(key, language);
   const regionKeys: Record<string, Parameters<typeof translateUi>[0]> = {
     "Kathmandu Valley": "valley", Kathmandu: "city", Lalitpur: "lalitpur", Bhaktapur: "bhaktapur",
