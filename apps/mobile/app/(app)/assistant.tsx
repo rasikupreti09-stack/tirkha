@@ -1,3 +1,4 @@
+import { LocationPicker } from "@/components/location-picker";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
@@ -298,6 +299,7 @@ export default function AssistantScreen() {
         <Text className="mt-1 text-sm leading-5 text-slate-600">{text.subtitle}</Text>
       </View>
 
+      <View className="px-4 pt-3"><LocationPicker value={bookingDraft.location?.map_pin ?? null} onChange={bookingDraft.setPin} region={bookingDraft.region} /></View>
       <ScrollView
         ref={scrollRef}
         className="flex-1"
