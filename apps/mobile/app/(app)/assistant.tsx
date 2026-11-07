@@ -2,6 +2,7 @@ import { LocationPicker } from "../../components/location-picker";
 import * as sharedCatalog from "../../../../packages/shared/src/catalog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -159,6 +160,29 @@ export default function AssistantScreen() {
     fault: FaultMatch;
   } | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(true);
+const confirmationY = useRef(0);
+const navigationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+const [isNavigating, setIsNavigating] = useState(false);
+
+const selectServiceCategory = useCallback((serviceId: string, prompt: string) => {
+  if (navigationTimer.current) clearTimeout(navigationTimer.current);
+  setSelectedServiceId(serviceId);
+  setIsNavigating(true);
+  setInput(prompt);
+  requestAnimationFrame(() => {
+    scrollRef.current?.scrollTo({ y: Math.max(0, confirmationY.current - 12), animated: true });
+  });
+  navigationTimer.current = setTimeout(() => {
+    setIsNavigating(false);
+    setSelectedServiceId(null);
+    navigationTimer.current = null;
+  }, 1200);
+}, []);
+
+useEffect(() => () => {
+  if (navigationTimer.current) clearTimeout(navigationTimer.current);
+}, []);
 
   const nextId = useCallback(() => {
     messageSequence.current += 1;
@@ -337,20 +361,17 @@ export default function AssistantScreen() {
         <Text className="mt-1 text-sm leading-5 text-slate-600">{text.subtitle}</Text>
       </View>
 
-      <View className="px-4 pt-3"><View testID="assistant-landing-header" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingTop: 12, paddingBottom: 10, backgroundColor: "#F7F9F7" }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        <Image source={brandLogo} style={{ width: 42, height: 42, borderRadius: 12 }} resizeMode="contain" />
-        <View>
-          <Text style={{ color: "#1F2937", fontSize: 18, fontWeight: "700" }}>Tirkha</Text>
-          <Text style={{ color: "#64748B", fontSize: 11 }}>Your home, effortlessly managed.</Text>
+      <View className="px-4 pt-3">
+        <View testID="assistant-landing-header" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingTop: 12, paddingBottom: 10, backgroundColor: "#F7F9F7" }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <Image source={brandLogo} style={{ width: 42, height: 42, borderRadius: 12 }} resizeMode="contain" />
+            <View>
+              <Text style={{ color: "#1F2937", fontSize: 18, fontWeight: "700" }}>Tirkha</Text>
+              <Text style={{ color: "#64748B", fontSize: 11 }}>Your home, effortlessly managed.</Text>
+            </View>
+          </View>
         </View>
       </View>
-      <LocationPicker value={bookingDraft.location?.map_pin ?? null} onChange={bookingDraft.setPin} region={bookingDraft.region} />
-    </View>
-    <View testID="assistant-coverage-map-panel" style={{ marginHorizontal: 16, marginBottom: 14, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: "#DCE7DF", backgroundColor: "#EEF5F0" }}>
-      <Text style={{ color: "#0F766E", fontSize: 11, fontWeight: "700", letterSpacing: 1 }}>TIRKHA MAP · SERVICE AREAS</Text>
-      <Text style={{ color: "#475569", fontSize: 13, marginTop: 4 }}>Choose your region above. Use the map picker to set your service location.</Text>
-    </View></View>
       <ScrollView
         ref={scrollRef}
         className="flex-1"
@@ -370,16 +391,20 @@ export default function AssistantScreen() {
             <Pressable
               key={categoryKey(category) || title + "-" + index}
               testID={"service-category-" + (categoryKey(category) || index)}
-              onPress={() => {
-                setInput(prompt);
-                requestAnimationFrame(() => inputRef.current?.focus());
-              }}
-              style={{ width: "48%", minHeight: 112, marginBottom: 10, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: "#DCE7DF", backgroundColor: "#FFFFFF", shadowColor: "#0F172A", shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 }}
+              onPress={() => selectServiceCategory(categoryKey(category) || title + "-" + index, prompt)}
+              disabled={isNavigating}
+              style={{ position: "relative", overflow: "hidden", width: "48%", minHeight: 112, marginBottom: 10, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: "#DCE7DF", backgroundColor: "#FFFFFF", shadowColor: "#0F172A", shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 }}
             >
               <Text numberOfLines={2} style={{ color: "#1F2937", fontSize: 15, fontWeight: "700" }}>{title}</Text>
               {!!nepali && <Text numberOfLines={1} style={{ color: "#0F766E", fontSize: 12, marginTop: 3 }}>{nepali}</Text>}
               {!!description && <Text numberOfLines={2} style={{ color: "#64748B", fontSize: 11, marginTop: 6 }}>{description}</Text>}
               <Text style={{ color: "#047857", fontSize: 12, fontWeight: "700", marginTop: 8 }}>Ask about this →</Text>
+              {isNavigating && selectedServiceId === (categoryKey(category) || title + "-" + index) ? (
+                <View pointerEvents="none" accessibilityLabel={isNepali ? "स्थान चयन खोलिँदैछ" : "Opening location selection"} style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, zIndex: 3, backgroundColor: "rgba(255,255,255,0.92)", alignItems: "center", justifyContent: "center", borderRadius: 16 }}>
+                  <ActivityIndicator size="large" color="#047857" />
+                  <Text style={{ color: "#065F46", fontSize: 12, fontWeight: "700", marginTop: 8 }}>{isNepali ? "स्थान चयन खोलिँदैछ…" : "Opening location selection…"}</Text>
+                </View>
+              ) : null}
             </Pressable>
           );
         })}
@@ -481,6 +506,16 @@ export default function AssistantScreen() {
             {text.noService}
           </Text>
         ) : null}
+
+        <View
+          testID="assistant-request-confirmation"
+          onLayout={(event) => { confirmationY.current = event.nativeEvent.layout.y; }}
+          style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 18, padding: 14, borderRadius: 18, borderWidth: 1, borderColor: "#DCE7DF", backgroundColor: "#EEF5F0" }}
+        >
+          <Text style={{ color: "#0F766E", fontSize: 11, fontWeight: "700", letterSpacing: 1 }}>{isNepali ? "सेवा स्थान पुष्टि गर्नुहोस्" : "CONFIRM SERVICE LOCATION"}</Text>
+          <Text style={{ color: "#475569", fontSize: 13, marginTop: 4, marginBottom: 12 }}>{isNepali ? "Hero कहाँ आउनुपर्ने हो, नक्साबाट स्थान छान्नुहोस्।" : "Choose where the Hero should arrive using the map."}</Text>
+          <LocationPicker value={bookingDraft.location?.map_pin ?? null} onChange={bookingDraft.setPin} region={bookingDraft.region} />
+        </View>
       </ScrollView>
 
       <View className="border-t border-slate-200 bg-white px-4 pb-4 pt-3">
