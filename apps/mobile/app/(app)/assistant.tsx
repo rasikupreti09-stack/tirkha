@@ -1,4 +1,5 @@
 import { LocationPicker } from "../../components/location-picker";
+import * as sharedCatalog from "../../../../packages/shared/src/catalog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
@@ -11,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+const brandLogo = require("../../assets/icon.png") as number;
 import {
   diagnosticLanguageForText,
   diagnosticQuestion,
@@ -37,6 +39,20 @@ type ChatMessage = {
   service?: CatalogService;
   reason?: string;
 };
+
+function catalogText(item: unknown, keys: readonly string[]): string {
+  if (!item || typeof item !== "object") return "";
+  const record = item as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function categoryKey(item: unknown): string {
+  return catalogText(item, ["id", "slug", "category_id", "categoryId"]);
+}
 
 type FaultMatch = {
   code: string;
@@ -97,6 +113,28 @@ function getServiceDuration(service: CatalogService): string {
   if (typeof value === "string" && value.trim()) return value;
   return "—";
 }
+
+type MobileCatalogCategory = {
+  id?: string;
+  name?: string;
+  title?: string;
+  nameEn?: string;
+  nameNe?: string;
+  description?: string;
+  descriptionEn?: string;
+  descriptionNe?: string;
+  image?: string;
+  imageUrl?: string;
+  icon?: string;
+};
+
+const SERVICE_CATEGORIES = (
+  Object.entries(sharedCatalog).find(
+    ([key, value]) =>
+      /service.*categor|categor.*service|service.*catalog|catalog.*service/i.test(key) &&
+      Array.isArray(value),
+  )?.[1] ?? []
+) as MobileCatalogCategory[];
 
 export default function AssistantScreen() {
   const router = useRouter();
@@ -299,14 +337,55 @@ export default function AssistantScreen() {
         <Text className="mt-1 text-sm leading-5 text-slate-600">{text.subtitle}</Text>
       </View>
 
-      <View className="px-4 pt-3"><LocationPicker value={bookingDraft.location?.map_pin ?? null} onChange={bookingDraft.setPin} region={bookingDraft.region} /></View>
+      <View className="px-4 pt-3"><View testID="assistant-landing-header" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingTop: 12, paddingBottom: 10, backgroundColor: "#F7F9F7" }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <Image source={brandLogo} style={{ width: 42, height: 42, borderRadius: 12 }} resizeMode="contain" />
+        <View>
+          <Text style={{ color: "#1F2937", fontSize: 18, fontWeight: "700" }}>Tirkha</Text>
+          <Text style={{ color: "#64748B", fontSize: 11 }}>Your home, effortlessly managed.</Text>
+        </View>
+      </View>
+      <LocationPicker value={bookingDraft.location?.map_pin ?? null} onChange={bookingDraft.setPin} region={bookingDraft.region} />
+    </View>
+    <View testID="assistant-coverage-map-panel" style={{ marginHorizontal: 16, marginBottom: 14, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: "#DCE7DF", backgroundColor: "#EEF5F0" }}>
+      <Text style={{ color: "#0F766E", fontSize: 11, fontWeight: "700", letterSpacing: 1 }}>TIRKHA MAP · SERVICE AREAS</Text>
+      <Text style={{ color: "#475569", fontSize: 13, marginTop: 4 }}>Choose your region above. Use the map picker to set your service location.</Text>
+    </View></View>
       <ScrollView
         ref={scrollRef}
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 20 }}
         keyboardShouldPersistTaps="handled"
       >
-        {welcome && (
+        <View testID="assistant-service-catalog" style={{ paddingHorizontal: 16, paddingBottom: 18 }}>
+      <Text style={{ color: "#1F2937", fontSize: 21, fontWeight: "700", marginBottom: 4 }}>Services for your home</Text>
+      <Text style={{ color: "#64748B", fontSize: 13, marginBottom: 12 }}>Choose a category or describe what needs fixing.</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" }}>
+        {SERVICE_CATEGORIES.map((category: MobileCatalogCategory, index: number) => {
+          const title = catalogText(category, ["name", "title", "label", "name_en", "title_en"]) || "Home service";
+          const nepali = catalogText(category, ["name_ne", "title_ne", "label_ne", "nepali_name"]);
+          const description = catalogText(category, ["description", "description_en", "summary"]);
+          const prompt = title + (nepali ? " (" + nepali + ")" : "");
+          return (
+            <Pressable
+              key={categoryKey(category) || title + "-" + index}
+              testID={"service-category-" + (categoryKey(category) || index)}
+              onPress={() => {
+                setInput(prompt);
+                requestAnimationFrame(() => inputRef.current?.focus());
+              }}
+              style={{ width: "48%", minHeight: 112, marginBottom: 10, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: "#DCE7DF", backgroundColor: "#FFFFFF", shadowColor: "#0F172A", shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 }}
+            >
+              <Text numberOfLines={2} style={{ color: "#1F2937", fontSize: 15, fontWeight: "700" }}>{title}</Text>
+              {!!nepali && <Text numberOfLines={1} style={{ color: "#0F766E", fontSize: 12, marginTop: 3 }}>{nepali}</Text>}
+              {!!description && <Text numberOfLines={2} style={{ color: "#64748B", fontSize: 11, marginTop: 6 }}>{description}</Text>}
+              <Text style={{ color: "#047857", fontSize: 12, fontWeight: "700", marginTop: 8 }}>Ask about this →</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+    {welcome && (
           <View>
             <View className="max-w-[88%] self-start rounded-3xl rounded-tl-md border border-slate-200 bg-white px-4 py-3 shadow-sm">
               <Text className="text-[15px] leading-6 text-slate-800">{text.welcome}</Text>
