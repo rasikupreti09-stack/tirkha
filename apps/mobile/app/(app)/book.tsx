@@ -77,6 +77,17 @@ function BookingFields({ slug, selectedServiceId }: { slug: string; selectedServ
     <View className="flex-row flex-wrap gap-2">{DURATION_OPTIONS.map((minutes) => <Choice key={minutes} label={`${minutes} ${t("durationMinutes")}`} selected={draft.duration === minutes} onPress={() => draft.setDuration(minutes)} />)}</View>
     <Text className="mb-3 mt-6 font-semibold text-foreground">{t("landmarkLocation")}</Text>
     <LocationPicker value={draft.location.map_pin ?? null} onChange={draft.setPin} disabled={draft.busy || draft.loading} region={draft.region} />
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !draft.location.map_pin || draft.busy || draft.loading, selected: draft.isLocationConfirmed }}
+      disabled={!draft.location.map_pin || draft.busy || draft.loading}
+      onPress={draft.confirmLocation}
+      className={`mt-3 min-h-12 items-center justify-center rounded-md p-3 ${draft.isLocationConfirmed ? "bg-emerald-700" : "bg-primary"}`}
+    >
+      <Text className="font-semibold text-primary-foreground">
+        {draft.isLocationConfirmed ? "Location confirmed · स्थान पुष्टि भयो ✓" : "Confirm location · स्थान पुष्टि गर्नुहोस्"}
+      </Text>
+    </Pressable>
     {draft.savedLocation && <Choice label={`${t("savedLocationLabel")}: ${draft.savedLocation.landmark}`} onPress={draft.useSavedLocation} />}
     <Field label={t("municipalityArea")} value={draft.location.municipality} onChangeText={(municipality) => draft.setLocation({ ...draft.location, municipality })} maxLength={100} />
     <Field label={t("wardOptional")} value={draft.location.ward} onChangeText={(ward) => draft.setLocation({ ...draft.location, ward })} keyboardType="number-pad" maxLength={2} />
@@ -85,7 +96,7 @@ function BookingFields({ slug, selectedServiceId }: { slug: string; selectedServ
     <Text className="mt-2 text-xl font-semibold text-primary">{t("estimatedLabourTotal")}: {draft.estimate === null ? t("quotePending") : formatNpr(draft.estimate)}</Text>
     <Text className="mb-6 mt-3 text-sm leading-5 text-muted-foreground">{t("labourEstimateOnly")}</Text>
     {(draft.error || draft.estimateError) && <Text accessibilityRole="alert" className="mb-4 text-foreground">{draft.error || draft.estimateError}</Text>}
-    <Pressable accessibilityRole="button" disabled={draft.busy || draft.loading} onPress={() => void draft.submit()} className="min-h-12 items-center justify-center rounded-md bg-primary p-4"><Text className="font-semibold text-primary-foreground">{draft.busy ? t("submitting") : t("submitRequest")}</Text></Pressable>
+    <Pressable accessibilityRole="button" disabled={draft.busy || draft.loading || !draft.isLocationConfirmed} onPress={() => void draft.submit()} className="min-h-12 items-center justify-center rounded-md bg-primary p-4"><Text className="font-semibold text-primary-foreground">{draft.busy ? t("submitting") : t("submitRequest")}</Text></Pressable>
     <Link href="/(app)/bookings" className="mt-4 py-3 text-center text-primary underline">{t("myBookings")}</Link>
   </ScrollView></KeyboardAvoidingView>;
 }

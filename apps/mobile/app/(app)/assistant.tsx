@@ -515,6 +515,19 @@ useEffect(() => () => {
           <Text style={{ color: "#0F766E", fontSize: 11, fontWeight: "700", letterSpacing: 1 }}>{isNepali ? "सेवा स्थान पुष्टि गर्नुहोस्" : "CONFIRM SERVICE LOCATION"}</Text>
           <Text style={{ color: "#475569", fontSize: 13, marginTop: 4, marginBottom: 12 }}>{isNepali ? "Hero कहाँ आउनुपर्ने हो, नक्साबाट स्थान छान्नुहोस्।" : "Choose where the Hero should arrive using the map."}</Text>
           <LocationPicker value={bookingDraft.location?.map_pin ?? null} onChange={bookingDraft.setPin} region={bookingDraft.region} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !bookingDraft.location?.map_pin, selected: bookingDraft.isLocationConfirmed }}
+            disabled={!bookingDraft.location?.map_pin}
+            onPress={bookingDraft.confirmLocation}
+            style={{ marginTop: 12, minHeight: 46, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: bookingDraft.isLocationConfirmed ? "#15803D" : "#0F766E", opacity: bookingDraft.location?.map_pin ? 1 : 0.5 }}
+          >
+            <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>
+              {bookingDraft.isLocationConfirmed
+                ? (isNepali ? "स्थान पुष्टि भयो ✓" : "Location confirmed ✓")
+                : (isNepali ? "सेवा स्थान पुष्टि गर्नुहोस्" : "Confirm Location")}
+            </Text>
+          </Pressable>
         </View>
       </ScrollView>
 

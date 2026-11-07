@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type SetStateAction } from "react";
 import {
   bookingRequestSchema, locationPreferenceSchema, locationToAddress, nepalDateTimeToIso,
   defaultNepalSchedule, estimateLabourPaisa, bookingErrorMessage, LOCATION_STORAGE_KEY,
@@ -24,7 +24,13 @@ export function useBookingDraft(initialSlug = "") {
   const [dataAttempt, setDataAttempt] = useState(0);
   const [dataError, setDataError] = useState("");
   const [error, setError] = useState("");
-  const [location, setLocation] = useState<LocationPreference & { ward: string }>({ municipality: "", ward: "", landmark: "" });
+  const [locationState, setLocationState] = useState<LocationPreference & { ward: string }>({ municipality: "", ward: "", landmark: "" });
+  const [isLocationConfirmed, setIsLocationConfirmed] = useState(false);
+  const location = locationState;
+  const setLocation = (next: SetStateAction<LocationPreference & { ward: string }>) => {
+    setIsLocationConfirmed(false);
+    setLocationState(next);
+  };
   const [savedLocation, setSavedLocation] = useState<LocationPreference | null>(null);
   const [schedule, setSchedule] = useState(defaultNepalSchedule);
   const [duration, setDuration] = useState(60);
@@ -117,6 +123,7 @@ export function useBookingDraft(initialSlug = "") {
       const address = locationPreferenceSchema.safeParse(location);
       if (!address.success) throw new Error(address.error.issues[0].message);
       if (!address.data.map_pin) throw new Error("Drop a pin on the map so nearby Heroes can receive the exact service location.");
+      if (!isLocationConfirmed) throw new Error("Confirm the service location before submitting your request.");
       const payload = {
         map_region_key: region, service_offering_id: selectedOffering.id,
         category_id: categoryId, professional_id: professionalId || null,
@@ -138,9 +145,19 @@ export function useBookingDraft(initialSlug = "") {
       finally { busyRef.current = false; setBusy(false); }
     } catch (error) { setError(error instanceof Error ? error.message : "Check your booking details."); }
   }
+
+  function confirmLocation() {
+    if (!location.map_pin) {
+      setError("Choose a location on the map before confirming.");
+      return false;
+    }
+    setError("");
+    setIsLocationConfirmed(true);
+    return true;
+  }
   return {
     categories, categoryId, region, regionalCatalog, categoryOfferings, availableOfferings, offeringId, catalogLoading, professionalId, choices, loading, proLoading, hasMore,
-    dataError, error, location, savedLocation, schedule, duration, details, busy, created,
+    dataError, error, location, isLocationConfirmed, confirmLocation, savedLocation, schedule, duration, details, busy, created,
     estimate, estimateError, selectedProfessional,
     setPin(pin: MapPin | null) {
       setLocation((current) => ({
