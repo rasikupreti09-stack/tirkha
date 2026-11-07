@@ -1,4 +1,4 @@
-import { LocationPicker } from "@/components/location-picker";
+import { LocationPicker } from "../../components/location-picker";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
