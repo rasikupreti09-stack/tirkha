@@ -5,7 +5,46 @@ import { coordinatesSchema, type MapPin } from "@tirkha/shared";
 import { usePinResolution } from "../hooks/use-pin-resolution";
 import LocationMap from "./location-map";
 
+/** Geographic camera extents (south, west, north, east) used to identify the
+ * active map area. These are viewport bounds, not administrative polygons. */
+const SERVICE_REGION_VIEWPORTS: Record<string, readonly [number, number, number, number]> = {
+  "kathmandu valley": [27.55, 85.17, 27.85, 85.57],
+  kathmandu: [27.64, 85.25, 27.79, 85.43],
+  lalitpur: [27.57, 85.27, 27.70, 85.38],
+  bhaktapur: [27.62, 85.38, 27.75, 85.51],
+  kirtipur: [27.63, 85.23, 27.70, 85.31],
+  pokhara: [28.10, 83.90, 28.30, 84.05],
+  hetauda: [27.35, 84.95, 27.55, 85.15],
+  "makwanpur district": [27.10, 84.65, 27.75, 85.40],
+  simara: [27.08, 84.95, 27.22, 85.15],
+  "bara/parsa corridor": [26.75, 84.55, 27.25, 85.25],
+  "chitwan district": [27.30, 83.85, 27.90, 84.80],
+  chitwan: [27.30, 83.85, 27.90, 84.80],
+  "sunsari district": [26.30, 87.00, 26.95, 87.35],
+  sunsari: [26.30, 87.00, 26.95, 87.35],
+  "jhapa district": [26.30, 87.55, 26.75, 88.20],
+  jhapa: [26.30, 87.55, 26.75, 88.20],
+};
+
+function canonicalMapRegion(value: string): string {
+  const key = value.trim().toLocaleLowerCase();
+  if (key.includes("jhapa")) return "Jhapa District";
+  if (key.includes("sunsari")) return "Sunsari District";
+  if (key.includes("chitwan")) return "Chitwan District";
+  if (key.includes("makwanpur")) return "Makwanpur District";
+  if (key.includes("bara") || key.includes("parsa") || key.includes("pathlaiya") || key.includes("dumarwana") || key.includes("birgunj")) return "Bara/Parsa Corridor";
+  if (key.includes("simara") || key.includes("jeetpur")) return "Simara";
+  if (key.includes("hetauda") || key.includes("ratomate") || key.includes("hatiya") || key.includes("nawalpur")) return "Hetauda";
+  if (key.includes("kirtipur")) return "Kirtipur";
+  if (key.includes("bhaktapur")) return "Bhaktapur";
+  if (key.includes("lalitpur") || key.includes("patan")) return "Lalitpur";
+  if (key.includes("pokhara")) return "Pokhara";
+  return "Kathmandu Valley";
+}
+
 export function LocationPicker({ value, onChange, disabled = false, region = "Kathmandu Valley" }: { value: MapPin | null; onChange: (pin: MapPin | null) => void; disabled?: boolean; region?: string }) {
+  const mapRegion = canonicalMapRegion(region);
+  const viewportBounds = SERVICE_REGION_VIEWPORTS[mapRegion.toLocaleLowerCase()] ?? SERVICE_REGION_VIEWPORTS["kathmandu valley"];
   const lookup = usePinResolution(value, onChange, disabled);
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
@@ -45,7 +84,9 @@ export function LocationPicker({ value, onChange, disabled = false, region = "Ka
     <Pressable accessibilityRole="button" accessibilityState={{ disabled: disabled || locating }} disabled={disabled || locating} onPress={() => void useCurrentLocation()} className={`${button} border-emerald-700 bg-emerald-700`}>
       <Text className="text-center font-semibold text-white">{locating ? "Finding your location…" : "◎  Use my current location"}</Text>
     </Pressable>
-    <View className="overflow-hidden rounded-lg border border-border"><LocationMap value={value} onPick={lookup.pick} disabled={disabled} region={region} /></View>
+    <View className="w-full overflow-hidden rounded-lg border border-border" style={{ height: 420 }} accessibilityLabel={`Map focused on ${mapRegion}; viewport extent ${viewportBounds.join(", ")}`}>
+      <LocationMap value={value} onPick={lookup.pick} disabled={disabled} region={mapRegion} />
+    </View>
     <Pressable accessibilityRole="button" onPress={() => setShowCoordinates(!showCoordinates)} className={button}><Text className="text-foreground">{showCoordinates ? "Hide coordinate entry" : "Enter coordinates manually"}</Text></Pressable>
     {showCoordinates && <View className="gap-2">
       <Text className="text-foreground">Latitude</Text><TextInput accessibilityLabel="Latitude" editable={!disabled} value={latitude} onChangeText={setLatitude} keyboardType="numbers-and-punctuation" className="min-h-12 rounded-md border border-border bg-card px-3 text-foreground" />
@@ -58,7 +99,7 @@ export function LocationPicker({ value, onChange, disabled = false, region = "Ka
     </View>}
     <Pressable accessibilityRole="button" accessibilityState={{ disabled: !value || lookup.busy || disabled }} disabled={!value || lookup.busy || disabled} onPress={() => void lookup.resolve()} className={button}><Text className="text-foreground">{lookup.busy ? "Resolving area…" : "Resolve area"}</Text></Pressable>
     {value && <Pressable accessibilityRole="button" disabled={disabled} onPress={() => lookup.pick(null)} className={button}><Text className="text-foreground">Remove pin</Text></Pressable>}
-    <Text accessibilityLiveRegion="polite" className="text-sm text-foreground">{value ? `${value.latitude.toFixed(5)}, ${value.longitude.toFixed(5)} · ${value.resolved_address || "Area not resolved; you can enter it manually."}` : "No pin selected. The map starts in Kathmandu."}</Text>
+    <Text accessibilityLiveRegion="polite" className="text-sm text-foreground">{value ? `${value.latitude.toFixed(5)}, ${value.longitude.toFixed(5)} · ${value.resolved_address || "Area not resolved; you can enter it manually."}` : `No pin selected. Map focused on ${mapRegion}.`}</Text>
     {(locationError || lookup.error || inputError) && <Text accessibilityRole="alert" className="text-sm text-foreground">{locationError || inputError || lookup.error}</Text>}
     <Text className="text-xs text-muted-foreground">Area lookup sends selected coordinates to OpenStreetMap, not your landmark or job details. Results are approximate; check your address.</Text>
     <Text accessibilityRole="link" onPress={() => void Linking.openURL("https://www.openstreetmap.org/copyright")} className="py-2 text-xs text-foreground underline">Area data © OpenStreetMap contributors</Text>
