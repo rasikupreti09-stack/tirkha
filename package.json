@@ -21,7 +21,10 @@
     "theme:sync": "node scripts/sync-theme.mjs",
     "theme:check": "node scripts/sync-theme.mjs --check",
     "preinstall": "node scripts/sync-theme.mjs"
+  },
+  "dependencies": {
+    "expo": "~57.0.31",
+    "react": "19.2.3",
+    "react-native": "0.86.3"
   }
 }
-
-
