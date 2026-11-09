@@ -62,7 +62,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       "@maplibre/maplibre-react-native",
       ["expo-location", { locationWhenInUsePermission: "Tirkha uses your location to place a customer service pin. Verified Heroes can choose Go online to share their own position for nearby dispatch and active jobs; GPS sharing pauses in the background." }],
     ],
-    ...(projectId ? { updates: { ...config.updates, url: `https://u.expo.dev/${projectId}` }, runtimeVersion: { policy: "appVersion" } } : {}),
+    ...(projectId ? { updates: { ...config.updates, url: `https://u.expo.dev/${projectId}` } } : {}),
+    // EAS Update does not support runtime-version policies for this bare Android workflow.
+    // Keep this value aligned with the installed app's native runtime.
+    runtimeVersion: "1.0.0",
     extra: {
       ...config.extra,
       ...(projectId ? { eas: { ...config.extra?.eas, projectId } } : {}),
