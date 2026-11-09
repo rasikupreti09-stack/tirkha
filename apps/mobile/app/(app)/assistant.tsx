@@ -1,561 +1,327 @@
-import { LocationPicker } from "../../components/location-picker";
-import * as sharedCatalog from "../../../../packages/shared/src/catalog";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
+  SafeAreaView,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
-} from "react-native";
-import { useRouter } from "expo-router";
-const brandLogo = require("../../assets/icon.png") as number;
-import {
-  diagnosticLanguageForText,
-  diagnosticQuestion,
-  detectHomeSafetyRisk,
-  matchHomeFault as matchFault,
-  resolveDiagnosticCode,
-  serviceIdForDiagnosticCode,
-  catalogPriceLabel,
-  operationalRegionFor,
-  type CatalogService,
-} from "@tirkha/shared";
-import { useLanguage } from "../../providers/language-provider";
-import { useBookingDraft } from "../../hooks/use-booking-draft";
-import { loadRegionalCatalog } from "../../lib/discovery";
-import { getServiceArtwork } from "../../lib/service-artwork";
+} from 'react-native';
+import { useRouter } from 'expo-router';
 
-type Language = ReturnType<typeof diagnosticLanguageForText>;
-type Choice = string | { label?: string; text?: string; title?: string; value?: string };
+type Recommendation = {
+  title: string;
+  category: 'Plumbing' | 'Electrical';
+  description: string;
+};
+
 type ChatMessage = {
   id: string;
-  role: "user" | "assistant";
+  sender: 'assistant' | 'user';
   text: string;
-  choices?: Choice[];
-  service?: CatalogService;
-  reason?: string;
+  recommendation?: Recommendation;
 };
 
-function catalogText(item: unknown, keys: readonly string[]): string {
-  if (!item || typeof item !== "object") return "";
-  const record = item as Record<string, unknown>;
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
+const PROMPTS = [
+  { label: 'Leaking Pipe', text: 'I have a leaking pipe' },
+  { label: 'Electrical Outlet Spark', text: 'My electrical outlet is sparking' },
+];
+
+function diagnose(text: string): Recommendation | undefined {
+  const normalized = text.toLocaleLowerCase();
+  const plumbingTerms = ['leak', 'pipe', 'tap', 'faucet', 'water', 'नल', 'पानी', 'चुह'];
+  const electricalTerms = ['spark', 'outlet', 'socket', 'electric', 'wire', 'short', 'बिजुली', 'करन्ट', 'तार'];
+
+  if (plumbingTerms.some((term) => normalized.includes(term))) {
+    return {
+      title: 'Plumbing support',
+      category: 'Plumbing',
+      description: 'A plumber can inspect the leak and confirm the repair scope on site.',
+    };
   }
-  return "";
-}
 
-function categoryKey(item: unknown): string {
-  return catalogText(item, ["id", "slug", "category_id", "categoryId"]);
-}
-
-type FaultMatch = {
-  code: string;
-  issueId: string;
-  title?: string;
-  serviceId?: string | null;
-};
-
-const copy = {
-  en: {
-    title: "Tirkha Home Assistant",
-    subtitle: "Describe what needs attention. I’ll ask focused questions before recommending a service.",
-    placeholder: "Describe the issue…",
-    send: "Send",
-    welcome: "Tell me what is happening at home. You can write in English or नेपाली.",
-    prompts: ["Leaking pipe", "AC isn't cooling", "Circuit short"],
-    noMatch: "I couldn't identify the fault yet. Add one detail: which fixture or appliance is affected, and what is it doing?",
-    safety: "Safety first: move away from exposed wiring or standing water near electricity. If safe, switch off the affected circuit and contact emergency help if there is immediate danger.",
-    book: "Book this service",
-    duration: "Typical time",
-    reason: "Why this match",
-    noService: "The diagnosis is ready, but this service is not bookable in the selected region yet.",
-  },
-  np: {
-    title: "तिर्खा गृह-सहायता",
-    subtitle: "समस्या लेख्नुहोस्। सेवा सिफारिस गर्नुअघि म उपयोगी प्रश्नहरू सोध्छु।",
-    placeholder: "समस्या लेख्नुहोस्…",
-    send: "पठाउनुहोस्",
-    welcome: "घरमा के समस्या भइरहेको छ लेख्नुहोस्। नेपाली वा English दुवैमा लेख्न सक्नुहुन्छ।",
-    prompts: ["नल चुहिएको", "AC चिसो छैन", "बिजुली सर्ट"],
-    noMatch: "समस्या अझै स्पष्ट भएन। कुन धारा वा उपकरणमा के भइरहेको छ भन्ने एक विवरण थप्नुहोस्।",
-    safety: "पहिले सुरक्षा: खुला तार वा बिजुली नजिकको पानीबाट टाढा रहनुहोस्। सुरक्षित भए प्रभावित सर्किट बन्द गर्नुहोस्। तत्काल जोखिम भए आपत्कालीन सहयोग लिनुहोस्।",
-    book: "यो सेवा बुक गर्नुहोस्",
-    duration: "सामान्य समय",
-    reason: "यो सेवा किन",
-    noService: "समस्या पहिचान भयो, तर यो सेवा चयन गरिएको क्षेत्रमा अहिले बुक गर्न उपलब्ध छैन।",
-  },
-} as const;
-
-function getChoiceLabel(choice: Choice): string {
-  if (typeof choice === "string") return choice;
-  return choice.label ?? choice.text ?? choice.title ?? choice.value ?? "";
-}
-
-function getServiceText(service: CatalogService, keys: string[], fallback = ""): string {
-  const record = service as unknown as Record<string, unknown>;
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim()) return value;
+  if (electricalTerms.some((term) => normalized.includes(term))) {
+    return {
+      title: 'Electrical safety support',
+      category: 'Electrical',
+      description: 'An electrician can inspect the outlet safely and identify the cause.',
+    };
   }
-  return fallback;
+
+  return undefined;
 }
-
-function getServiceDuration(service: CatalogService): string {
-  const record = service as unknown as Record<string, unknown>;
-  const value = record.duration_minutes ?? record.duration ?? record.estimated_minutes;
-  if (typeof value === "number") return `${value} min`;
-  if (typeof value === "string" && value.trim()) return value;
-  return "—";
-}
-
-type MobileCatalogCategory = {
-  id?: string;
-  name?: string;
-  title?: string;
-  nameEn?: string;
-  nameNe?: string;
-  description?: string;
-  descriptionEn?: string;
-  descriptionNe?: string;
-  image?: string;
-  imageUrl?: string;
-  icon?: string;
-};
-
-const SERVICE_CATEGORIES = (
-  Object.entries(sharedCatalog).find(
-    ([key, value]) =>
-      /service.*categor|categor.*service|service.*catalog|catalog.*service/i.test(key) &&
-      Array.isArray(value),
-  )?.[1] ?? []
-) as MobileCatalogCategory[];
 
 export default function AssistantScreen() {
   const router = useRouter();
-  const languageContext = useLanguage() as { language?: string };
-  const isNepali = languageContext.language === "np" || languageContext.language === "ne";
-  const text = isNepali ? copy.np : copy.en;
-
-  // The booking draft is shared with the /book funnel so a recommendation can
-  // be selected before navigation instead of relying on route-only display state.
-  const bookingDraft = useBookingDraft();
   const scrollRef = useRef<ScrollView>(null);
-  const inputRef = useRef<TextInput>(null);
-  const messageSequence = useRef(0);
-  const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [services, setServices] = useState<CatalogService[]>([]);
-  const [diagnostic, setDiagnostic] = useState<{
-    issueId: string;
-    faultCode: string;
-    language: Language;
-    answers: number[];
-    fault: FaultMatch;
-  } | null>(null);
-  const [catalogLoading, setCatalogLoading] = useState(true);
-const confirmationY = useRef(0);
-const navigationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
-const [isNavigating, setIsNavigating] = useState(false);
-
-const selectServiceCategory = useCallback((serviceId: string, prompt: string) => {
-  if (navigationTimer.current) clearTimeout(navigationTimer.current);
-  setSelectedServiceId(serviceId);
-  setIsNavigating(true);
-  setInput(prompt);
-  requestAnimationFrame(() => {
-    scrollRef.current?.scrollTo({ y: Math.max(0, confirmationY.current - 12), animated: true });
-  });
-  navigationTimer.current = setTimeout(() => {
-    setIsNavigating(false);
-    setSelectedServiceId(null);
-    navigationTimer.current = null;
-  }, 1200);
-}, []);
-
-useEffect(() => () => {
-  if (navigationTimer.current) clearTimeout(navigationTimer.current);
-}, []);
-
-  const nextId = useCallback(() => {
-    messageSequence.current += 1;
-    return `message-${messageSequence.current}`;
-  }, []);
+  const [inputText, setInputText] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'welcome',
+      sender: 'assistant',
+      text: 'Namaste! Tell me what is happening at home. I can help narrow down the service you may need.',
+    },
+  ]);
 
   useEffect(() => {
-    let alive = true;
-    const region = operationalRegionFor(bookingDraft.region);
-    setCatalogLoading(true);
-    setServices([]);
-    if (!region) {
-      setCatalogLoading(false);
-      return () => {
-        alive = false;
-      };
-    }
-    void loadRegionalCatalog(region)
-      .then((rows) => {
-        if (!alive) return;
-        setServices(
-          rows
-            .filter((row) => row.availability_status === "available")
-            .map((row) => row.service),
-        );
-      })
-      .catch(() => {
-        if (alive) setServices([]);
-      })
-      .finally(() => {
-        if (alive) setCatalogLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [bookingDraft.region]);
-
-  useEffect(() => {
-    if (messages.length) {
-      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
-    }
+    scrollRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
-  const appendAssistant = useCallback(
-    (message: Omit<ChatMessage, "id" | "role">) => {
-      setMessages((current) => [...current, { ...message, id: nextId(), role: "assistant" }]);
-    },
-    [nextId],
-  );
+  const sendMessage = (value = inputText) => {
+    const text = value.trim();
+    if (!text) return;
 
-  const findService = useCallback(
-    (serviceId: string | null | undefined) =>
-      serviceId ? services.find((service) => service.id === serviceId) : undefined,
-    [services],
-  );
+    const recommendation = diagnose(text);
+    const reply: ChatMessage = {
+      id: `assistant-${Date.now()}`,
+      sender: 'assistant',
+      text: recommendation
+        ? 'From what you described, this service may be a good place to start. A professional should confirm the issue and final scope on site.'
+        : 'Could you share one more detail—what is affected, and when did the problem begin? You can also choose a suggestion below.',
+      recommendation,
+    };
 
-  const askSharedQuestion = useCallback(
-    (state: NonNullable<typeof diagnostic>) => {
-      const question = diagnosticQuestion(
-        state.issueId as Parameters<typeof diagnosticQuestion>[0],
-        state.answers.length,
-        state.language,
-        state.answers,
-        state.faultCode,
-      );
-      if (!question) {
-        const resolved = resolveDiagnosticCode(
-          state.issueId as Parameters<typeof resolveDiagnosticCode>[0],
-          state.answers,
-          state.faultCode,
-        );
-        const code = resolved as unknown as string | null;
-        const serviceId = code ? serviceIdForDiagnosticCode(code as Parameters<typeof serviceIdForDiagnosticCode>[0]) : state.fault.serviceId;
-        const service = findService(serviceId);
-        appendAssistant({
-          text: isNepali ? "तपाईंको जवाफका आधारमा सम्भावित समस्या पहिचान गरिएको छ।" : "Based on your answers, the likely fault has been identified.",
-          service,
-          reason: state.fault.title ?? state.fault.code,
-        });
-        return;
-      }
-      appendAssistant({
-        text: question.prompt,
-        choices: question.choices as Choice[],
-      });
-    },
-    [appendAssistant, findService, isNepali],
-  );
+    setMessages((current) => [
+      ...current,
+      { id: `user-${Date.now()}`, sender: 'user', text },
+      reply,
+    ]);
+    setInputText('');
+  };
 
-  const processText = useCallback(
-    (rawText: string) => {
-      const submitted = rawText.trim();
-      if (!submitted) return;
-      setMessages((current) => [...current, { id: nextId(), role: "user", text: submitted }]);
-      setInput("");
-
-      // Use the same shared matcher and fault-tree question generator as the web triage flow.
-      const matched = matchFault(submitted) as FaultMatch | null;
-      if (!matched) {
-        appendAssistant({ text: text.noMatch });
-        return;
-      }
-
-      const detectedLanguage = diagnosticLanguageForText(submitted);
-      const state = {
-        issueId: matched.issueId,
-        faultCode: matched.code,
-        language: detectedLanguage,
-        answers: [],
-        fault: matched,
-      };
-      setDiagnostic(state);
-      if (detectHomeSafetyRisk(submitted)) {
-        appendAssistant({ text: text.safety });
-      }
-      askSharedQuestion(state);
-    },
-    [appendAssistant, askSharedQuestion, nextId, text.noMatch, text.safety],
-  );
-
-  const answerChoice = useCallback(
-    (choiceIndex: number, choice: Choice) => {
-      if (!diagnostic) return;
-      const label = getChoiceLabel(choice);
-      setMessages((current) => [...current, { id: nextId(), role: "user", text: label }]);
-      const state = { ...diagnostic, answers: [...diagnostic.answers, choiceIndex] };
-      setDiagnostic(state);
-      askSharedQuestion(state);
-    },
-    [askSharedQuestion, diagnostic, nextId],
-  );
-
-  const choosePrompt = useCallback(
-    (prompt: string) => {
-      inputRef.current?.blur();
-      processText(prompt);
-    },
-    [processText],
-  );
-
-  const openBooking = useCallback(
-    (service: CatalogService) => {
-      const record = service as unknown as Record<string, unknown>;
-      const rawCategory = String(record.category_id ?? record.categoryId ?? record.category_slug ?? "");
-      const category = bookingDraft.categories.find(
-        (item) => item.id === rawCategory || item.slug === rawCategory,
-      );
-      const categoryId = category?.id ?? rawCategory;
-      const categorySlug = category?.slug ?? rawCategory;
-      const serviceId = service.id;
-      // Set the shared draft first; route params also let the booking screen restore
-      // the selection after app process recreation.
-      bookingDraft.changeCategory(categoryId);
-      bookingDraft.setOfferingId?.(serviceId);
-      router.push({
-        pathname: "/(app)/book",
-        params: { category: categorySlug, serviceId },
-      });
-    },
-    [bookingDraft, router],
-  );
-
-  const welcome = useMemo(
-    () => messages.length === 0,
-    [messages.length],
-  );
+  const useSuggestion = (recommendation: Recommendation) => {
+    setInputText(`${recommendation.category}: ${recommendation.title}`);
+  };
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-[#f6f8f6]"
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 84 : 0}
-    >
-      <View className="border-b border-slate-200 bg-white px-5 pb-4 pt-3">
-        <Text className="text-xl font-bold text-slate-900">{text.title}</Text>
-        <Text className="mt-1 text-sm leading-5 text-slate-600">{text.subtitle}</Text>
-      </View>
-
-      <View className="px-4 pt-3">
-        <View testID="assistant-landing-header" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingTop: 12, paddingBottom: 10, backgroundColor: "#F7F9F7" }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <Image source={brandLogo} style={{ width: 42, height: 42, borderRadius: 12 }} resizeMode="contain" />
-            <View>
-              <Text style={{ color: "#1F2937", fontSize: 18, fontWeight: "700" }}>Tirkha</Text>
-              <Text style={{ color: "#64748B", fontSize: 11 }}>Your home, effortlessly managed.</Text>
-            </View>
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        style={styles.screen}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Text style={{ color: "#087A5B", fontSize: 20 }}>•</Text>
+          </TouchableOpacity>
+          <View style={styles.headerCopy}>
+            <Text style={styles.eyebrow}>TIRKHA · HOME HELP</Text>
+            <Text style={styles.headerTitle}>Tirkha AI Assistant</Text>
+          </View>
+          <View style={styles.assistantMark}>
+            <Text style={{ color: "#087A5B", fontSize: 20 }}>•</Text>
           </View>
         </View>
-      </View>
-      <ScrollView
-        ref={scrollRef}
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 20 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View testID="assistant-service-catalog" style={{ paddingHorizontal: 16, paddingBottom: 18 }}>
-      <Text style={{ color: "#1F2937", fontSize: 21, fontWeight: "700", marginBottom: 4 }}>Services for your home</Text>
-      <Text style={{ color: "#64748B", fontSize: 13, marginBottom: 12 }}>Choose a category or describe what needs fixing.</Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" }}>
-        {SERVICE_CATEGORIES.map((category: MobileCatalogCategory, index: number) => {
-          const title = catalogText(category, ["name", "title", "label", "name_en", "title_en"]) || "Home service";
-          const nepali = catalogText(category, ["name_ne", "title_ne", "label_ne", "nepali_name"]);
-          const description = catalogText(category, ["description", "description_en", "summary"]);
-          const prompt = title + (nepali ? " (" + nepali + ")" : "");
-          return (
-            <Pressable
-              key={categoryKey(category) || title + "-" + index}
-              testID={"service-category-" + (categoryKey(category) || index)}
-              onPress={() => selectServiceCategory(categoryKey(category) || title + "-" + index, prompt)}
-              disabled={isNavigating}
-              style={{ position: "relative", overflow: "hidden", width: "48%", minHeight: 112, marginBottom: 10, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: "#DCE7DF", backgroundColor: "#FFFFFF", shadowColor: "#0F172A", shadowOpacity: 0.07, shadowRadius: 8, elevation: 2 }}
-            >
-              <Text numberOfLines={2} style={{ color: "#1F2937", fontSize: 15, fontWeight: "700" }}>{title}</Text>
-              {!!nepali && <Text numberOfLines={1} style={{ color: "#0F766E", fontSize: 12, marginTop: 3 }}>{nepali}</Text>}
-              {!!description && <Text numberOfLines={2} style={{ color: "#64748B", fontSize: 11, marginTop: 6 }}>{description}</Text>}
-              <Text style={{ color: "#047857", fontSize: 12, fontWeight: "700", marginTop: 8 }}>Ask about this →</Text>
-              {isNavigating && selectedServiceId === (categoryKey(category) || title + "-" + index) ? (
-                <View pointerEvents="none" accessibilityLabel={isNepali ? "स्थान चयन खोलिँदैछ" : "Opening location selection"} style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, zIndex: 3, backgroundColor: "rgba(255,255,255,0.92)", alignItems: "center", justifyContent: "center", borderRadius: 16 }}>
-                  <ActivityIndicator size="large" color="#047857" />
-                  <Text style={{ color: "#065F46", fontSize: 12, fontWeight: "700", marginTop: 8 }}>{isNepali ? "स्थान चयन खोलिँदैछ…" : "Opening location selection…"}</Text>
-                </View>
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
-    {welcome && (
-          <View>
-            <View className="max-w-[88%] self-start rounded-3xl rounded-tl-md border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <Text className="text-[15px] leading-6 text-slate-800">{text.welcome}</Text>
-            </View>
-            <View className="mt-5 flex-row flex-wrap gap-2">
-              {text.prompts.map((prompt) => (
-                <Pressable
-                  key={prompt}
-                  onPress={() => choosePrompt(prompt)}
-                  className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2.5 active:bg-emerald-100"
-                >
-                  <Text className="text-sm font-semibold text-emerald-900">{prompt}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        )}
 
-        {messages.map((message) => (
-          <View
-            key={message.id}
-            className={`mb-4 max-w-[94%] ${message.role === "user" ? "self-end" : "self-start"}`}
-          >
+        <ScrollView
+          ref={scrollRef}
+          style={styles.chat}
+          contentContainerStyle={styles.chatContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.sectionLabel}>QUICK SUGGESTIONS</Text>
+          <View style={styles.promptRow}>
+            {PROMPTS.map((prompt) => (
+              <TouchableOpacity
+                key={prompt.label}
+                accessibilityRole="button"
+                onPress={() => sendMessage(prompt.text)}
+                style={styles.promptChip}
+              >
+                <Text style={styles.promptText}>{prompt.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {messages.map((message) => (
             <View
-              className={`rounded-3xl px-4 py-3 shadow-sm ${message.role === "user" ? "rounded-tr-md bg-emerald-700" : "rounded-tl-md border border-slate-200 bg-white"}`}
+              key={message.id}
+              style={[
+                styles.messageGroup,
+                message.sender === 'user' ? styles.userGroup : styles.assistantGroup,
+              ]}
             >
-              <Text className={`text-[15px] leading-6 ${message.role === "user" ? "text-white" : "text-slate-800"}`}>
-                {message.text}
-              </Text>
-              {message.choices && diagnostic && (
-                <View className="mt-3 gap-2">
-                  {message.choices.map((choice, index) => (
-                    <Pressable
-                      key={`${message.id}-choice-${index}`}
-                      onPress={() => answerChoice(index, choice)}
-                      className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 active:bg-emerald-100"
+              <View
+                style={[
+                  styles.bubble,
+                  message.sender === 'user' ? styles.userBubble : styles.assistantBubble,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.messageText,
+                    message.sender === 'user' ? styles.userMessageText : styles.assistantMessageText,
+                  ]}
+                >
+                  {message.text}
+                </Text>
+              </View>
+
+              {message.recommendation && (
+                <View style={styles.recommendationCard}>
+                  <View style={styles.recommendationIcon}>
+                    <Text style={{ color: "#087A5B", fontSize: 20 }}>•</Text>
+                  </View>
+                  <View style={styles.recommendationCopy}>
+                    <Text style={styles.recommendationCategory}>{message.recommendation.category}</Text>
+                    <Text style={styles.recommendationTitle}>{message.recommendation.title}</Text>
+                    <Text style={styles.recommendationDescription}>
+                      {message.recommendation.description}
+                    </Text>
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      onPress={() => useSuggestion(message.recommendation!)}
+                      style={styles.recommendationAction}
                     >
-                      <Text className="text-sm font-medium text-emerald-950">{getChoiceLabel(choice)}</Text>
-                    </Pressable>
-                  ))}
+                      <Text style={styles.recommendationActionText}>Use this suggestion</Text>
+                      <Text style={{ color: "#087A5B", fontSize: 20 }}>•</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </View>
+          ))}
+        </ScrollView>
 
-            {message.service && (
-              <View className="mt-3 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-md">
-                <Image
-                source={getServiceArtwork(message.service.image, message.service.category_slug)}
-                  className="h-48 w-full bg-slate-100"
-                  resizeMode="cover"
-                  accessibilityLabel={getServiceText(message.service, ["name", "title", "name_en"], "Service")}
-                />
-                <View className="p-4">
-                  <Text className="text-lg font-bold text-slate-900">
-                    {getServiceText(
-                      message.service,
-                      isNepali ? ["name_ne", "title_ne", "name_np"] : ["name_en", "title_en", "name"],
-                      getServiceText(message.service, ["name", "title"], ""),
-                    )}
-                  </Text>
-                  <Text className="mt-2 text-base font-bold text-emerald-800">
-                    {isNepali ? "रू " : "NPR "}
-                    {catalogPriceLabel(message.service).replace(/^Rs\.\s*/i, "")}
-                  </Text>
-                  <Text className="mt-1 text-sm text-slate-600">
-                    {text.duration}: {getServiceDuration(message.service)}
-                  </Text>
-                  {message.reason ? (
-                    <View className="mt-3 rounded-2xl bg-slate-50 p-3">
-                      <Text className="text-xs font-bold uppercase tracking-wide text-slate-500">{text.reason}</Text>
-                      <Text className="mt-1 text-sm leading-5 text-slate-700">{message.reason}</Text>
-                    </View>
-                  ) : null}
-                  <Pressable
-                    onPress={() => openBooking(message.service!)}
-                    className="mt-4 items-center rounded-2xl bg-emerald-700 px-4 py-3.5 active:bg-emerald-800"
-                  >
-                    <Text className="font-bold text-white">{text.book}</Text>
-                  </Pressable>
-                </View>
-              </View>
-            )}
-          </View>
-        ))}
-
-        {catalogLoading ? (
-          <Text className="mb-3 self-center text-xs text-slate-500">
-            {isNepali ? "सेवा सूची लोड हुँदैछ…" : "Loading available services…"}
-          </Text>
-        ) : null}
-        {!catalogLoading && messages.some((message) => message.reason && !message.service) ? (
-          <Text className="mb-3 max-w-[90%] self-start rounded-2xl bg-amber-50 px-4 py-3 text-sm leading-5 text-amber-900">
-            {text.noService}
-          </Text>
-        ) : null}
-
-        <View
-          testID="assistant-request-confirmation"
-          onLayout={(event) => { confirmationY.current = event.nativeEvent.layout.y; }}
-          style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 18, padding: 14, borderRadius: 18, borderWidth: 1, borderColor: "#DCE7DF", backgroundColor: "#EEF5F0" }}
-        >
-          <Text style={{ color: "#0F766E", fontSize: 11, fontWeight: "700", letterSpacing: 1 }}>{isNepali ? "सेवा स्थान पुष्टि गर्नुहोस्" : "CONFIRM SERVICE LOCATION"}</Text>
-          <Text style={{ color: "#475569", fontSize: 13, marginTop: 4, marginBottom: 12 }}>{isNepali ? "Hero कहाँ आउनुपर्ने हो, नक्साबाट स्थान छान्नुहोस्।" : "Choose where the Hero should arrive using the map."}</Text>
-          <LocationPicker value={bookingDraft.location?.map_pin ?? null} onChange={bookingDraft.setPin} region={bookingDraft.region} />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !bookingDraft.location?.map_pin, selected: bookingDraft.isLocationConfirmed }}
-            disabled={!bookingDraft.location?.map_pin}
-            onPress={bookingDraft.confirmLocation}
-            style={{ marginTop: 12, minHeight: 46, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: bookingDraft.isLocationConfirmed ? "#15803D" : "#0F766E", opacity: bookingDraft.location?.map_pin ? 1 : 0.5 }}
-          >
-            <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>
-              {bookingDraft.isLocationConfirmed
-                ? (isNepali ? "स्थान पुष्टि भयो ✓" : "Location confirmed ✓")
-                : (isNepali ? "सेवा स्थान पुष्टि गर्नुहोस्" : "Confirm Location")}
-            </Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-
-      <View className="border-t border-slate-200 bg-white px-4 pb-4 pt-3">
-        <View className="flex-row items-end gap-2 rounded-3xl border border-slate-300 bg-slate-50 p-2">
+        <View style={styles.composerWrap}>
           <TextInput
-            ref={inputRef}
-            value={input}
-            onChangeText={setInput}
-            placeholder={text.placeholder}
-            placeholderTextColor="#64748b"
-            multiline
-            maxLength={1200}
-            className="max-h-28 min-h-11 flex-1 px-3 py-2 text-[15px] leading-5 text-slate-900"
-            onSubmitEditing={() => processText(input)}
+            accessibilityLabel="Describe your home issue"
+            style={styles.input}
+            placeholder="Describe your home issue..."
+            placeholderTextColor="#7b8794"
+            value={inputText}
+            onChangeText={setInputText}
+            onSubmitEditing={() => sendMessage()}
             returnKeyType="send"
+            multiline
           />
-          <Pressable
+          <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel={text.send}
-            disabled={!input.trim()}
-            onPress={() => processText(input)}
-            className={`mb-0.5 rounded-full px-4 py-3 ${input.trim() ? "bg-emerald-700" : "bg-slate-300"}`}
+            accessibilityLabel="Send message"
+            onPress={() => sendMessage()}
+            disabled={!inputText.trim()}
+            style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
           >
-            <Text className="font-bold text-white">{text.send}</Text>
-          </Pressable>
+            <Text style={{ color: "#087A5B", fontSize: 20 }}>•</Text>
+          </TouchableOpacity>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#f7f9fb' },
+  screen: { flex: 1 },
+  header: {
+    minHeight: 76,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8e5',
+  },
+  backButton: { width: 38, height: 42, justifyContent: 'center' },
+  headerCopy: { flex: 1, paddingLeft: 6 },
+  eyebrow: { color: '#087f5b', fontSize: 10, fontWeight: '800', letterSpacing: 1.6 },
+  headerTitle: { marginTop: 3, color: '#202b3b', fontSize: 18, fontWeight: '700' },
+  assistantMark: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eaf5ef',
+  },
+  chat: { flex: 1 },
+  chatContent: { padding: 18, paddingBottom: 26 },
+  sectionLabel: { color: '#687782', fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
+  promptRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 11, marginBottom: 22 },
+  promptChip: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#dce6df',
+    backgroundColor: '#fff',
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+  },
+  promptText: { color: '#35483f', fontSize: 13, fontWeight: '600' },
+  messageGroup: { maxWidth: '92%', marginBottom: 16 },
+  assistantGroup: { alignSelf: 'flex-start' },
+  userGroup: { alignSelf: 'flex-end', alignItems: 'flex-end' },
+  bubble: { borderRadius: 18, paddingHorizontal: 15, paddingVertical: 12 },
+  assistantBubble: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e1e8e4',
+    borderTopLeftRadius: 6,
+  },
+  userBubble: { backgroundColor: '#087f5b', borderTopRightRadius: 6 },
+  messageText: { fontSize: 15, lineHeight: 22 },
+  assistantMessageText: { color: '#263342' },
+  userMessageText: { color: '#fff' },
+  recommendationCard: {
+    flexDirection: 'row',
+    marginTop: 10,
+    padding: 13,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#dce8df',
+  },
+  recommendationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#eaf5ef',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recommendationCopy: { flex: 1, paddingLeft: 11 },
+  recommendationCategory: { color: '#087f5b', fontSize: 11, fontWeight: '800', letterSpacing: 0.7 },
+  recommendationTitle: { marginTop: 3, color: '#202b3b', fontSize: 15, fontWeight: '700' },
+  recommendationDescription: { marginTop: 5, color: '#64717d', fontSize: 13, lineHeight: 19 },
+  recommendationAction: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  recommendationActionText: { color: '#087f5b', fontSize: 13, fontWeight: '700' },
+  composerWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8e5',
+  },
+  input: {
+    flex: 1,
+    maxHeight: 112,
+    minHeight: 44,
+    paddingHorizontal: 15,
+    paddingVertical: 11,
+    borderRadius: 22,
+    backgroundColor: '#f2f6f4',
+    color: '#202b3b',
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#087f5b',
+  },
+  sendButtonDisabled: { backgroundColor: '#9fb5aa' },
+});
