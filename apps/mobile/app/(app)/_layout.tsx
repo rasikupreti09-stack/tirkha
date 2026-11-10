@@ -1,5 +1,5 @@
-import { Redirect, Tabs } from "expo-router";
-import { ActivityIndicator, Text, View, type ColorValue } from "react-native";
+import { Redirect, Tabs, useSegments } from "expo-router";
+import { ActivityIndicator, Image, Text, View, type ColorValue } from "react-native";
 import { tokens } from "@tirkha/shared";
 import { useAuth } from "../../providers/auth-provider";
 import { useAccount } from "../../hooks/use-account";
@@ -12,13 +12,37 @@ export default function AppLayout() {
   const { session, loading, isDemo } = useAuth();
   const { account } = useAccount();
   const isHero = account?.profile.role === "professional";
+  const segments = useSegments();
+  const activeRoute = segments[segments.length - 1];
   if (loading) return <View className="flex-1 items-center justify-center bg-background px-8">
     <ActivityIndicator size="large" color={tokens.colors.primary} accessibilityLabel="Loading account" />
     <Text accessibilityLiveRegion="polite" className="mt-5 text-xl font-semibold text-primary">Tirkha | तिर्खा</Text>
     <Text className="mt-2 text-center text-muted-foreground">Preparing your account…</Text>
   </View>;
   if (!session && !isDemo) return <Redirect href="/(auth)/login" />;
+  const customerOnlyRoutes = ["index", "bookings", "assistant", "book", "categories"];
+  const isHeroRoute = segments.includes("hero") || activeRoute === "jobs";
+  if (isHero && customerOnlyRoutes.includes(activeRoute ?? "")) {
+    return <Redirect href="/(app)/hero/index" />;
+  }
+  if (!isHero && isHeroRoute) return <Redirect href="/(app)" />;
+
   return <HeroLocationService account={account}>
+    <View className="flex-1 bg-background">
+      <View className="flex-row items-center border-b border-border bg-white px-5 py-3">
+        <Image
+          source={require("../../assets/icon.png")}
+          accessibilityLabel="Tirkha logo"
+          resizeMode="contain"
+          style={{ width: 38, height: 38, borderRadius: 10 }}
+        />
+        <View className="ml-3">
+          <Text className="text-base font-bold text-foreground">Tirkha | तिर्खा</Text>
+          <Text className="text-[10px] font-semibold uppercase tracking-[2px] text-primary">
+            {isHero ? "Hero Portal" : "Home Services"}
+          </Text>
+        </View>
+      </View>
     <Tabs
       key={isHero ? "hero-tabs" : "customer-tabs"}
       initialRouteName={isHero ? "hero/index" : "index"}
@@ -73,5 +97,6 @@ export default function AppLayout() {
       <Tabs.Screen name="hero-register" options={{ href: null }} />
       <Tabs.Screen name="categories" options={{ href: null }} />
     </Tabs>
+    </View>
   </HeroLocationService>;
 }

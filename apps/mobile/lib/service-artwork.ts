@@ -31,7 +31,7 @@ const ARTWORK: Record<string, ImageSourcePropType> = {
 const CATEGORY_ARTWORK: Record<string, ImageSourcePropType> = {
   plumbing: ARTWORK["tirkha-plumber.webp"],
   electrical: ARTWORK["tirkha-electrician.webp"],
-  "home-cleaning": ARTWORK["tirkha-tank-care.webp"],
+  "home-cleaning": ARTWORK["tirkha-home-care.webp"],
   "appliance-repair": ARTWORK["tirkha-service-inverter-utility-room.webp"],
   painting: ARTWORK["tirkha-hero-team.webp"],
   carpentry: ARTWORK["tirkha-carpenter.webp"],
@@ -43,7 +43,40 @@ const CATEGORY_ARTWORK: Record<string, ImageSourcePropType> = {
   events: ARTWORK["tirkha-decorator.webp"],
 };
 
+const SERVICE_ARTWORK: Record<string, ImageSourcePropType> = {
+  "tap-faucet-leakage-repair": ARTWORK["tirkha-service-tap-leak.webp"],
+  "tap-leak-repair": ARTWORK["tirkha-service-tap-leak.webp"],
+  "pipe-fitting-repair": ARTWORK["tirkha-service-pipe-fitting.webp"],
+  "tap-installation": ARTWORK["tirkha-service-tap-installation.webp"],
+  "waste-pipe-drainage-clearing": ARTWORK["tirkha-service-drain-clearing.webp"],
+  "drain-clearing": ARTWORK["tirkha-service-drain-clearing.webp"],
+  "water-motor-sump-pump-fitting": ARTWORK["tirkha-service-sump-pump.webp"],
+  "sump-pump-fitting": ARTWORK["tirkha-service-sump-pump.webp"],
+  "electrical-safety-inspection-mcb-diagnosis": ARTWORK["tirkha-service-electrical-inspection.webp"],
+  "mcb-diagnosis": ARTWORK["tirkha-service-mcb-alcove.webp"],
+  "inverter-setup": ARTWORK["tirkha-service-inverter-utility-room.webp"],
+  "deep-home-cleaning": ARTWORK["tirkha-home-care.webp"],
+  "sofa-carpet-shampooing": ARTWORK["tirkha-service-sofa-cleaning.webp"],
+  "water-tank-reservoir-cleaning": ARTWORK["tirkha-tank-care.webp"],
+  "doctor-consultation-at-home": ARTWORK["tirkha-home-doctor.webp"],
+  "home-nurse-elderly-care": ARTWORK["tirkha-service-home-nurse.webp"],
+  "at-home-physiotherapy": ARTWORK["tirkha-service-physiotherapy.webp"],
+  "home-tutoring-session": ARTWORK["tirkha-tutor.webp"],
+  "home-decoration-consultation": ARTWORK["tirkha-decorator.webp"],
+};
+
 export function getServiceArtwork(imagePath?: string | null, categorySlug?: string): ImageSourcePropType {
-  const filename = imagePath?.split("/").pop();
-  return (filename && ARTWORK[filename]) || (categorySlug && CATEGORY_ARTWORK[categorySlug]) || ARTWORK["tirkha-hero-team.webp"];
+  const cleanPath = imagePath?.split(/[?#]/, 1)[0];
+  const filename = cleanPath?.split("/").pop();
+  const normalizedName = (filename ?? cleanPath ?? "")
+    .replace(/\.[^.]+$/, "")
+    .toLowerCase()
+    .replace(/^tirkha-service-/, "")
+    .replace(/^tirkha-/, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return (filename && ARTWORK[filename])
+    || SERVICE_ARTWORK[normalizedName]
+    || (categorySlug && CATEGORY_ARTWORK[categorySlug])
+    || ARTWORK["tirkha-hero-team.webp"];
 }

@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "653f131b-22cd-49c6-8f2f-d266a38b4ace"
+      }
+    },
+    "android": {
+      "package": "com.rasikupreti09.tirkha"
+    }
+  }
+}
