@@ -26,6 +26,13 @@ const SERVICE_REGION_VIEWPORTS: Record<string, readonly [number, number, number,
   jhapa: [26.30, 87.55, 26.75, 88.20],
 };
 
+function isWithinRegionBounds(latitude: number, longitude: number, bounds: readonly [number, number, number, number]): boolean {
+  const [south, west, north, east] = bounds;
+  return Number.isFinite(latitude) && Number.isFinite(longitude)
+    && latitude >= south && latitude <= north
+    && longitude >= west && longitude <= east;
+}
+
 function canonicalMapRegion(value: string): string {
   const key = value.trim().toLocaleLowerCase();
   if (key.includes("jhapa")) return "Jhapa District";
@@ -53,6 +60,28 @@ export function LocationPicker({ value, onChange, disabled = false, region = "Ka
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
   useEffect(() => { setLatitude(value ? String(value.latitude) : ""); setLongitude(value ? String(value.longitude) : ""); setInputError(""); }, [value?.latitude, value?.longitude]);
+  useEffect(() => {
+    if (value && !isWithinRegionBounds(value.latitude, value.longitude, viewportBounds)) {
+      onChange(null);
+      setLocationError(`The selected pin is outside ${mapRegion}. Choose a point inside the selected service area.`);
+    }
+  }, [mapRegion, onChange, value?.latitude, value?.longitude, viewportBounds]);
+  function pickWithinRegion(pin: MapPin | null) {
+    if (!pin) {
+      lookup.pick(null);
+      return;
+    }
+    if (!isWithinRegionBounds(pin.latitude, pin.longitude, viewportBounds)) {
+      setLocationError(`That point is outside ${mapRegion}. Choose a point inside the selected service area.`);
+      lookup.pick(null);
+      return;
+    }
+    setLocationError("");
+    lookup.pick(pin);
+  }
+  function handleMapPick(point: { latitude: number; longitude: number }) {
+    pickWithinRegion(point);
+  }
   const button = "my-2 min-h-12 justify-center rounded-md border border-border bg-card p-3";
   async function useCurrentLocation() {
     if (disabled || locating) return;
@@ -70,7 +99,14 @@ export function LocationPicker({ value, onChange, disabled = false, region = "Ka
         return;
       }
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      lookup.pick({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+      const point = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+      if (!isWithinRegionBounds(point.latitude, point.longitude, viewportBounds)) {
+        lookup.pick(null);
+        setLocationError(`Your current location is outside ${mapRegion}. Choose a point inside the selected service area.`);
+        return;
+      }
+      setLocationError("");
+      lookup.pick(point);
       setLatitude(String(position.coords.latitude));
       setLongitude(String(position.coords.longitude));
     } catch (error) {
@@ -85,7 +121,7 @@ export function LocationPicker({ value, onChange, disabled = false, region = "Ka
       <Text className="text-center font-semibold text-white">{locating ? "Finding your location…" : "◎  Use my current location"}</Text>
     </Pressable>
     <View className="w-full overflow-hidden rounded-lg border border-border" style={{ height: 420 }} accessibilityLabel={`Map focused on ${mapRegion}; viewport extent ${viewportBounds.join(", ")}`}>
-      <LocationMap value={value} onPick={lookup.pick} disabled={disabled} region={mapRegion} />
+      <LocationMap value={value} onPick={handleMapPick} disabled={disabled} region={mapRegion} />
     </View>
     <Pressable accessibilityRole="button" onPress={() => setShowCoordinates(!showCoordinates)} className={button}><Text className="text-foreground">{showCoordinates ? "Hide coordinate entry" : "Enter coordinates manually"}</Text></Pressable>
     {showCoordinates && <View className="gap-2">
@@ -94,7 +130,12 @@ export function LocationPicker({ value, onChange, disabled = false, region = "Ka
       <Pressable accessibilityRole="button" disabled={disabled} className={button} onPress={() => {
         const parsed = coordinatesSchema.safeParse({ latitude: Number(latitude), longitude: Number(longitude) });
         if (!latitude.trim() || !longitude.trim() || !parsed.success) { setInputError("Enter latitude −90 to 90 and longitude −180 to 180."); return; }
-        setInputError(""); lookup.pick(parsed.data);
+        if (!isWithinRegionBounds(parsed.data.latitude, parsed.data.longitude, viewportBounds)) {
+          setInputError(`Coordinates must be inside ${mapRegion}.`);
+          lookup.pick(null);
+          return;
+        }
+        setInputError(""); setLocationError(""); lookup.pick(parsed.data);
       }}><Text className="text-foreground">Place pin at coordinates</Text></Pressable>
     </View>}
     <Pressable accessibilityRole="button" accessibilityState={{ disabled: !value || lookup.busy || disabled }} disabled={!value || lookup.busy || disabled} onPress={() => void lookup.resolve()} className={button}><Text className="text-foreground">{lookup.busy ? "Resolving area…" : "Resolve area"}</Text></Pressable>

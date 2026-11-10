@@ -1,9 +1,62 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import * as MapLibreGL from "@maplibre/maplibre-react-native";
 import type { CameraRef, MapProps, ViewAnnotationEvent } from "@maplibre/maplibre-react-native";
 import * as Location from "expo-location";
 import { KATHMANDU_CENTER, TIRKHA_MAP_STYLE_URL, tokens, type Coordinates, type MapPin } from "@tirkha/shared";
+import * as regionBoundsModule from "../lib/service-region-bounds";
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+
+type RegionBounds = { north: number; south: number; east: number; west: number };
+
+function normalizeRegionBounds(value: unknown): RegionBounds | null {
+  if (Array.isArray(value) && value.length >= 4) {
+    const [south, west, north, east] = value.map(Number);
+    return [south, west, north, east].every(Number.isFinite) ? { north, south, east, west } : null;
+  }
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, unknown>;
+  const ne = (item.neBound ?? item.northEast ?? item.ne) as Record<string, unknown> | number[] | undefined;
+  const sw = (item.swBound ?? item.southWest ?? item.sw) as Record<string, unknown> | number[] | undefined;
+  const number = (v: unknown) => Number(v);
+  const north = number(item.north ?? item.maxLat ?? (Array.isArray(ne) ? ne[1] : ne?.latitude ?? ne?.lat));
+  const east = number(item.east ?? item.maxLng ?? (Array.isArray(ne) ? ne[0] : ne?.longitude ?? ne?.lng));
+  const south = number(item.south ?? item.minLat ?? (Array.isArray(sw) ? sw[1] : sw?.latitude ?? sw?.lat));
+  const west = number(item.west ?? item.minLng ?? (Array.isArray(sw) ? sw[0] : sw?.longitude ?? sw?.lng));
+  return [north, south, east, west].every(Number.isFinite) ? { north, south, east, west } : null;
+}
+
+function getRegionBounds(region: string): RegionBounds | null {
+  const api = regionBoundsModule as unknown as Record<string, unknown>;
+  for (const name of ["getServiceRegionBounds", "getRegionBounds", "getBoundsForRegion"]) {
+    const getter = api[name];
+    if (typeof getter === "function") {
+      try {
+        const bounds = normalizeRegionBounds((getter as (key: string) => unknown)(region));
+        if (bounds) return bounds;
+      } catch { /* Use the exported bounds map below. */ }
+    }
+  }
+  const map = (api.SERVICE_REGION_BOUNDS ?? api.serviceRegionBounds ?? api.REGION_BOUNDS ?? api.regionBounds) as Record<string, unknown> | undefined;
+  return normalizeRegionBounds(map?.[region] ?? map?.[region.toLowerCase().replaceAll(" ", "-")]);
+}
+
+function isWithinRegion(point: Coordinates, region: string, bounds: RegionBounds | null): boolean {
+  const api = regionBoundsModule as unknown as Record<string, unknown>;
+  if (typeof api.isWithinRegionBounds === "function") {
+    try {
+      return Boolean((api.isWithinRegionBounds as (key: string, latitude: number, longitude: number) => boolean)(region, point.latitude, point.longitude));
+    } catch { return false; }
+  }
+  return Boolean(bounds && point.latitude >= bounds.south && point.latitude <= bounds.north && point.longitude >= bounds.west && point.longitude <= bounds.east);
+}
+
+function regionContainsCoordinates(
+  point: Coordinates | null | undefined,
+  region: string,
+  bounds: RegionBounds | null,
+): point is Coordinates {
+  return Boolean(point && isWithinRegion(point, region, bounds));
+}
 
 const regionCenters: Record<string, Coordinates> = {
   "Kathmandu Valley": KATHMANDU_CENTER,
@@ -48,21 +101,55 @@ export default function LocationMap({
   const [currentLocation, setCurrentLocation] = useState<Coordinates | null>(null);
   const [locating, setLocating] = useState(false);
   const regionCenter = regionCenters[region] ?? KATHMANDU_CENTER;
-  const center = value ?? regionCenter;
+  const regionBounds = getRegionBounds(region);
+  const selectedLocation = regionContainsCoordinates(value, region, regionBounds) ? value : null;
+  const visibleCurrentLocation = regionContainsCoordinates(currentLocation, region, regionBounds) ? currentLocation : null;
+  const center = selectedLocation ?? regionCenter;
   const centerCoordinate = useMemo<[number, number]>(
     () => [center.longitude, center.latitude],
     [center.longitude, center.latitude],
   );
+  const cameraBoundsProps = useMemo(() => {
+    if (!regionBounds) return {};
+    const bounds = {
+      neBound: [regionBounds.east, regionBounds.north] as [number, number],
+      swBound: [regionBounds.west, regionBounds.south] as [number, number],
+    };
+    return { bounds, maxBounds: bounds } as unknown as ComponentProps<typeof MapLibreGL.Camera>;
+  }, [regionBounds]);
 
   useEffect(() => {
-    if (mapReady) camera.current?.flyTo({ center: centerCoordinate, duration: 350, easing: "ease" });
-  }, [centerCoordinate, mapReady, region]);
+    if (!regionContainsCoordinates(currentLocation, region, regionBounds)) setCurrentLocation(null);
+    if (!mapReady) return;
+    const boundedCamera = camera.current as (CameraRef & {
+      fitBounds?: (ne: [number, number], sw: [number, number], padding?: number, duration?: number) => void;
+    }) | null;
+    if (regionBounds && boundedCamera?.fitBounds) {
+      boundedCamera.fitBounds(
+        [regionBounds.east, regionBounds.north],
+        [regionBounds.west, regionBounds.south],
+        28,
+        350,
+      );
+      return;
+    }
+    camera.current?.flyTo({ center: centerCoordinate, duration: 350, easing: "ease" });
+  }, [centerCoordinate, currentLocation, mapReady, region, regionBounds]);
+
+  const pickWithinRegion = useCallback((point: Coordinates | null) => {
+    if (disabled) return;
+    if (!point || !regionContainsCoordinates(point, region, regionBounds)) {
+      Alert.alert("Outside selected service area", `Choose a location inside ${region}.`);
+      return;
+    }
+    onPick(point);
+  }, [disabled, onPick, region, regionBounds]);
 
   const handleMapPress = useCallback((event: MapPressEvent) => {
     if (disabled) return;
     const point = toCoordinates(event);
-    if (point) onPick(point);
-  }, [disabled, onPick]);
+    if (point) pickWithinRegion(point);
+  }, [disabled, pickWithinRegion]);
 
   const centerOnMyLocation = useCallback(async () => {
     if (locating) return;
@@ -78,6 +165,11 @@ export default function LocationMap({
       if (!Number.isFinite(point.latitude) || !Number.isFinite(point.longitude)) {
         throw new Error("The device returned an invalid location.");
       }
+      if (!regionContainsCoordinates(point, region, regionBounds)) {
+        setCurrentLocation(null);
+        Alert.alert("Outside selected service area", `Your current location is outside ${region}. Choose a location inside the selected service area.`);
+        return;
+      }
       setCurrentLocation(point);
       camera.current?.flyTo({ center: [point.longitude, point.latitude], duration: 500, easing: "ease" });
     } catch {
@@ -85,11 +177,12 @@ export default function LocationMap({
     } finally {
       setLocating(false);
     }
-  }, [locating]);
+  }, [locating, region, regionBounds]);
 
   return (
     <View accessibilityLabel="Service location map. Tap to place the pin." style={{ width: "100%", height: 300, overflow: "hidden", backgroundColor: "#e8efeb" }}>
       <MapLibreGL.Map
+        {...(regionBounds ? ({ maxBounds: cameraBoundsProps.maxBounds } as unknown as Partial<MapProps>) : {})}
         mapStyle={TIRKHA_MAP_STYLE_URL}
         style={{ width: "100%", height: 300 }}
         androidView="texture"
@@ -110,13 +203,14 @@ export default function LocationMap({
       >
         <MapLibreGL.Camera
           ref={camera}
+          {...cameraBoundsProps}
           initialViewState={{ center: centerCoordinate, zoom: 13.5 }}
           minZoom={5}
           maxZoom={20}
         />
-        {currentLocation && (
+        {visibleCurrentLocation && (
           <MapLibreGL.ViewAnnotation
-            lngLat={[currentLocation.longitude, currentLocation.latitude]}
+            lngLat={[visibleCurrentLocation.longitude, visibleCurrentLocation.latitude]}
             anchor="center"
           >
             <View accessible accessibilityLabel="Your current GPS location" style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(37,99,235,0.18)", alignItems: "center", justifyContent: "center" }}>
@@ -124,15 +218,15 @@ export default function LocationMap({
             </View>
           </MapLibreGL.ViewAnnotation>
         )}
-        {value && (
+        {selectedLocation && (
           <MapLibreGL.ViewAnnotation
-            lngLat={[value.longitude, value.latitude]}
+            lngLat={[selectedLocation.longitude, selectedLocation.latitude]}
             anchor="bottom"
             draggable={!disabled}
             onDragEnd={(event: { nativeEvent: ViewAnnotationEvent }) => {
               if (disabled) return;
               const point = toCoordinates(event);
-              if (point) onPick(point);
+              if (point) pickWithinRegion(point);
             }}
           >
             <View accessible accessibilityLabel="Selected service location" style={{ alignItems: "center", justifyContent: "center", width: 34, height: 42 }}>
